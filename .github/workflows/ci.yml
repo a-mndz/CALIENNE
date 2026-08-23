@@ -53,7 +53,9 @@ jobs:
         # requirements.txt (uv pip compile). Installing it makes CI
         # reproducible; regenerate with:
         #   uv pip compile requirements.txt -o requirements.lock --generate-hashes
-        run: pip install -r requirements.lock -r requirements-dev.txt
+        run: |
+          pip install -r requirements.lock
+          pip install -r requirements-dev.txt
       - name: Ruff
         run: python -m ruff check .
       - name: Golden-set + corpus integrity (G5)
@@ -95,6 +97,8 @@ jobs:
           python-version: "3.11"
           cache: pip
       - name: Install dependencies
-        run: pip install -r requirements.lock -r requirements-dev.txt
+        run: |
+          pip install -r requirements.lock
+          pip install -r requirements-dev.txt
       - name: Slow integration tests (testcontainers PostgreSQL)
         run: python -m pytest -m "slow" -q
