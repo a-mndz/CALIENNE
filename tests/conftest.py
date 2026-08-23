@@ -131,6 +131,16 @@ class StubGateway:
         **kwargs: Any,
     ) -> str:
         self.calls.append({"role": role, "prompt_len": len(prompt or "")})
+        # Simulate an instruction-following model: when the caller asks for
+        # specific JSON keys (DAG contract prompts), return exactly those
+        # keys instead of the generic canned shape.
+        if system_prompt and "exactly these keys:" in system_prompt:
+            keys_part = system_prompt.split("exactly these keys:", 1)[1].strip().rstrip(".")
+            keys = [k.strip() for k in keys_part.split(",") if k.strip()]
+            if keys:
+                import json as _json
+
+                return _json.dumps({k: f"stub {k}" for k in keys})
         return self.response_text
 
     async def close(self) -> None:

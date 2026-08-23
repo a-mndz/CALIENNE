@@ -67,6 +67,59 @@ _STOP_WORDS: frozenset[str] = frozenset(
 
 _NEGATION_MARKERS: frozenset[str] = frozenset({"no", "not", "never", "without", "none", "cannot"})
 
+# Terms excluded from support-coverage scoring: stopwords, negation markers
+# (polarity is judged separately via _contains_negation — counting "not"
+# against coverage systematically penalises contradicted claims), and pure
+# auxiliaries that carry no content.
+_COVERAGE_EXCLUDE: frozenset[str] = _STOP_WORDS | _NEGATION_MARKERS | {"does", "did"}
+
+
+def _stem_term(term: str) -> str:
+    """Naive suffix stripper with double-consonant collapse.
+
+    Good enough to align regular inflections (logging/log, emitted/emit,
+    windows/window); irregular verbs (built/build) are not handled and
+    corpus rows relying on them are worded around.
+    """
+    if len(term) <= 3:
+        return term
+    for suffix, replacement in (("ies", "y"), ("ing", ""), ("es", ""), ("ed", ""), ("s", "")):
+        if term.endswith(suffix) and not term.endswith("ss"):
+            stem = term[: -len(suffix)] + replacement
+            if len(stem) >= 3 and stem[-1] == stem[-2] and stem[-1] not in "aeiouy":
+                stem = stem[:-1]
+            return stem
+    return term
+
+
+def _coverage_terms(text: str) -> set[str]:
+    return {
+        _stem_term(token)
+        for token in re.findall(r"[A-Za-z0-9_]+", text.lower())
+        if len(token) > 2 and token not in _COVERAGE_EXCLUDE
+    }
+
+
+def support_coverage(claim_text: str, evidence_text: str) -> float:
+    """Fraction of the claim's content terms present in one evidence record.
+
+    The v2 support score building block: a measured 0-1 value, unlike the
+    v1 two-keyword-overlap rule that verified any claim sharing two words
+    with unrelated evidence (see evals/firewall_known_gaps.md, class A).
+    """
+    claim_terms = _coverage_terms(claim_text)
+    if not claim_terms:
+        return 0.0
+    return len(claim_terms & _coverage_terms(evidence_text)) / len(claim_terms)
+
+
+def score_support(claim_text: str, evidence_texts: list[str]) -> float:
+    """Best-evidence support score in [0, 1] — the public firewall v2 API."""
+    if not evidence_texts:
+        return 0.0
+    return max(support_coverage(claim_text, text) for text in evidence_texts)
+
+
 
 # ── Enums ──────────────────────────────────────────────────────────────────
 
@@ -141,6 +194,12 @@ class ClaimManager:
             re.IGNORECASE,
         ),
     ]
+
+    # v2 support gate: minimum stemmed-coverage fraction of the claim's
+    # content terms that a supporting evidence record must carry. 0.7 keeps
+    # every unambiguous verified exemplar in evals/firewall_corpus.jsonl
+    # matched while rejecting the class-A false-verified gap rows.
+    SUPPORT_COVERAGE_MIN: float = 0.7
 
     # Keywords for claim type classification.
     _LOGICAL_KEYWORDS: frozenset[str] = frozenset({
@@ -247,14 +306,27 @@ class ClaimManager:
         for record in evidence:
             record_terms = self._keyword_set(record.content)
             overlap = claim_terms & record_terms
-            if not overlap and claim.content.lower() not in record.content.lower():
+            # The substring bypass needs a claim long enough to carry meaning:
+            # ``"" in x`` is vacuously True and would verify a degenerate
+            # (empty or 1-3 char) claim against any evidence record.
+            claim_lower = claim.content.lower().strip()
+            substring_match = len(claim_lower) >= 4 and claim_lower in record.content.lower()
+            if not overlap and not substring_match:
                 continue
 
             record_numbers = self._numbers(record.content)
             if claim_numbers and not claim_numbers.issubset(record_numbers):
                 continue
 
-            if len(overlap) >= overlap_threshold or claim.content.lower() in record.content.lower():
+            # v2 support gate: keyword overlap alone verified claims whose
+            # subject the evidence never addressed (known-gaps class A).
+            # Coverage >= SUPPORT_COVERAGE_MIN or a verbatim substring
+            # containment counts as measured support.
+            coverage = support_coverage(claim.content, record.content)
+            if not substring_match and coverage < self.SUPPORT_COVERAGE_MIN:
+                continue
+
+            if len(overlap) >= overlap_threshold or substring_match:
                 matched.append((len(overlap), record))
                 if claim_negated != self._contains_negation(record.content):
                     contradicted = True
@@ -276,6 +348,11 @@ class ClaimManager:
             {
                 "evidence": supporting_evidence,
                 "validation_method": "evidence_checker",
+                "support_score": (
+                    score_support(claim.content, [record.content for record in evidence])
+                    if evidence
+                    else 0.0
+                ),
             }
         )
         claim.provenance = existing_provenance

@@ -3,42 +3,34 @@
     "owner": "RFC-003",
     "reviewers": "Architecture",
     "spec": "RFC-002 §6 (max_concurrency), RFC-003 §10 (weights by task_type), RFC-005 §6 (version field)",
-    "notes": "Capability weights are 0.0-1.0 per task_type. On load failure the loader (api_gateway/capabilities.py) falls back to a neutral 0.5 (RFC-002 §5). SEED VALUES — tune against Experience DB calibration (offline, manual-PR only)."
+    "notes": "Capability weights are 0.0-1.0 per task_type. On load failure the loader (api_gateway/capabilities.py) falls back to a neutral 0.5 (RFC-002 §5). SEED VALUES — tune against Experience DB calibration (offline, manual-PR only). Live-capture refresh 2026-08-22: google/gemini-2.5-* unavailable to new keys → 3.x line (weights seeded from the 2.5-tier equivalents until calibration data exists); unli/* dropped (HTTP 401, stale key)."
   },
-  "version": "1",
+  "version": "2",
   "task_types": ["general", "coding", "research", "math", "creative"],
   "models": {
-    "google/gemini-2.5-flash": {
+    "google/gemini-3.5-flash-lite": {
       "max_concurrency": 8,
       "weights": { "general": 0.70, "coding": 0.60, "research": 0.65, "math": 0.55, "creative": 0.60 }
     },
-    "google/gemini-2.5-pro": {
+    "google/gemini-3.5-flash": {
+      "max_concurrency": 8,
+      "weights": { "general": 0.78, "coding": 0.72, "research": 0.75, "math": 0.68, "creative": 0.70 }
+    },
+    "google/gemini-3.7-flash": {
+      "max_concurrency": 8,
+      "weights": { "general": 0.80, "coding": 0.75, "research": 0.78, "math": 0.72, "creative": 0.74 }
+    },
+    "google/gemini-pro-latest": {
       "max_concurrency": 4,
       "weights": { "general": 0.85, "coding": 0.80, "research": 0.85, "math": 0.80, "creative": 0.80 }
     },
-    "github/meta-llama-3.1-70b-instruct": {
-      "max_concurrency": 4,
-      "weights": { "general": 0.70, "coding": 0.70, "research": 0.65, "math": 0.60, "creative": 0.65 }
-    },
-    "groq/llama-3.3-70b-versatile": {
+    "groq/openai/gpt-oss-120b": {
       "max_concurrency": 6,
-      "weights": { "general": 0.72, "coding": 0.70, "research": 0.68, "math": 0.62, "creative": 0.66 }
+      "weights": { "general": 0.74, "coding": 0.78, "research": 0.72, "math": 0.76, "creative": 0.68 }
     },
-    "groq/llama-3.1-8b-instant": {
+    "groq/openai/gpt-oss-20b": {
       "max_concurrency": 10,
-      "weights": { "general": 0.50, "coding": 0.40, "research": 0.42, "math": 0.38, "creative": 0.45 }
-    },
-    "unli/deepseek-chat": {
-      "max_concurrency": 4,
-      "weights": { "general": 0.72, "coding": 0.82, "research": 0.68, "math": 0.80, "creative": 0.60 }
-    },
-    "unli/gpt-4o-mini": {
-      "max_concurrency": 6,
-      "weights": { "general": 0.62, "coding": 0.60, "research": 0.60, "math": 0.55, "creative": 0.60 }
-    },
-    "unli/gpt-4o": {
-      "max_concurrency": 4,
-      "weights": { "general": 0.85, "coding": 0.82, "research": 0.83, "math": 0.80, "creative": 0.82 }
+      "weights": { "general": 0.55, "coding": 0.55, "research": 0.50, "math": 0.52, "creative": 0.50 }
     },
     "openai/gpt-4o-mini": {
       "max_concurrency": 6,
@@ -48,9 +40,13 @@
       "max_concurrency": 4,
       "weights": { "general": 0.86, "coding": 0.83, "research": 0.84, "math": 0.82, "creative": 0.84 }
     },
-    "openrouter/anthropic/claude-3.5-sonnet": {
+    "openrouter/anthropic/claude-sonnet-5": {
       "max_concurrency": 4,
-      "weights": { "general": 0.88, "coding": 0.90, "research": 0.85, "math": 0.80, "creative": 0.88 }
+      "weights": { "general": 0.90, "coding": 0.92, "research": 0.90, "math": 0.86, "creative": 0.90 }
+    },
+    "openrouter/anthropic/claude-opus-5": {
+      "max_concurrency": 4,
+      "weights": { "general": 0.93, "coding": 0.93, "research": 0.93, "math": 0.90, "creative": 0.92 }
     }
   }
 }

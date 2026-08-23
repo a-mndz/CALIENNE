@@ -202,7 +202,7 @@ export default function ModelApiStudioModal({ isOpen, onClose, models = [], onTo
                               {r.toUpperCase()}
                             </span>
                           ))}
-                          <span className="studio-latency-badge">⚡ {m.latency || "1.1s"}</span>
+                          <span className="studio-latency-badge">⚡ {m.latency || "—"}</span>
                         </div>
                       </div>
                       <div className="studio-model-actions">

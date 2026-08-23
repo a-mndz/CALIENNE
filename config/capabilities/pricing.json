@@ -3,22 +3,22 @@
     "owner": "RFC-002",
     "reviewers": "Finance + Architecture",
     "spec": "RFC-002 §5 — feeds expected_cost prediction (RFC-003 §3.6) and pricing-aware model selection.",
-    "notes": "Prices are USD per 1,000,000 tokens, split input/output. SEED ESTIMATES ONLY — VERIFY against live provider price sheets before trusting cost telemetry. FREE-tier routes (google/*, github/*, groq/*) are priced 0.0 as community/open-weight per StrategyMode.FREE.",
+    "notes": "Prices are USD per 1,000,000 tokens, split input/output. Live-capture refresh 2026-08-22 (second refresh same day): google/gemini-2.5-* removed — 'no longer available to new users' per the API on this key's first live capture; the 3.x line verified via /v1beta/models + ai.google.dev/gemini-api/docs/pricing (3.6/3.7 intro rates through 2026-12-31; gemini-pro-latest priced as 3.1 Pro). unli/* removed — HTTP 401 on every model (stale key). groq/openai/gpt-oss-* unchanged, verified console.groq.com. openrouter/anthropic/claude-* verified platform.claude.com/pricing 2026-08-21.",
     "unit": "usd_per_million_tokens"
   },
-  "version": "1",
+  "version": "3",
   "models": {
-    "google/gemini-2.5-flash":                { "input": 0.0,  "output": 0.0 },
-    "google/gemini-2.5-pro":                  { "input": 0.0,  "output": 0.0 },
-    "github/meta-llama-3.1-70b-instruct":     { "input": 0.0,  "output": 0.0 },
-    "groq/llama-3.3-70b-versatile":           { "input": 0.0,  "output": 0.0 },
-    "groq/llama-3.1-8b-instant":              { "input": 0.0,  "output": 0.0 },
-    "unli/deepseek-chat":                     { "input": 0.14, "output": 0.28 },
-    "unli/gpt-4o-mini":                       { "input": 0.15, "output": 0.60 },
-    "unli/gpt-4o":                            { "input": 2.50, "output": 10.00 },
-    "openai/gpt-4o-mini":                     { "input": 0.15, "output": 0.60 },
-    "openai/gpt-4o":                          { "input": 2.50, "output": 10.00 },
-    "openrouter/anthropic/claude-3.5-sonnet": { "input": 3.00, "output": 15.00 }
+    "google/gemini-3.5-flash-lite":          { "input": 0.30, "output": 2.50 },
+    "google/gemini-3.5-flash":               { "input": 1.50, "output": 9.00 },
+    "google/gemini-3.6-flash":               { "input": 0.75, "output": 3.75 },
+    "google/gemini-3.7-flash":               { "input": 0.75, "output": 3.75 },
+    "google/gemini-pro-latest":              { "input": 2.00, "output": 12.00 },
+    "groq/openai/gpt-oss-120b":              { "input": 0.15, "output": 0.60 },
+    "groq/openai/gpt-oss-20b":               { "input": 0.075, "output": 0.30 },
+    "openai/gpt-4o-mini":                    { "input": 0.15, "output": 0.60 },
+    "openai/gpt-4o":                         { "input": 2.50, "output": 10.00 },
+    "openrouter/anthropic/claude-sonnet-5":  { "input": 2.00, "output": 10.00 },
+    "openrouter/anthropic/claude-opus-5":    { "input": 5.00, "output": 25.00 }
   },
   "default": { "input": 1.00, "output": 3.00 }
 }

@@ -16,9 +16,9 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Coroutine, Optional
+from typing import Any, Callable, Coroutine, Dict, Optional
 
-from api_gateway.client import AsyncHTTPClient
+from api_gateway.client import AsyncHTTPClient, get_last_provider_usage
 from api_gateway.strategy import ProviderStrategy
 from core.passport import ExecutionPassport
 from core.security import (
@@ -186,8 +186,13 @@ class ProviderPool:
             self._capabilities[name] = capabilities
         logger.info("Registered provider '%s' with roles %s.", name, roles or [])
 
-    def report_success(self, provider_name: str) -> None:
-        """Reset errors, restore health, and update circuit breaker on success."""
+    def report_success(self, provider_name: str, latency_ms: Optional[float] = None) -> None:
+        """Reset errors, restore health, and update circuit breaker on success.
+
+        *latency_ms*, when provided, feeds the rolling-window mean latency
+        surfaced by ``get_health_metrics`` — without it the metric stays 0
+        forever and consumers fall back to fabricated display values.
+        """
         state = self._get_state(provider_name)
         if not state:
             return
@@ -197,7 +202,10 @@ class ProviderPool:
         state.consecutive_successes += 1
 
         # Record request outcome for metrics
-        state.request_history.append({"success": True, "timestamp": time.time()})
+        outcome: dict[str, Any] = {"success": True, "timestamp": time.time()}
+        if latency_ms is not None and latency_ms > 0:
+            outcome["latency_ms"] = latency_ms
+        state.request_history.append(outcome)
 
         if state.circuit_breaker_state is CircuitBreakerState.HALF_OPEN:
             if state.consecutive_successes >= self.CIRCUIT_BREAKER_SUCCESS_THRESHOLD:
@@ -851,6 +859,7 @@ class AsyncAPIGateway:
         system_prompt: Optional[str] = None,
         history: list[dict[str, str]] | None = None,
         passport: Optional[Any] = None,
+        max_tokens: Optional[int] = None,
     ) -> str:
         """
         Execute a prompt against the model chain for role, falling back
@@ -889,8 +898,14 @@ class AsyncAPIGateway:
                 )
 
             try:
-                response = await self._guarded_call(model, prompt, system_prompt, history)
-                pool.report_success(provider_name)
+                response = await self._guarded_call(model, prompt, system_prompt, history, max_tokens=max_tokens)
+                usage = get_last_provider_usage()
+                latency_ms = (
+                    float(usage.get("latency_s", 0.0)) * 1000.0
+                    if usage and usage.get("latency_s")
+                    else None
+                )
+                pool.report_success(provider_name, latency_ms=latency_ms)
                 logger.info(
                     "Model '%s' succeeded for role '%s' (attempt %d/%d).",
                     model,
@@ -919,7 +934,7 @@ class AsyncAPIGateway:
 
         raise AllModelsExhaustedError(role=role, chain=chain, errors=errors)
 
-    async def _guarded_call(self, model: str, prompt: str, system_prompt: Optional[str] = None, history: list[dict[str, str]] | None = None) -> str:  # noqa: E501
+    async def _guarded_call(self, model: str, prompt: str, system_prompt: Optional[str] = None, history: list[dict[str, str]] | None = None, max_tokens: Optional[int] = None) -> str:  # noqa: E501
         """
         Execute a single call using retry-with-backoff, semaphore, and jitter.
         """
@@ -954,7 +969,7 @@ class AsyncAPIGateway:
                     if self._call_fn:
                         response = await self._call_fn(model, prompt, system_prompt, history)
                     else:
-                        response = await self._client.post_request(model, prompt, system_prompt, history)
+                        response = await self._client.post_request(model, prompt, system_prompt, history, max_tokens=max_tokens)
 
                     elapsed = time.monotonic() - start
                     logger.debug("Model '%s' responded in %.2fs.", model, elapsed)

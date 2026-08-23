@@ -12,6 +12,8 @@ extend-exclude = [
     "__pycache__",
     "node_modules",
     ".ua",
+    # Local research scratch space — untracked, never present in CI.
+    ".research_tmp",
 ]
 
 [lint]

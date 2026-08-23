@@ -719,3 +719,63 @@ async def test_execution_manager_prediction_dashboard_metrics_match_prediction_t
     telemetry = result["prediction_telemetry"]
     assert telemetry is not None
     assert metrics["prediction.tokens.actual"] == telemetry["prediction.tokens.actual"]
+
+
+# ── Honest contract-field population (research Tier 0.2, fixed 2026-08-22) ─
+
+
+class TestPopulateContractFields:
+    """Every declared field used to receive the same response string — a
+    contract layer certifying fabricated content. Now only fields the model
+    actually produced are populated."""
+
+    def test_single_field_contract_gets_normalized_text(self) -> None:
+        from orchestrator.execution_manager import populate_contract_fields
+
+        out = populate_contract_fields('{"answer": "hi"}', "hi", ["answer"])
+        assert out == {"answer": "hi"}
+
+    def test_multi_field_structured_response_populates_real_fields(self) -> None:
+        from orchestrator.execution_manager import populate_contract_fields
+
+        raw = '{"answer": "ship it", "reasoning": "tests pass"}'
+        out = populate_contract_fields(raw, "ship it", ["answer", "reasoning"])
+        assert out == {"answer": "ship it", "reasoning": "tests pass"}
+
+    def test_multi_field_partial_response_leaves_missing_fields_out(self) -> None:
+        from orchestrator.execution_manager import populate_contract_fields
+
+        raw = '{"answer": "ship it"}'
+        out = populate_contract_fields(raw, "ship it", ["answer", "reasoning"])
+        assert out == {"answer": "ship it"}  # "reasoning" NOT fabricated
+
+    def test_unstructured_multi_field_emits_one_field_only(self) -> None:
+        from orchestrator.execution_manager import populate_contract_fields
+
+        out = populate_contract_fields("plain text answer", "plain text answer", ["a", "b", "c"])
+        assert out == {"a": "plain text answer"}  # b, c left for violations
+
+    @pytest.mark.asyncio
+    async def test_dag_multi_field_violation_is_raised_not_certified(
+        stub_strategy, stub_pool
+    ) -> None:
+        """A node declaring fields the model did not produce must fail its
+        contract, not pass with fabricated copies (validate_outputs sees the
+        missing fields and the node raises)."""
+        from orchestrator.contracts import OutputContract
+        from orchestrator.execution_manager import populate_contract_fields
+
+        contract = OutputContract(
+            produced_fields=["answer", "reasoning"], types={"answer": "string", "reasoning": "string"}
+        )
+
+        class _Node:
+            task_id = "n1"
+            output_contract = contract
+
+        from orchestrator.contracts import validate_outputs
+
+        produced = populate_contract_fields('{"answer": "x"}', "x", contract.produced_fields)
+        violations = validate_outputs(_Node(), produced)
+        assert [v.kind for v in violations] == ["missing_output"]
+        assert violations[0].field == "reasoning"

@@ -107,21 +107,33 @@ _PHONE_RE = re.compile(r"\+\d[\d\s-]{6,18}\d|\b\d{3}[\s-]\d{3}[\s-]\d{4}\b")
 # Long digit runs (card / account numbers).  Applied BEFORE the phone
 # rule so a 12+ digit run is captured as a NUMBER, not eaten by PHONE.
 _LONG_DIGITS_RE = re.compile(r"\b\d{12,}\b")
+# Credential-shaped strings: bearer tokens, JWTs, and the common API-key
+# prefixes handled by core.config.LEAKED_KEY_PREFIXES.  Replays that capture
+# these verbatim would write live secrets into the trace store.
+_BEARER_RE = re.compile(r"(?i)bearer\s+[A-Za-z0-9._~+/-]{8,}={0,2}")
+_JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")
+_API_KEY_RE = re.compile(
+    r"\b(?:sk-or-v1-|sk-proj-|sk-ant-|sk-[A-Za-z0-9]{20,}|nvapi-|gsk_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AQ\.Ab8[A-Za-z0-9._-]{10,})[A-Za-z0-9._-]*"
+)
 
 
 def redact_pii(text: str) -> str:
     """Best-effort deterministic PII scrub applied before storage (guide 20a).
 
-    Redaction order is deliberate: emails → long digit runs → phone-like
-    sequences.  Applying long-digits before phone keeps a 12+ digit card
-    number from being consumed by a greedy phone match.  Never raises;
+    Redaction order is deliberate: credentials first (so a JWT embedded in a
+    longer bearer header is consumed whole), then emails → long digit runs →
+    phone-like sequences.  Applying long-digits before phone keeps a 12+ digit
+    card number from being consumed by a greedy phone match.  Never raises;
     on any unexpected input it returns the original string (ADR-007).
     """
 
     if not isinstance(text, str) or not text:
         return text
     try:
-        scrubbed = _EMAIL_RE.sub("[REDACTED_EMAIL]", text)
+        scrubbed = _BEARER_RE.sub("[REDACTED_TOKEN]", text)
+        scrubbed = _JWT_RE.sub("[REDACTED_TOKEN]", scrubbed)
+        scrubbed = _API_KEY_RE.sub("[REDACTED_KEY]", scrubbed)
+        scrubbed = _EMAIL_RE.sub("[REDACTED_EMAIL]", scrubbed)
         scrubbed = _LONG_DIGITS_RE.sub("[REDACTED_NUMBER]", scrubbed)
         scrubbed = _PHONE_RE.sub("[REDACTED_PHONE]", scrubbed)
         return scrubbed

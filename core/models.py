@@ -74,6 +74,11 @@ class ConversationSessionRecord(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
+    # 004: last save activity — the conversations list orders by this so a
+    # re-saved session floats to the top instead of showing creation time.
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     messages: Mapped[list["ConversationMessageRecord"]] = relationship(

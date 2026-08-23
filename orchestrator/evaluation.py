@@ -21,6 +21,23 @@ from core.schemas import aetherisOutput
 logger = logging.getLogger("aetheris.Orchestrator.Evaluation")
 
 
+def _delimit_safe(value: str) -> str:
+    """JSON-encode untrusted text for embedding in a delimited prompt section.
+
+    ``json.dumps`` escapes quotes and backslashes but leaves ``<``, ``>``, and
+    ``&`` literal, so text containing e.g. ``</user_query>`` would close the
+    delimited section and inject instructions into the judge prompt. Escaping
+    them as JSON unicode escapes keeps the value decodable while guaranteeing
+    the closing delimiter can never appear in the untrusted span.
+    """
+    return (
+        json.dumps(value)
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+    )
+
+
 async def arbitrate_and_synthesize(
     query: str,
     answer_a: str,
@@ -53,14 +70,14 @@ async def arbitrate_and_synthesize(
     lessons:
         Historical loop-failure lessons to inject.
     """
-    # Escape user-controlled content to prevent prompt injection.
-    # json.dumps wraps values in quotes and escapes special characters,
-    # making it structurally impossible for user input to break out of
-    # the delimited sections.
-    safe_query = json.dumps(query)
-    safe_answer_a = json.dumps(answer_a)
-    safe_answer_b = json.dumps(answer_b)
-    safe_lessons = json.dumps(lessons if lessons else "None. This is the primary loop execution.")
+    # JSON-encode untrusted content and escape the delimiter-significant
+    # characters json.dumps leaves literal (< > &) so user input cannot
+    # close the <user_query>/<logician_argument>/... sections and inject
+    # judge instructions. See _delimit_safe.
+    safe_query = _delimit_safe(query)
+    safe_answer_a = _delimit_safe(answer_a)
+    safe_answer_b = _delimit_safe(answer_b)
+    safe_lessons = _delimit_safe(lessons if lessons else "None. This is the primary loop execution.")
 
     evaluation_prompt = f"""\
 You are the Senior Synthesizer Arbiter. Your task is to evaluate two competing reasoning
@@ -102,6 +119,10 @@ Output strictly in raw JSON following the aetherisOutput schema layout:
     logger.info("Calling Synthesizer validation judge...")
     system_prompt = assemble_synthesizer_prompt(strategy.mode.value)
 
+    # The judge synthesizes two full answers into one: the 4096-token default
+    # truncated live responses mid-JSON, losing final_answer (which models
+    # emit last, after their reasoning_steps) — found on the first live
+    # capture, 2026-08-22.
     raw_judge_output = await gateway.execute_with_fallback(
         prompt=evaluation_prompt,
         system_prompt=system_prompt,
@@ -109,6 +130,7 @@ Output strictly in raw JSON following the aetherisOutput schema layout:
         strategy=strategy,
         pool=pool,
         history=history,
+        max_tokens=8192,
     )
 
     return parse_and_repair(raw_judge_output, aetherisOutput)

@@ -47,8 +47,18 @@ class AgentOutput(AetherisBaseModel):
                         data["confidence"] = mapping.get(level.lower().strip(), 0.5)
                     else:
                         data["confidence"] = 0.5
+                elif isinstance(conf, str):
+                    # Live models emit plain-string levels ("Low") as often as
+                    # the dict form; coerce both (audit 2026-08-22 capture).
+                    mapping = {"high": 0.9, "medium": 0.5, "low": 0.2}
+                    data["confidence"] = mapping.get(conf.lower().strip(), 0.5)
 
             # 2. Resolve 'answer'
+            # A present-but-null answer (a live model's honest "I have no
+            # answer") must fall through to the substitution below instead of
+            # failing strict string validation.
+            if data.get("answer") is None:
+                data.pop("answer", None)
             if "answer" not in data:
                 potential_answers = [
                     "summary",

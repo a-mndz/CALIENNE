@@ -104,21 +104,34 @@ def load_prompt_file_with_validation(filepath: str) -> str:
 
 def load_runtime_contracts(prompts_dir: Optional[str] = None) -> list:
     """
-    Load all runtime contract XML files from prompts/runtime/ directory.
-    Files are sorted by numeric prefix (00-11).
+    Load the runtime contract XML files from prompts/runtime/ that shape a
+    single completion call's OUTPUT, sorted by numeric prefix.
 
     HIGH-018 audit finding: 48 file I/O ops per request (20-80ms).  This
     function memoises its result so subsequent calls within the same process
     cost a dictionary lookup.  An optional ``clear_prompt_cache`` helper is
     exposed for SIGHUP / tests that need to wipe state.
 
-    Args:
-        prompts_dir: Optional base prompts directory path. If None, uses default.
-
-    Returns:
-        List of validated XML content strings
+    Live-capture finding (2026-08-22): shipping all 12 contracts put every
+    request body at ~30KB, which Groq hard-rejects (HTTP 413) — so the
+    per-call layer is restricted to the contracts a completion call can
+    actually act on. The pipeline-mechanics contracts (prompt loader,
+    context manager, execution/pipeline state, memory manager, stream
+    transport, provider behaviour) describe orchestration the model cannot
+    affect from inside one completion; they remain in prompts/runtime/ for
+    the components that consume them directly.
     """
     return list(_load_runtime_contracts_cached(prompts_dir))
+
+
+# Output-shaping contracts included in every per-call system prompt.
+PER_CALL_RUNTIME_CONTRACTS: frozenset[str] = frozenset(
+    {
+        "02_response_contract.xml",   # JSON response format
+        "05_error_handling.xml",      # failure semantics of the answer itself
+        "10_security_contract.xml",   # untrusted-input handling rules
+    }
+)
 
 
 @lru_cache(maxsize=4)
@@ -137,7 +150,9 @@ def _load_runtime_contracts_cached(prompts_dir: Optional[str]) -> tuple:
 
     try:
         xml_files = sorted(
-            f for f in os.listdir(runtime_dir) if f.endswith(".xml")
+            f
+            for f in os.listdir(runtime_dir)
+            if f.endswith(".xml") and f in PER_CALL_RUNTIME_CONTRACTS
         )
         for filename in xml_files:
             filepath = os.path.join(runtime_dir, filename)
@@ -353,7 +368,11 @@ Execution Mode
     # 3. Load agent-specific XML prompt with fallback
     agent_prompt = load_system_prompt(system_prompt_filename, prompts_dir)
 
-    # Combine all parts with double newlines
-    parts = [role_block] + runtime_prompts + [agent_prompt]
+    # Combine all parts with double newlines. Static content (runtime
+    # contracts + agent prompt) MUST precede the per-request <ROLE> block:
+    # provider prompt caches (OpenAI, Gemini implicit, DeepSeek, Groq gpt-oss)
+    # match on longest common prefix, and a volatile block first would
+    # invalidate the whole ~25k-token static prefix on every request.
+    parts = runtime_prompts + [agent_prompt, role_block]
     non_empty_parts = [p for p in parts if p.strip()]
     return "\n\n".join(non_empty_parts)

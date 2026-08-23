@@ -89,3 +89,15 @@ aetheris-ui
 docs/aetheris_architecture.md
 docs/deployment.md
 docs/PROJECT_BIBLE.md
+evals/runs/
+
+# Research scratch — sub-agent notes, asset generators, arXiv id lists.
+# Local-only by design; curated findings live in research/ (stays visible).
+.research_tmp/
+
+# Execution replay traces — runtime output written by ReplayStore
+# (redacted, but still per-request content; 30-day local retention).
+telemetry/replays/
+
+# pyenv local version pin
+.python-version

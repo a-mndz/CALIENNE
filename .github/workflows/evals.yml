@@ -1,0 +1,67 @@
+name: Evals (stochastic)
+
+# G6/G7 — live-model gates. NEVER a required check: fork PRs receive no
+# secrets, and temperature 0 is not determinism (batch-invariance is the
+# missing property; AETHERIS controls neither OpenRouter's nor Groq's batch
+# size). Runs nightly and on opt-in labels only; `continue-on-error` keeps
+# it from ever turning a PR red. See evals/README.md.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      reruns:
+        description: "Repetitions per item for the G7 noise floor"
+        default: "1"
+      limit:
+        description: "First N golden items (empty = all 50)"
+        default: ""
+  pull_request:
+    # Opt-in only: most PRs touch neither prompts nor judge code.
+    types: [labeled]
+
+jobs:
+  evals:
+    if: github.event_name != 'pull_request' || contains(github.event.label.name, 'run-evals')
+    name: Paired judge regression + noise floor
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    continue-on-error: true
+    env:
+      AETHERIS_JWT_SECRET_KEY: ci-only-not-a-real-secret-32chars-minimum
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.lock -r requirements-dev.txt
+      - name: Golden-set integrity (G5, must pass even here)
+        run: python -m evals.validate
+      - name: Capture candidate arm
+        env:
+          AETHERIS_OPENROUTER_API_KEY: ${{ secrets.AETHERIS_OPENROUTER_API_KEY }}
+          AETHERIS_GROQ_API_KEY: ${{ secrets.AETHERIS_GROQ_API_KEY }}
+          AETHERIS_GOOGLE_API_KEY: ${{ secrets.AETHERIS_GOOGLE_API_KEY }}
+          LIMIT: ${{ github.event.inputs.limit }}
+          RERUNS: ${{ github.event.inputs.reruns }}
+        run: |
+          python -m evals.capture --label candidate \
+            ${LIMIT:+--limit $LIMIT} ${RERUNS:+--reruns $RERUNS} --mode FREE
+      - name: Compare against baseline (G6) if present
+        run: |
+          if [ -f evals/runs/baseline.jsonl ]; then
+            python -m evals.mcnemar evals/runs/baseline.jsonl evals/runs/candidate.jsonl || true
+          else
+            echo "no baseline captured yet — this run becomes the baseline reference (artifact)"
+          fi
+      - name: β measurement
+        run: python -m evals.beta evals/runs/candidate.jsonl || true
+      - name: Upload run artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-runs-${{ github.run_id }}
+          path: evals/runs/
+          retention-days: 29

@@ -4,6 +4,10 @@ json-repair>=0.12.0
 httpx>=0.24.0
 python-dotenv>=1.0.0
 fastapi>=0.110.0
+# CVE-2025-54121 (starlette <0.47.2, multipart DoS). Transitive via fastapi;
+# floor pinned explicitly so no resolver can walk below it. The frozen
+# resolution lives in requirements.lock (uv pip compile, hashed).
+starlette>=0.47.2
 uvicorn[standard]>=0.27.0
 sqlalchemy>=2.0.0
 asyncpg>=0.29.0

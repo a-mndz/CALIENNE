@@ -9,7 +9,7 @@ import os
 import sys
 from typing import Any, ClassVar, Literal
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -175,6 +175,18 @@ class aetherisConfig(BaseSettings):
         description="Maximum number of /auth/* requests a single IP may issue per minute.",
     )
 
+    BREAKER_TIMEOUT_MS: int = Field(
+        default=100,
+        ge=100,
+        le=60_000,
+        validation_alias="AETHERIS_BREAKER_TIMEOUT_MS",
+        description=(
+            "Breaker gate budget in milliseconds. 100 (the default) fits "
+            "simulation mode; a live LLM round-trip needs ~5000-8000. On "
+            "expiry the gate fails open and the pipeline continues."
+        ),
+    )
+
     JWT_SECRET_KEY: str = Field(
         default="",
         validation_alias="AETHERIS_JWT_SECRET_KEY",
@@ -215,13 +227,21 @@ class aetherisConfig(BaseSettings):
 
     JWT_ALGORITHM: str = Field(
         default="HS256",
-        validation_alias="aetheris_JWT_ALGORITHM",
+        # Tier 0.6: the alias was lowercase "aetheris_*", which silently
+        # ignored the documented uppercase AETHERIS_* form. Both accepted,
+        # uppercase first.
+        validation_alias=AliasChoices(
+            "AETHERIS_JWT_ALGORITHM", "aetheris_JWT_ALGORITHM"
+        ),
         description="Algorithm used for signing JWT tokens",
     )
 
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
         default=60,
-        validation_alias="aetheris_JWT_ACCESS_TOKEN_EXPIRE_MINUTES",
+        validation_alias=AliasChoices(
+            "AETHERIS_JWT_ACCESS_TOKEN_EXPIRE_MINUTES",
+            "aetheris_JWT_ACCESS_TOKEN_EXPIRE_MINUTES",
+        ),
         description="Duration in minutes that access tokens are valid for",
     )
 

@@ -163,12 +163,29 @@ class ValidationLayer:
             notes.append(
                 f"Hallucination firewall qualified {firewall.removed_or_qualified_count} unsupported claim(s)."  # noqa: E501
             )
+        # Stage 2: the score is the measured fraction of supported claims,
+        # not a hardcoded 7.5/9.0. Zero extracted claims is vacuous support —
+        # stated in the notes rather than silently scored as perfect.
+        total_claims = len(firewall.claims)
+        unsupported_count = len(unsupported)
+        if total_claims:
+            support_ratio = (total_claims - unsupported_count) / total_claims
+        else:
+            support_ratio = 1.0
+            notes.append("No claims extracted — support score is vacuous, not measured.")
+        validation_score = round(10.0 * support_ratio, 1)
+        if unsupported_count == 0:
+            overall_confidence = "High"
+        elif support_ratio >= 0.5:
+            overall_confidence = "Medium"
+        else:
+            overall_confidence = "Low"
         output = aetherisOutput(
             final_answer=firewall.sanitized_text or final_text,
-            overall_confidence="Medium" if unsupported else "High",
+            overall_confidence=overall_confidence,
             overall_bias_risk="Medium" if unsupported else "Low",
             disagreement_notes=notes,
-            validation_score=7.5 if unsupported else 9.0,
+            validation_score=validation_score,
         )
         return output, {
             "original_text": firewall.original_text,
@@ -179,6 +196,13 @@ class ValidationLayer:
 
     @staticmethod
     def assess(task_profile: TaskProfile) -> StageAssessment:
+        """Return UNCALIBRATED PRIOR estimates for the uncertainty engine.
+
+        These lookup tables are seed priors, not measurements — nothing here
+        traces to an observation. They may bias the uncertainty engine until
+        calibrated against real outcome data (Experience DB); treat every
+        field accordingly and never surface them as telemetry.
+        """
         confidence = {"low": 0.97, "medium": 0.92, "high": 0.88, "critical": 0.82}
         calibration = {"low": 0.90, "medium": 0.86, "high": 0.82, "critical": 0.78}
         route = {

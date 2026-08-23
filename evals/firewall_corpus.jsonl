@@ -1,0 +1,66 @@
+{"claim": "The integration tests run against PostgreSQL 16.2.", "evidence": ["Integration tests run against PostgreSQL 16.2 in the CI pipeline."], "expected_status": "verified"}
+{"claim": "The API gateway timeout is 600 seconds.", "evidence": ["The gateway client uses a 600 second timeout for provider calls."], "expected_status": "verified"}
+{"claim": "The project targets Python 3.11 or newer.", "evidence": ["The project targets Python 3.11 or newer per the README badge."], "expected_status": "verified"}
+{"claim": "The pipeline has four stages: breaker, generation, judging, and synthesis.", "evidence": ["The pipeline stages are breaker, generation, judging, and synthesis."], "expected_status": "verified"}
+{"claim": "Rate limits are enforced per provider.", "evidence": ["Rate limits are enforced per provider via token buckets."], "expected_status": "verified"}
+{"claim": "The frontend build uses Vite.", "evidence": ["The frontend build uses Vite according to the package.json scripts."], "expected_status": "verified"}
+{"claim": "Metrics are exposed in Prometheus format.", "evidence": ["Metrics are exposed in Prometheus format behind an authenticated endpoint."], "expected_status": "verified"}
+{"claim": "User passwords are hashed with bcrypt.", "evidence": ["User passwords are stored hashed with bcrypt and a per-user salt."], "expected_status": "verified"}
+{"claim": "Provider keys can be loaded from the OS keyring at startup.", "evidence": ["Provider keys can be loaded from the OS keyring at startup by the bootstrap module."], "expected_status": "verified"}
+{"claim": "Conversation history is capped at 50 messages.", "evidence": ["The query request schema caps conversation history at 50 messages."], "expected_status": "verified"}
+{"claim": "The default strategy mode is HYBRID.", "evidence": ["The server bootstraps the provider strategy in HYBRID mode."], "expected_status": "verified"}
+{"claim": "Logs are emitted as JSON in production.", "evidence": ["Structured logging emits JSON in production and console text in development."], "expected_status": "verified"}
+{"claim": "The request body limit is 100 kilobytes.", "evidence": ["The middleware rejects request bodies larger than 100 kilobytes."], "expected_status": "verified"}
+{"claim": "Circuit breakers open after five consecutive failures.", "evidence": ["The circuit breaker opens after five consecutive provider failures."], "expected_status": "verified"}
+{"claim": "Migrations are managed with Alembic.", "evidence": ["Database schema migrations are managed with Alembic revision files."], "expected_status": "verified"}
+{"claim": "Conversation sessions are scoped by owner email.", "evidence": ["Conversation sessions are scoped by owner email at the row level."], "expected_status": "verified"}
+{"claim": "The golden set is stored in the evals directory.", "evidence": ["The golden dataset is stored in the evals directory; the replay store prunes traces after 30 days."], "expected_status": "verified"}
+{"claim": "Failed provider calls count toward the success rate.", "evidence": ["Failed provider calls are recorded with zero tokens and count in the success rate."], "expected_status": "verified"}
+{"claim": "Prompt caching discounts cached input by half on Groq.", "evidence": ["Groq prompt caching applies a 50 percent discount on cached input tokens."], "expected_status": "verified"}
+{"claim": "The judge prompt delimits untrusted content with escaped tags.", "evidence": ["Untrusted content in judge prompts is escaped so delimiter breakout is prevented."], "expected_status": "verified"}
+{"claim": "Usage accounting reads provider-reported token counts.", "evidence": ["Token accounting uses the usage block reported by the provider when present."], "expected_status": "verified"}
+{"claim": "The metrics endpoint requires a bearer token in production.", "evidence": ["The metrics endpoint requires a bearer token when running in production."], "expected_status": "verified"}
+{"claim": "Streaming responses use server-sent events.", "evidence": ["Streaming responses are delivered to the frontend as server-sent events."], "expected_status": "verified"}
+{"claim": "Stage exit criteria require telemetry values free of fabrication.", "evidence": ["Stage exit criteria require telemetry values free of fabrication."], "expected_status": "verified"}
+{"claim": "Revenue doubled in the third quarter.", "evidence": ["The company hired 40 engineers and opened two offices in the third quarter."], "expected_status": "unverified"}
+{"claim": "The database migration failed on Tuesday.", "evidence": ["The release train deploys on Thursdays behind a flag."], "expected_status": "unverified"}
+{"claim": "Latency improved by 40 percent after the upgrade.", "evidence": ["Latency improved by 18 percent after the upgrade was measured over one week."], "expected_status": "unverified"}
+{"claim": "The model supports 200k token context windows.", "evidence": ["The model was released with a 128k token context window."], "expected_status": "unverified"}
+{"claim": "All users preferred the new interface.", "evidence": ["The interface redesign shipped to five percent of users last month."], "expected_status": "unverified"}
+{"claim": "The outage lasted six hours.", "evidence": ["Status dashboards updated every 15 minutes and the incident was closed within two hours."], "expected_status": "unverified"}
+{"claim": "The library has zero known vulnerabilities.", "evidence": ["The security scan runs weekly and files issues for review."], "expected_status": "unverified"}
+{"claim": "Training completed in three days.", "evidence": ["Training ran for two days on eight GPUs."], "expected_status": "unverified"}
+{"claim": "The contract was signed by both parties in March.", "evidence": ["Legal review of the contract began in March."], "expected_status": "unverified"}
+{"claim": "Customer satisfaction is at an all-time high.", "evidence": ["The support queue depth varies between 20 and 60 tickets."], "expected_status": "unverified"}
+{"claim": "The API supports GraphQL.", "evidence": ["The API exposes REST endpoints with JSON responses."], "expected_status": "unverified"}
+{"claim": "Storage costs fell below budget.", "evidence": ["Storage utilization grew 12 percent quarter over quarter."], "expected_status": "unverified"}
+{"claim": "Every test passed on the first run.", "evidence": ["The suite runs 439 tests across unit and integration markers."], "expected_status": "unverified"}
+{"claim": "The team doubled in size this year.", "evidence": ["The team opened three requisitions this year."], "expected_status": "unverified"}
+{"claim": "Churn dropped after the pricing change.", "evidence": ["The pricing change launched in one region behind a staggered rollout."], "expected_status": "unverified"}
+{"claim": "The judge model agrees with human raters most of the time.", "evidence": ["Judge agreement is measured nightly and reported as a flip rate."], "expected_status": "unverified"}
+{"claim": "The cache hit rate exceeds 90 percent.", "evidence": ["Cache metrics were added to the dashboard last sprint."], "expected_status": "unverified"}
+{"claim": "Errors originate in the parser.", "evidence": ["The parser handles malformed JSON with a repair pass."], "expected_status": "unverified"}
+{"claim": "The migration is reversible.", "evidence": ["The migration adds one column with a server default value."], "expected_status": "unverified"}
+{"claim": "Support volume peaks on Mondays.", "evidence": ["Support coverage includes weekends on a rotating schedule."], "expected_status": "unverified"}
+{"claim": "The new model is cheaper to serve.", "evidence": ["The new model requires fewer GPUs per replica."], "expected_status": "unverified"}
+{"claim": "Compliance review is complete.", "evidence": ["Compliance review is scheduled after the security audit."], "expected_status": "unverified"}
+{"claim": "The service does not support streaming responses.", "evidence": ["The service supports streaming responses over server-sent events."], "expected_status": "contradicted"}
+{"claim": "Passwords are stored in plain text.", "evidence": ["Passwords are never stored in plain text; they are hashed with bcrypt."], "expected_status": "contradicted"}
+{"claim": "The rate limiter is not applied to authenticated users.", "evidence": ["The rate limiter is applied to authenticated users keyed by email."], "expected_status": "contradicted"}
+{"claim": "Circuit breakers never open automatically.", "evidence": ["Circuit breakers open automatically after five consecutive failures."], "expected_status": "contradicted"}
+{"claim": "The metrics endpoint is public.", "evidence": ["The metrics endpoint is not public; it requires a bearer token."], "expected_status": "contradicted"}
+{"claim": "Simulation mode is allowed in production.", "evidence": ["Simulation mode is refused in production and only used without keys."], "expected_status": "contradicted"}
+{"claim": "The golden set may be edited in place.", "evidence": ["The golden set must never be edited in place; versions are immutable."], "expected_status": "contradicted"}
+{"claim": "Provider latency is fabricated when unmeasured.", "evidence": ["Provider latency is not fabricated when unmeasured; the field is omitted."], "expected_status": "contradicted"}
+{"claim": "User sessions are shared across accounts.", "evidence": ["User sessions are never shared across accounts; they are scoped by owner."], "expected_status": "contradicted"}
+{"claim": "The lockfile is regenerated on every install.", "evidence": ["The lockfile is not regenerated on install; it is committed and installed directly."], "expected_status": "contradicted"}
+{"claim": "Failed calls are excluded from the success rate.", "evidence": ["Failed calls are not excluded from the success rate; they are counted."], "expected_status": "contradicted"}
+{"claim": "Judge prompts embed raw user input.", "evidence": ["Judge prompts do not embed raw user input; the content is escaped before assembly."], "expected_status": "contradicted"}
+{"claim": "The staging database runs PostgreSQL 15.4.", "evidence": ["The staging environment uses a containerized database for integration testing."], "expected_status": "unverified"}
+{"claim": "The review checklist requires two approvals.", "evidence": ["The review checklist requires two approvals before merge."], "expected_status": "verified"}
+{"claim": "The incident channel is archived after 90 days.", "evidence": ["The incident channel is archived after 90 days per the retention policy."], "expected_status": "verified"}
+{"claim": "The CLI starts in HYBRID strategy mode.", "evidence": ["The CLI starts with the HYBRID strategy mode unless configured otherwise."], "expected_status": "verified"}
+{"claim": "Backups are encrypted with per-tenant keys.", "evidence": ["Backups run nightly and verify checksums on restore."], "expected_status": "unverified"}
+{"claim": "On-call rotations span four time zones.", "evidence": ["The on-call handbook documents escalation paths and paging policy."], "expected_status": "unverified"}
+{"claim": "Load tests simulate 50 thousand concurrent users.", "evidence": ["Load tests run before each major release against a staging copy."], "expected_status": "unverified"}
+{"claim": "Test fixtures dial live provider endpoints.", "evidence": ["Test fixtures never dial live endpoints; cassettes and stubs are used instead."], "expected_status": "contradicted"}

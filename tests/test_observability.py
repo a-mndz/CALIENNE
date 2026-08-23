@@ -214,7 +214,15 @@ class TestMetricsEndpointAuth:
 
     @pytest.mark.parametrize(
         "authorization",
-        [None, "Bearer wrong-token", "Basic scrape-me-please", "scrape-me-please"],
+        [
+            None,
+            "Bearer wrong-token",
+            "Basic scrape-me-please",
+            "scrape-me-please",
+            # compare_digest on str raises TypeError for non-ASCII input —
+            # a malformed header must be a clean 401, never a 500.
+            "Bearer ñoño-pi-token",
+        ],
     )
     def test_rejects_bad_credentials(
         self, monkeypatch: pytest.MonkeyPatch, authorization: str | None

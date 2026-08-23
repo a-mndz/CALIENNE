@@ -1,8 +1,10 @@
 import asyncio
 import json
 import logging
+import time
+from contextvars import ContextVar
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 
@@ -11,6 +13,21 @@ from core.security import SecurityValidator
 from telemetry.observer import observer
 
 logger = logging.getLogger("aetheris.Gateway.Client")
+
+# Provider-reported usage for the most recent post_request in this task's
+# context. Async-safe: concurrent requests each see their own value. Set to
+# {"estimated": True, ...} when the provider returned no usage block, so
+# consumers (e.g. DAG budget accounting) can distinguish measured from
+# estimated token counts.
+_last_provider_usage: ContextVar[dict[str, Any] | None] = ContextVar(
+    "aetheris_last_provider_usage", default=None
+)
+
+
+def get_last_provider_usage() -> dict[str, Any] | None:
+    """Return the usage block reported by the provider for the last call."""
+    return _last_provider_usage.get()
+
 
 class AsyncHTTPClient:
     """
@@ -24,7 +41,7 @@ class AsyncHTTPClient:
         self.client = httpx.AsyncClient(timeout=600.0)
         self.security_validator = security_validator or SecurityValidator()
 
-    async def post_request(self, model: str, prompt: str, system_prompt: Optional[str] = None, history: list[dict[str, str]] | None = None) -> str:  # noqa: E501
+    async def post_request(self, model: str, prompt: str, system_prompt: Optional[str] = None, history: list[dict[str, str]] | None = None, max_tokens: Optional[int] = None) -> str:  # noqa: E501
         """Dispatches an asynchronous post request to target providers."""
         parts = model.split('/')
         provider = parts[0]
@@ -68,8 +85,17 @@ class AsyncHTTPClient:
         payload = {
             "model": actual_model,
             "messages": messages,
-            "temperature": 0.1
         }
+        # Without an explicit ceiling, providers apply their default output
+        # cap — which truncated live judge responses mid-JSON on the first
+        # live capture (2026-08-22), losing the tail field final_answer.
+        if max_tokens is not None:
+            payload["max_tokens"] = int(max_tokens)
+        # Claude 4.7+ (and the Claude 5 family) reject any temperature other
+        # than the default with a 400, so the low-variance value is applied
+        # only to providers that accept it.
+        if not (provider == "openrouter" and "/claude-" in actual_model):
+            payload["temperature"] = 0.1
 
         if provider not in {"nvidia", "nvidia-nim"}:
             payload["response_format"] = {"type": "json_object"}
@@ -107,8 +133,23 @@ class AsyncHTTPClient:
         else:
             raise ValueError(f"Unsupported provider prefix: {provider}")
 
+        request_start = time.monotonic()
         response = await self.client.post(url, json=payload, headers=headers)
+        latency_s = time.monotonic() - request_start
         if response.status_code != 200:
+            # Failed calls count against success rate and latency with zero
+            # tokens — omitting them made success_rate a constant 100%.
+            observer.track_usage(
+                actual_model, 0, 0, latency_s=latency_s, success=False
+            )
+            _last_provider_usage.set({
+                "model": actual_model,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "latency_s": latency_s,
+                "success": False,
+                "estimated": False,
+            })
             raise httpx.HTTPStatusError(
                 f"Provider request failed with HTTP {response.status_code}",
                 request=response.request,
@@ -117,9 +158,31 @@ class AsyncHTTPClient:
 
         data = response.json()
 
-        # Harvest telemetry statistics
-        usage = data.get("usage", {"prompt_tokens": 0, "completion_tokens": 0})
-        observer.track_usage(actual_model, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
+        # Harvest telemetry statistics. Provider-reported usage when present;
+        # a labelled estimate otherwise (never silently invented).
+        raw_usage = data.get("usage") or {}
+        prompt_tokens = int(raw_usage.get("prompt_tokens", 0) or 0)
+        completion_tokens = int(raw_usage.get("completion_tokens", 0) or 0)
+        estimated = not (prompt_tokens or completion_tokens)
+        if estimated:
+            prompt_tokens = max(1, len(prompt) // 4)
+            content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
+            completion_tokens = max(1, len(content or "") // 4)
+        observer.track_usage(
+            actual_model,
+            prompt_tokens,
+            completion_tokens,
+            latency_s=latency_s,
+            success=True,
+        )
+        _last_provider_usage.set({
+            "model": actual_model,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "latency_s": latency_s,
+            "success": True,
+            "estimated": estimated,
+        })
 
         output_content = data["choices"][0]["message"]["content"]
 
@@ -170,7 +233,9 @@ class AsyncHTTPClient:
     async def _run_simulation(self, model: str, prompt: str, system_prompt: Optional[str] = None, history: list[dict[str, str]] | None = None) -> str:  # noqa: E501
         """Generates deterministic synthetic returns to keep system operable without live bills."""
         await asyncio.sleep(0.5)
-        observer.track_usage(model, len(prompt)//4, 150)
+        # Deliberately does NOT call observer.track_usage: simulated calls
+        # fabricate tokens and success, and must never pollute the real
+        # usage/cost/success-rate accounting.
 
         # Determine role from system prompt (or fall back to merged prompt for backward compat).
         role_hint = (system_prompt or "").lower() + " " + (prompt or "").lower()

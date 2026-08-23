@@ -1,8 +1,11 @@
+// Display aliases for the live strategy routes (verified 2026-08-22; the
+// 2.5 Gemini line is unavailable to new keys and unli/* returns 401).
+// Latencies stay "—" until measured — never fabricated.
 export const INIT_MODELS = [
-  { id: "gpt4o", name: "gpt-4o", latency: "1.2s", active: true },
-  { id: "claude35", name: "claude-3.5", latency: "1.8s", active: true },
-  { id: "gemini25", name: "gemini-2.5-pro", latency: "1.3s", active: true },
-  { id: "deepseekr1", name: "deepseek-r1", latency: "0.9s", active: true },
-  { id: "llama33", name: "llama-3.3-70b", latency: "1.6s", active: true },
-  { id: "mistrall", name: "mistral-large", latency: "1.1s", active: false },
+  { id: "gpt4o", name: "gpt-4o", latency: "—", active: true },
+  { id: "claudesonnet5", name: "claude-sonnet-5", latency: "—", active: true },
+  { id: "gemini37", name: "gemini-3.7-flash", latency: "—", active: true },
+  { id: "gemini35lite", name: "gemini-3.5-flash-lite", latency: "—", active: true },
+  { id: "gptoss120", name: "gpt-oss-120b", latency: "—", active: true },
+  { id: "gptoss20", name: "gpt-oss-20b", latency: "—", active: false },
 ];

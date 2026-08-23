@@ -93,6 +93,9 @@ Get Vault Status
 
 Return secure masked status of provider API keys in vault.
 
+Admin-only like the write path: even masked key status (configured flag,
+last 4 chars) describes the server's secrets, not the caller's own data.
+
 **Responses:**
 
 - `200` Successful Response — `object`
@@ -132,6 +135,20 @@ Persist or update a conversation session and its transcript in PostgreSQL.
 
 - `200` Successful Response — `object`
 - `422` Validation Error — `HTTPValidationError`
+
+## `DELETE /api/conversations`
+
+Purge Conversations
+
+Delete every conversation owned by the current user.
+
+GDPR Art. 17 erasure path for durable memory: sessions cascade to their
+messages (ON DELETE CASCADE), and the memory-search index is a GENERATED
+column over those messages, so nothing user-authored survives this call.
+
+**Responses:**
+
+- `200` Successful Response — `object`
 
 ## `DELETE /api/conversations/{session_id}`
 
@@ -263,8 +280,8 @@ Handle Query Stream
 Stream the micro-mode pipeline as Server-Sent Events.
 
 Each event is a JSON-encoded SSE data line.  The frontend reads the
-response via ``fetch()`` + ``ReadableStream`` and updates the UI
-in real time as each pipeline stage completes.
+response via ``fetch()`` + ``ReadableStream`` and updates the UI in
+real time as each pipeline stage completes.
 
 **Request body:** `QueryRequest`
 

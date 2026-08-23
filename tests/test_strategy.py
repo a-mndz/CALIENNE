@@ -24,7 +24,7 @@ class _Plan:
 def test_get_model_chain_unchanged_for_base_roles() -> None:
     strat = ProviderStrategy("PAID")
     chain = strat.get_model_chain("generation")
-    assert chain[0] == "openrouter/anthropic/claude-3.5-sonnet"
+    assert chain[0] == "openrouter/anthropic/claude-sonnet-5"
     assert len(chain) >= 2  # primary + fallback guarantee
 
 
@@ -80,11 +80,11 @@ def test_critical_complexity_widens_chain() -> None:
 
 
 def test_coding_plan_prefers_strongest_coding_model() -> None:
-    # PAID generation chain: claude-3.5-sonnet(coding .90), gpt-4o(.83),
+    # PAID generation chain: claude-sonnet-5(coding .92), gpt-4o(.83),
     # deepseek-chat(.82) → re-rank puts claude first at 'high' depth.
     strat = ProviderStrategy("PAID")
     chain = strat.get_model_chain_for_plan(_Plan(task_type="coding", complexity="high"))
-    assert chain[0] == "openrouter/anthropic/claude-3.5-sonnet"
+    assert chain[0] == "openrouter/anthropic/claude-sonnet-5"
 
 
 def test_unknown_task_type_degrades_to_generation() -> None:

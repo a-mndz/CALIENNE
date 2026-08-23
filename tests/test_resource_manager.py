@@ -52,22 +52,21 @@ def _rm(**kw: Any) -> ResourceManager:
 
 def test_effective_parallel_bound_by_model_limit() -> None:
     rm = _rm()
-    # google provider_limit=8, gemini-2.5-pro max_concurrency=4 → model wins.
-    assert rm.effective_parallel(provider="google", model="google/gemini-2.5-pro") == 4
+    # google provider_limit=8, gemini-pro-latest max_concurrency=4 → model wins.
+    assert rm.effective_parallel(provider="google", model="google/gemini-pro-latest") == 4
 
 
 def test_effective_parallel_bound_by_provider_limit() -> None:
     rm = _rm()
-    # github provider_limit=4, llama-3.1-70b max_concurrency=4 → tie at 4.
-    # groq provider_limit=6, llama-3.1-8b-instant max_concurrency=10 → provider wins.
-    assert rm.effective_parallel(provider="groq", model="groq/llama-3.1-8b-instant") == 6
+    # groq provider_limit=6, gpt-oss-20b max_concurrency=10 → provider wins.
+    assert rm.effective_parallel(provider="groq", model="groq/openai/gpt-oss-20b") == 6
 
 
 def test_effective_parallel_bound_by_budget() -> None:
     rm = _rm()
     assert (
         rm.effective_parallel(
-            provider="google", model="google/gemini-2.5-flash", budget_parallel=2
+            provider="google", model="google/gemini-3.5-flash-lite", budget_parallel=2
         )
         == 2
     )
@@ -78,7 +77,7 @@ def test_effective_parallel_bound_by_rate_limit() -> None:
     # rate_limit.remaining is the sixth min() term; a small positive binds it.
     assert (
         rm.effective_parallel(
-            provider="google", model="google/gemini-2.5-flash", rate_limit_remaining=1
+            provider="google", model="google/gemini-3.5-flash-lite", rate_limit_remaining=1
         )
         == 1
     )
@@ -87,7 +86,7 @@ def test_effective_parallel_bound_by_rate_limit() -> None:
 def test_effective_parallel_rejects_zero_rate_limit() -> None:
     rm = _rm()
     got = rm.effective_parallel(
-        provider="google", model="google/gemini-2.5-flash", rate_limit_remaining=0
+        provider="google", model="google/gemini-3.5-flash-lite", rate_limit_remaining=0
     )
     assert got == 0
 
@@ -98,12 +97,12 @@ def test_effective_parallel_rejects_zero_rate_limit() -> None:
 def test_acquire_release_roundtrip() -> None:
     async def run() -> None:
         rm = _rm()
-        node = _Node(model="google/gemini-2.5-flash")
+        node = _Node(model="google/gemini-3.5-flash-lite")
         res = await rm.acquire(node)
         assert res.granted is True
         # provider is extract_provider_key(model) — first two path segments.
-        assert res.provider == "google/gemini-2.5-flash"
-        assert res.model == "google/gemini-2.5-flash"
+        assert res.provider == "google/gemini-3.5-flash-lite"
+        assert res.model == "google/gemini-3.5-flash-lite"
         assert rm.snapshot().concurrency_active == 1
         await rm.release(res)
         assert rm.snapshot().concurrency_active == 0
@@ -117,7 +116,7 @@ def test_acquire_rejects_when_ceiling_reached() -> None:
         rm = ResourceManager(
             cpu_parallel_ceiling=1, memory_parallel_ceiling=1, default_budget_parallel=1
         )
-        node = _Node(model="google/gemini-2.5-flash")
+        node = _Node(model="google/gemini-3.5-flash-lite")
         first = await rm.acquire(node)
         assert first.granted is True
         second = await rm.acquire(node)
@@ -161,7 +160,7 @@ def test_recompute_plan_rejects_empty_graph() -> None:
 
 
 def test_recompute_plan_ok_for_runnable_graph() -> None:
-    g = _Graph(nodes=[_Node(model="google/gemini-2.5-flash")])
+    g = _Graph(nodes=[_Node(model="google/gemini-3.5-flash-lite")])
     assert _rm().recompute_plan(g) == "ok"
 
 

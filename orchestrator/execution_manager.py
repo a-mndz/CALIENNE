@@ -13,6 +13,7 @@ import time
 import uuid
 from typing import Any
 
+from api_gateway.client import get_last_provider_usage
 from core.passport import ExecutionPassport
 from core.runtime import RuntimeContract
 from core.schemas import PipelineBudget, StrategicPlan, TaskGraph, TaskProfile
@@ -42,6 +43,7 @@ from orchestrator.skills import load_prompt_versions
 from orchestrator.strategic_planner import StrategicPlanner
 from orchestrator.uncertainty import UncertaintyDecision, UncertaintyEngine
 from orchestrator.validation_layer import ValidationLayer
+from telemetry.observer import estimate_cost_usd
 
 LOGGER = logging.getLogger(__name__)
 
@@ -105,6 +107,44 @@ _DASHBOARD_METRIC_TEMPLATE: dict[str, Any] = {
     "planner.template.fallback": None,
     "planner.fingerprint.hash": None,
 }
+
+
+def populate_contract_fields(raw: Any, normalized: str, fields: list[str]) -> dict[str, Any]:
+    """Honest population of a node's declared output fields (research Tier 0.2).
+
+    Single-field contracts: the normalized response IS the field.
+    Multi-field contracts: populate only fields the model actually produced
+    in a structured response. Declared-but-absent fields stay missing so
+    ``validate_outputs`` reports them — the previous behaviour (every
+    declared field receiving the same response string) was a contract layer
+    certifying fabricated content, which is strictly worse than no contract
+    layer at all.
+    """
+    if len(fields) <= 1:
+        return {fields[0]: normalized}
+    parsed: Any = None
+    if isinstance(raw, dict):
+        parsed = raw
+    elif isinstance(raw, str):
+        try:
+            candidate = json.loads(raw)
+        except json.JSONDecodeError:
+            candidate = None
+        if isinstance(candidate, dict):
+            parsed = candidate
+    if not parsed:
+        # No structured response to draw from: emit only the normalized text
+        # under the first field; the contract checker reports the rest missing.
+        return {fields[0]: normalized}
+    produced = {field: parsed[field] for field in fields if field in parsed}
+    if not produced:
+        # Structured but none of the declared keys (e.g. a generic
+        # {"answer": ...} against contract-specific names): the model did
+        # produce an answer — map it to the first declared field and let any
+        # remaining declared fields surface as violations rather than
+        # certifying copies.
+        return {fields[0]: normalized}
+    return produced
 
 
 class ExecutionManager:
@@ -187,6 +227,7 @@ class ExecutionManager:
         session_id: str | None = None,
         force_skills: list[str] | None = None,
         block_skills: list[str] | None = None,
+        user_id: str | None = None,
     ) -> MicroModeResult | dict[str, Any]:
         if not self._flags.dag:
             return await run_micro_mode(
@@ -203,6 +244,7 @@ class ExecutionManager:
                 conversation_director=conversation_director,
                 session_id=session_id,
                 flags=self._flags,
+                user_id=user_id,
             )
 
         execution_manifest = build_execution_manifest(
@@ -458,14 +500,23 @@ class ExecutionManager:
             passport.update_stage("completed")
         prediction_telemetry = None
         if prediction is not None:
-            token_ratio = actual_tokens / max(1.0, prediction.expected_tokens.value)
-            actual_cost = round(prediction.expected_cost.value * token_ratio, 6)
+            # Stage 2: actuals are measured, not derived from the prediction
+            # itself (the old token-ratio scaling invented agreement), and
+            # confidence comes from the firewall-derived validation score
+            # instead of a hardcoded 0.8.
+            measured_cost = sum(
+                float(result.get("measured_cost_usd", 0.0) or 0.0)
+                for result in results.values()
+                if isinstance(result, dict)
+            )
             prediction_telemetry = self._prediction_layer.record_actuals(
                 prediction,
-                actual_cost=actual_cost,
+                actual_cost=round(measured_cost, 6),
                 actual_latency_ms=(time.monotonic() - start_time) * 1000,
                 actual_tokens=actual_tokens,
-                actual_confidence=0.8,
+                actual_confidence=max(
+                    0.0, min(1.0, final_output.validation_score / 10.0)
+                ),
             )
         rag_telemetry = self._aggregate_rag_telemetry(
             results=results,
@@ -711,6 +762,7 @@ class ExecutionManager:
                 )
             try:
                 if node.task_id == "classify" and node.output_contract is not None:
+                    raw_response = task_profile.model_dump_json()
                     response_text = task_profile.model_dump_json()
                 else:
                     upstream = {
@@ -724,6 +776,15 @@ class ExecutionManager:
                         f"Upstream results:\n{json.dumps(upstream, default=str)}"
                     )
                     role = "judge" if node.task_id == "final" else "generation"
+                    # Ask for exactly the declared contract keys so a merged
+                    # node (MetaReasoner union contracts) is satisfiable by an
+                    # instruction-following model — the contract layer checks
+                    # the same keys it requests.
+                    output_keys = (
+                        ", ".join(node.output_contract.produced_fields)
+                        if node.output_contract is not None
+                        else "result, answer, or final_answer"
+                    )
                     call_kwargs = {
                         "prompt": prompt,
                         "role": role,
@@ -731,7 +792,7 @@ class ExecutionManager:
                         "pool": pool,
                         "system_prompt": (
                             "Execute only the current DAG task. Use supplied upstream results. "
-                            "Return a JSON object with one of: result, answer, or final_answer."
+                            f"Return a JSON object with exactly these keys: {output_keys}."
                         ),
                         "history": history,
                         "passport": passport,
@@ -753,14 +814,31 @@ class ExecutionManager:
             finally:
                 await resource_manager.release(reservation)
 
-            actual_tokens = max(1, len(response_text) // 4)
+            # Stage 2: token accounting uses the provider-reported usage for
+            # this call when available; the len//4 estimate is a labelled
+            # fallback for providers that return no usage block.
+            usage = get_last_provider_usage()
+            node_measured_cost = 0.0
+            if usage and not usage.get("estimated"):
+                actual_tokens = max(
+                    1,
+                    int(usage.get("prompt_tokens", 0))
+                    + int(usage.get("completion_tokens", 0)),
+                )
+                node_measured_cost = estimate_cost_usd(
+                    str(usage.get("model", "")),
+                    int(usage.get("prompt_tokens", 0)),
+                    int(usage.get("completion_tokens", 0)),
+                )
+            else:
+                actual_tokens = max(1, len(response_text) // 4)
             async with budget_lock:
                 reserved_tokens += actual_tokens - expected_tokens
                 if reserved_tokens > budget.total_tokens:
                     raise RuntimeError(f"Node {node.task_id} exhausted token budget")
 
             fields = node.output_contract.produced_fields if node.output_contract else ["result"]
-            produced_outputs = {field: response_text for field in fields}
+            produced_outputs = populate_contract_fields(raw_response, response_text, fields)
             output_violations = validate_outputs(node, produced_outputs)
             if output_violations:
                 fields = ", ".join(violation.field for violation in output_violations)
@@ -783,6 +861,7 @@ class ExecutionManager:
                 "produced_outputs": produced_outputs,
                 "contract_violations": [],
                 "actual_tokens": actual_tokens,
+                "measured_cost_usd": round(node_measured_cost, 6),
                 **produced_outputs,
             }
 

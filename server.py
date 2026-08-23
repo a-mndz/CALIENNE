@@ -53,6 +53,7 @@ from orchestrator import metrics
 from orchestrator.aetheris_orchestrator import create_request_passport, initialize_aetheris_components
 from orchestrator.background_tasks import cancel_background_tasks, create_background_tasks
 from orchestrator.conversation import ConversationState
+from orchestrator.memory_search import hydrate_history
 from orchestrator.pipelines import _build_frontend_payload
 from orchestrator.streaming import EventType, StreamingManager
 from telemetry.observer import observer
@@ -73,6 +74,12 @@ _background_tasks: list[asyncio.Task] = []
 # HIGH-014 — fixed-window in-process limiter for /auth/* routes.
 _auth_rate_log: dict[str, list[float]] = {}
 _AUTH_RATE_WINDOW_SEC = 60.0
+# Hard cap on tracked IPs: the log is process-global, so without a bound a
+# scrub of unique source IPs grows it without limit (memory-exhaustion
+# vector). Expired entries are evicted first; under a full cap of live
+# entries the oldest-inserted IP is dropped (best-effort limiter — real
+# deployments should also limit at the reverse proxy).
+_AUTH_RATE_LOG_MAX_IPS = 10_000
 
 
 def _enforce_auth_rate_limit(client_ip: str) -> bool:
@@ -80,6 +87,15 @@ def _enforce_auth_rate_limit(client_ip: str) -> bool:
     now = datetime.now(timezone.utc).timestamp()
     settings = get_settings()
     limit = max(1, int(settings.AUTH_RATE_LIMIT_PER_MINUTE))
+    if len(_auth_rate_log) >= _AUTH_RATE_LOG_MAX_IPS:
+        expired = [
+            ip for ip, entries in _auth_rate_log.items()
+            if not entries or now - entries[-1] >= _AUTH_RATE_WINDOW_SEC
+        ]
+        for ip in expired:
+            del _auth_rate_log[ip]
+        while len(_auth_rate_log) >= _AUTH_RATE_LOG_MAX_IPS:
+            _auth_rate_log.pop(next(iter(_auth_rate_log)))
     history = _auth_rate_log.setdefault(client_ip, [])
     history[:] = [t for t in history if now - t < _AUTH_RATE_WINDOW_SEC]
     if len(history) >= limit:
@@ -141,6 +157,15 @@ async def lifespan(app: FastAPI):
     _pool = _bootstrap_pool(_strategy)
     _gateway = AsyncAPIGateway()
     _aetheris = initialize_aetheris_components()
+
+    # Publish singletons to the api/ route modules (late-bound, no cycles).
+    from api.state import state as _api_state
+
+    _api_state.aetheris = _aetheris
+    _api_state.gateway = _gateway
+    _api_state.strategy = _strategy
+    _api_state.pool = _pool
+    _api_state.streaming_manager = _streaming_mgr
 
     # Create background tasks for cleanup operations
     # Add streaming_manager to aetheris components if not already present
@@ -252,17 +277,17 @@ WEB_DIR = Path(__file__).parent / "frontend" / "dist"
 
 # ── Request / Response Models ───────────────────────────────────────────
 
-class _StrictRequestModel(BaseModel):
-    """Base for public API ingress payloads (RFC-001 §4 critical contract).
+# Route handlers live in api/ (one module per domain); server.py assembles
+# the app, owns shared runtime singletons, and re-exports the request models
+# and handlers that tests import from here.
+from api.routes_auth import router as _auth_router
+from api.routes_conversations import router as _conversations_router
+from api.routes_sessions import router as _sessions_router
+from api.schemas import _StrictRequestModel
 
-    Unknown fields are rejected rather than silently ignored, so malformed
-    or unexpected client payloads fail fast instead of masking bugs. Response
-    models stay on plain ``BaseModel`` — only inbound request bodies are
-    critical contracts. Superseded by ``AetherisBaseModel`` once RFC-007
-    Step 2 lands ``core/base.py``.
-    """
-
-    model_config = ConfigDict(extra="forbid")
+app.include_router(_auth_router)
+app.include_router(_conversations_router)
+app.include_router(_sessions_router)
 
 
 class Message(_StrictRequestModel):
@@ -283,83 +308,7 @@ class QueryRequest(_StrictRequestModel):
 
 # ── Auth Request Schemas ──────────────────────────────────────────────────
 
-class AuthLoginRequest(_StrictRequestModel):
-    email: str
-    password: str
 
-    @field_validator("email")
-    @classmethod
-    def _validate_email(cls, value: str) -> str:
-        normalised = value.strip().lower()
-        if "@" not in normalised or " " in normalised or len(normalised) > 254:
-            raise ValueError("email must be a well-formed address")
-        return normalised
-
-class AuthRegisterRequest(AuthLoginRequest):
-    @field_validator("password")
-    @classmethod
-    def _validate_password_strength(cls, value: str) -> str:
-        # MED-021 audit fix: enforce minimum strength baseline so trivially
-        # guessable passwords cannot be registered.
-        if len(value) < 8:
-            raise ValueError("password must be at least 8 characters long")
-        if len(set(value)) < 3:
-            raise ValueError("password must contain at least 3 unique characters")
-        return value
-
-
-# ── Session Management Schemas ────────────────────────────────────────────
-
-class SessionCreateRequest(_StrictRequestModel):
-    session_id: str | None = None
-
-
-class SessionCreateResponse(BaseModel):
-    session_id: str
-    state: str
-    created_at: str
-
-
-class SessionMetadataResponse(BaseModel):
-    session_id: str
-    turn_count: int
-    total_tokens: int
-    state: str
-    remaining_capacity: int
-
-
-class SessionHistoryResponse(BaseModel):
-    history: list[dict[str, str]]
-
-
-class SessionCloseResponse(BaseModel):
-    session_id: str
-    state: str
-    closed_at: str
-
-
-# ── Checkpoint Management Schemas ─────────────────────────────────────────
-
-class CheckpointListResponse(BaseModel):
-    checkpoints: list[dict[str, str]]
-
-
-class CheckpointRestoreRequest(_StrictRequestModel):
-    pass
-
-
-class CheckpointRestoreResponse(BaseModel):
-    request_id: str
-    resumed_from_stage: str
-    status: str
-
-
-class CheckpointDeleteResponse(BaseModel):
-    request_id: str
-    deleted_count: int
-
-
-# ── Provider Health Schemas ───────────────────────────────────────────────
 
 class ProviderHealthResponse(BaseModel):
     provider_name: str
@@ -385,118 +334,12 @@ class ProviderRecoveryResponse(BaseModel):
 
 # ── Auth and Page Serving Routes ─────────────────────────────────────────
 
-@app.get("/login")
-async def serve_login():
-    """Serve the login HTML page."""
-    login_path = Path(__file__).parent / "aetheris_login.html"
-    if not login_path.exists():
-        raise HTTPException(status_code=404, detail="Login page not found.")
-    return FileResponse(login_path, media_type="text/html")
-
-
-@app.get("/aetheris_hero_video_graded.mp4")
-async def serve_login_hero_video():
-    """Serve the login HTML hero video."""
-    video_path = Path(__file__).parent / "aetheris_hero_video_graded.mp4"
-    if not video_path.exists():
-        raise HTTPException(status_code=404, detail="Hero video not found.")
-    return FileResponse(video_path, media_type="video/mp4")
-
-
-@app.post("/auth/register", status_code=201)
-async def register_user(req: AuthRegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    """Register a new user, checking if the email already exists."""
-    client_ip = request.client.host if request.client else "unknown"
-    if not _enforce_auth_rate_limit(client_ip):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many registration attempts; slow down.",
-        )
-
-    stmt = select(User).where(User.email == req.email)
-    result = await db.execute(stmt)
-    if result.scalars().first() is not None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered",
-        )
-
-    # Hash the password and store the user
-    hashed = hash_password(req.password)
-    new_user = User(email=req.email, password_hash=hashed)
-    db.add(new_user)
-    await db.commit()
-    return {"message": "User registered successfully"}
-
-
-def _set_auth_cookie(response: JSONResponse, token: str) -> None:
-    """HIGH-013: deliver the JWT via an httpOnly, SameSite=Strict cookie."""
-    settings = get_settings()
-    response.set_cookie(
-        key=settings.AUTH_COOKIE_NAME,
-        value=token,
-        httponly=True,
-        secure=settings.ENVIRONMENT != "development",
-        samesite="strict",
-        max_age=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        path="/",
-    )
-
-
-@app.post("/auth/login")
-async def login_user(req: AuthLoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    """Authenticate credentials and emit an httpOnly JWT cookie."""
-    client_ip = request.client.host if request.client else "unknown"
-    if not _enforce_auth_rate_limit(client_ip):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many login attempts; slow down.",
-        )
-
-    stmt = select(User).where(User.email == req.email)
-    result = await db.execute(stmt)
-    user = result.scalars().first()
-
-    if user is None or not verify_password(req.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    token = create_access_token(data={"sub": user.email})
-    response = JSONResponse({"status": "ok"})
-    _set_auth_cookie(response, token)
-    return response
-
-
-@app.post("/auth/logout")
-async def logout_user() -> JSONResponse:
-    """Clear the httpOnly auth cookie (HIGH-013)."""
-    settings = get_settings()
-    response = JSONResponse({"status": "ok"})
-    response.delete_cookie(settings.AUTH_COOKIE_NAME, path="/")
-    return response
-
-
-@app.post("/auth/refresh")
-async def refresh_token(
-    request: Request,
-    current_user: User = Depends(get_current_user),
-) -> JSONResponse:
-    """Refresh the authenticated user's httpOnly JWT cookie."""
-    token = create_access_token(data={"sub": current_user.email})
-    response = JSONResponse({"status": "ok"})
-    _set_auth_cookie(response, token)
-    return response
-
-
-# ── API Endpoints ───────────────────────────────────────────────────────
 
 @app.post("/api/query")
 async def handle_query(
     req: QueryRequest,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Run the micro-mode pipeline for a user query."""
     if not req.query.strip():
@@ -504,8 +347,21 @@ async def handle_query(
 
     try:
         history_list = [msg.model_dump() for msg in req.history] if req.history else None
+        if history_list is None:
+            # Memory v1 (ReFind): no client history — hydrate the owner's
+            # recent + topically relevant past turns. Scoped to
+            # current_user.email inside the SQL; never another user's turns.
+            # Memory is an enhancement, never a hard dependency: on any
+            # storage failure the query proceeds without it (ADR-007).
+            try:
+                history_list = await hydrate_history(
+                    db, owner_email=current_user.email, query=req.query.strip()
+                )
+            except Exception as exc:
+                logger.warning("Memory hydration unavailable: %s", exc)
+                history_list = None
         session_id = str(uuid.uuid4())
-        passport = create_request_passport()
+        passport = create_request_passport(user_id=current_user.email)
         result = await asyncio.wait_for(
             _aetheris["execution_manager"].execute(
                 user_query=req.query.strip(),
@@ -520,6 +376,7 @@ async def handle_query(
                 streaming_manager=_aetheris.get("streaming_manager"),
                 conversation_director=_aetheris.get("conversation_director"),
                 session_id=session_id,
+                user_id=current_user.email,
             ),
             timeout=_PIPELINE_TIMEOUT_SEC,
         )
@@ -565,20 +422,31 @@ async def handle_query(
 async def handle_query_stream(
     req: QueryRequest,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> StreamingResponse:
     """Stream the micro-mode pipeline as Server-Sent Events.
 
     Each event is a JSON-encoded SSE data line.  The frontend reads the
-    response via ``fetch()`` + ``ReadableStream`` and updates the UI
-    in real time as each pipeline stage completes.
+    response via ``fetch()`` + ``ReadableStream`` and updates the UI in
+    real time as each pipeline stage completes.
     """
     if not req.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty.")
 
     session_id = str(uuid.uuid4())
-    passport = create_request_passport(session_id=session_id)
+    passport = create_request_passport(session_id=session_id, user_id=current_user.email)
     request_id = passport.request_id
     history_list = [msg.model_dump() for msg in req.history] if req.history else None
+    if history_list is None:
+        # Memory v1: same hydration as /api/query, same owner scoping,
+        # same fail-open posture.
+        try:
+            history_list = await hydrate_history(
+                db, owner_email=current_user.email, query=req.query.strip()
+            )
+        except Exception as exc:
+            logger.warning("Memory hydration unavailable: %s", exc)
+            history_list = None
 
     try:
         _streaming_mgr.create_stream(request_id)
@@ -611,6 +479,7 @@ async def handle_query_stream(
                     streaming_manager=_streaming_mgr,
                     conversation_director=_aetheris.get("conversation_director"),
                     session_id=session_id,
+                    user_id=current_user.email,
                 ),
                 timeout=_PIPELINE_TIMEOUT_SEC,
             )
@@ -639,13 +508,32 @@ async def handle_query_stream(
                 {"stage": "unknown", "message": "Pipeline execution failed."},
             )
         finally:
-            # Put sentinel to signal end of stream
+            # Put sentinel to signal end of stream. Mirror emit()'s
+            # drop-oldest policy if the buffer is full: a lost intermediate
+            # event degrades one update, a lost terminator hangs the client
+            # until its timeout.
             queue = _streaming_mgr._active_streams.get(request_id)
             if queue is not None:
                 try:
                     queue.put_nowait(None)
                 except asyncio.QueueFull:
-                    pass
+                    logger.warning(
+                        "SSE buffer full for request_id=%s — evicting oldest "
+                        "event to guarantee stream termination.",
+                        request_id,
+                    )
+                    try:
+                        queue.get_nowait()
+                    except asyncio.QueueEmpty:  # pragma: no cover — raced consumer
+                        pass
+                    try:
+                        queue.put_nowait(None)
+                    except asyncio.QueueFull:  # pragma: no cover — consumer gone
+                        logger.error(
+                            "SSE sentinel undeliverable for request_id=%s; "
+                            "closing stream.",
+                            request_id,
+                        )
 
     async def event_generator():
         # Start pipeline execution as background task
@@ -712,7 +600,9 @@ def _get_dynamic_models() -> list[dict[str, Any]]:
         for model_str in _strategy.get_configured_model_chain(role):
             if model_str not in models_dict:
                 provider_key = extract_provider_key(model_str)
-                latency_str = "1.1s"
+                # No fabricated latency: "—" until the pool has real
+                # measurements (mean_latency_ms is now fed by report_success).
+                latency_str = "—"
                 is_active = _strategy.is_model_enabled(model_str)
                 if _pool:
                     metrics = _pool.get_health_metrics(provider_key)
@@ -823,119 +713,6 @@ async def set_strategy_mode_endpoint(
     return {"status": "success", "mode": _strategy.mode.value}
 
 
-class ConversationSaveRequest(_StrictRequestModel):
-    id: str
-    title: str = "New Conversation"
-    mode: str = "HYBRID"
-    transcript: list[dict[str, Any]] = PField(default_factory=list)
-
-
-@app.get("/api/conversations")
-async def get_conversations(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> dict:
-    """Return all conversation sessions owned by the current user from PostgreSQL."""
-    stmt = (
-        select(ConversationSessionRecord)
-        .where(ConversationSessionRecord.owner_email == current_user.email)
-        .options(selectinload(ConversationSessionRecord.messages))
-        .order_by(ConversationSessionRecord.created_at.desc())
-    )
-    res = await db.execute(stmt)
-    sessions = res.scalars().all()
-
-    convs = []
-    for s in sessions:
-        sorted_msgs = sorted(s.messages, key=lambda m: m.timestamp)
-        convs.append({
-            "id": s.session_id,
-            "title": s.title or "Conversation",
-            "time": s.created_at.strftime("%b %d, %H:%M") if s.created_at else "Just now",
-            "mode": s.state,
-            "agentsCount": 1,
-            "score": None,
-            "transcript": [
-                {
-                    "id": str(m.id),
-                    "role": m.role,
-                    "text": m.content,
-                }
-                for m in sorted_msgs
-            ],
-        })
-    return {"conversations": convs}
-
-
-@app.post("/api/conversations")
-async def save_conversation(
-    req: ConversationSaveRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> dict:
-    """Persist or update a conversation session and its transcript in PostgreSQL."""
-    stmt = (
-        select(ConversationSessionRecord)
-        .where(
-            ConversationSessionRecord.session_id == req.id,
-            ConversationSessionRecord.owner_email == current_user.email,
-        )
-        .options(selectinload(ConversationSessionRecord.messages))
-    )
-    res = await db.execute(stmt)
-    session_rec = res.scalars().first()
-
-    if session_rec is None:
-        session_rec = ConversationSessionRecord(
-            session_id=req.id,
-            owner_email=current_user.email,
-            title=req.title[:255],
-            state=req.mode[:32],
-        )
-        db.add(session_rec)
-        await db.flush()
-    else:
-        session_rec.title = req.title[:255]
-        session_rec.state = req.mode[:32]
-        session_rec.turn_count = len(req.transcript)
-        await db.execute(
-            delete(ConversationMessageRecord).where(
-                ConversationMessageRecord.session_id == session_rec.id
-            )
-        )
-
-    for turn in req.transcript:
-        msg_text = turn.get("text") or ""
-        msg_role = turn.get("role") or "user"
-        msg_rec = ConversationMessageRecord(
-            session_id=session_rec.id,
-            role=msg_role[:16],
-            content=msg_text,
-        )
-        db.add(msg_rec)
-
-    session_rec.turn_count = len(req.transcript)
-    await db.commit()
-    return {"status": "ok", "id": req.id}
-
-
-@app.delete("/api/conversations/{session_id}")
-async def delete_conversation(
-    session_id: str,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> dict:
-    """Delete a conversation owned by current user from PostgreSQL."""
-    stmt = select(ConversationSessionRecord).where(
-        ConversationSessionRecord.session_id == session_id,
-        ConversationSessionRecord.owner_email == current_user.email,
-    )
-    res = await db.execute(stmt)
-    session_rec = res.scalars().first()
-    if session_rec:
-        await db.delete(session_rec)
-        await db.commit()
-    return {"status": "deleted"}
 
 
 def _get_vault_status() -> list[dict[str, Any]]:
@@ -976,8 +753,12 @@ class CustomModelRequest(_StrictRequestModel):
 
 
 @app.get("/api/config/vault")
-async def get_vault_status(current_user: User = Depends(get_current_user)) -> dict:
-    """Return secure masked status of provider API keys in vault."""
+async def get_vault_status(current_user: User = Depends(require_role("admin"))) -> dict:
+    """Return secure masked status of provider API keys in vault.
+
+    Admin-only like the write path: even masked key status (configured flag,
+    last 4 chars) describes the server's secrets, not the caller's own data.
+    """
     return {"providers": _get_vault_status()}
 
 
@@ -1050,196 +831,6 @@ async def get_config(current_user: User = Depends(get_current_user)) -> dict:
 
 # ── Session Management Endpoints ──────────────────────────────────────────
 
-@app.post("/api/sessions", response_model=SessionCreateResponse, status_code=201)
-async def create_session(
-    req: SessionCreateRequest,
-    current_user: User = Depends(get_current_user),
-) -> SessionCreateResponse:
-    """Create a new conversation session owned by the caller (HIGH-015)."""
-    import uuid
-
-    conversation_director = _aetheris.get("conversation_director")
-    if not conversation_director:
-        raise HTTPException(status_code=503, detail="Conversation director not available")
-
-    session_id = req.session_id or str(uuid.uuid4())
-    owner = current_user.email
-
-    try:
-        session = conversation_director.create_session(session_id, owner_email=owner)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    return SessionCreateResponse(
-        session_id=session.session_id,
-        state=session.state.value,
-        created_at=session.created_at.isoformat(),
-    )
-
-
-def _require_session_ownership(
-    conversation_director: Any,
-    session_id: str,
-    current_user: User,
-) -> None:
-    """HIGH-015: reject cross-user session access with 403."""
-    if not conversation_director.verify_access(session_id, current_user.email):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Session does not belong to the authenticated user.",
-        )
-
-
-@app.get("/api/sessions/{session_id}", response_model=SessionMetadataResponse)
-async def get_session_metadata(
-    session_id: str,
-    current_user: User = Depends(get_current_user),
-) -> SessionMetadataResponse:
-    """Retrieve session metadata (HIGH-015 ownership enforced)."""
-    conversation_director = _aetheris.get("conversation_director")
-    if not conversation_director:
-        raise HTTPException(status_code=503, detail="Conversation director not available")
-
-    _require_session_ownership(conversation_director, session_id, current_user)
-
-    try:
-        metadata = conversation_director.get_metadata(session_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    return SessionMetadataResponse(**metadata)
-
-
-@app.get("/api/sessions/{session_id}/history", response_model=SessionHistoryResponse)
-async def get_session_history(
-    session_id: str,
-    current_user: User = Depends(get_current_user),
-) -> SessionHistoryResponse:
-    """Retrieve conversation history (HIGH-015 ownership enforced)."""
-    conversation_director = _aetheris.get("conversation_director")
-    if not conversation_director:
-        raise HTTPException(status_code=503, detail="Conversation director not available")
-
-    _require_session_ownership(conversation_director, session_id, current_user)
-
-    try:
-        history = conversation_director.get_history(session_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    return SessionHistoryResponse(history=history)
-
-
-@app.delete("/api/sessions/{session_id}", response_model=SessionCloseResponse)
-async def close_session(
-    session_id: str,
-    current_user: User = Depends(get_current_user),
-) -> SessionCloseResponse:
-    """Explicitly close a conversation session (HIGH-015 ownership enforced)."""
-    from datetime import datetime
-
-    conversation_director = _aetheris.get("conversation_director")
-    if not conversation_director:
-        raise HTTPException(status_code=503, detail="Conversation director not available")
-
-    _require_session_ownership(conversation_director, session_id, current_user)
-
-    try:
-        conversation_director.transition_state(session_id, ConversationState.COMPLETED)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    return SessionCloseResponse(
-        session_id=session_id,
-        state="completed",
-        closed_at=datetime.now(timezone.utc).isoformat(),
-    )
-
-
-# ── Checkpoint Management Endpoints ───────────────────────────────────────
-
-@app.get("/api/checkpoints/{request_id}", response_model=CheckpointListResponse)
-async def list_checkpoints(
-    request_id: str,
-    current_user: User = Depends(get_current_user),
-) -> CheckpointListResponse:
-    """List checkpoints for a request."""
-    checkpoint_manager = _aetheris.get("checkpoint_manager")
-    if not checkpoint_manager:
-        raise HTTPException(status_code=503, detail="Checkpoint manager not available")
-
-    try:
-        checkpoints = await checkpoint_manager.list_checkpoints(
-            request_id=request_id, user_email=current_user.email
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    checkpoint_list = [
-        {
-            "checkpoint_id": cp.checkpoint_id,
-            "stage": cp.stage,
-            "timestamp": cp.timestamp.isoformat(),
-            "expires_at": cp.expires_at.isoformat(),
-        }
-        for cp in checkpoints
-    ]
-
-    return CheckpointListResponse(checkpoints=checkpoint_list)
-
-
-@app.post("/api/checkpoints/{checkpoint_id}/restore", response_model=CheckpointRestoreResponse)
-async def restore_checkpoint(
-    checkpoint_id: str,
-    req: CheckpointRestoreRequest,
-    current_user: User = Depends(get_current_user),
-) -> CheckpointRestoreResponse:
-    """Resume pipeline from a checkpoint."""
-    checkpoint_manager = _aetheris.get("checkpoint_manager")
-    if not checkpoint_manager:
-        raise HTTPException(status_code=503, detail="Checkpoint manager not available")
-
-    try:
-        checkpoint = await checkpoint_manager.restore_checkpoint(
-            checkpoint_id, user_email=current_user.email
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    if checkpoint is None:
-        raise HTTPException(status_code=404, detail=f"Checkpoint {checkpoint_id} not found or expired")
-
-    return CheckpointRestoreResponse(
-        request_id=checkpoint.request_id,
-        resumed_from_stage=checkpoint.stage,
-        status="restored",
-    )
-
-
-@app.delete("/api/checkpoints/{request_id}", response_model=CheckpointDeleteResponse)
-async def delete_checkpoints(
-    request_id: str,
-    current_user: User = Depends(get_current_user),
-) -> CheckpointDeleteResponse:
-    """Delete all checkpoints for a request."""
-    checkpoint_manager = _aetheris.get("checkpoint_manager")
-    if not checkpoint_manager:
-        raise HTTPException(status_code=503, detail="Checkpoint manager not available")
-
-    try:
-        deleted_count = await checkpoint_manager.delete_checkpoints(
-            request_id, user_email=current_user.email
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    return CheckpointDeleteResponse(
-        request_id=request_id,
-        deleted_count=deleted_count,
-    )
-
 
 # ── Execution Replay Debug Endpoint (Step 20a) ────────────────────────────
 
@@ -1288,7 +879,11 @@ async def prometheus_metrics(request: Request) -> Response:
     else:
         header = request.headers.get("authorization", "")
         scheme, _, presented = header.partition(" ")
-        if scheme.lower() != "bearer" or not secrets.compare_digest(presented, expected):
+        # Compare as bytes: compare_digest on str raises TypeError for
+        # non-ASCII input, turning a malformed header into a 500.
+        if scheme.lower() != "bearer" or not secrets.compare_digest(
+            presented.encode("utf-8"), expected.encode("utf-8")
+        ):
             raise HTTPException(status_code=401, detail="Invalid metrics token.")
 
     metrics.refresh(
@@ -1414,3 +1009,40 @@ async def catch_all(full_path: str):
     if not index.exists():
         raise HTTPException(status_code=404, detail="Frontend not found.")
     return FileResponse(index, media_type="text/html")
+
+
+# ── Re-exports (tests import these from `server`) ────────────────────────
+from api.routes_auth import (  # noqa: E402,F401
+    AuthLoginRequest,
+    AuthRegisterRequest,
+    _set_auth_cookie,
+    login_user,
+    logout_user,
+    refresh_token,
+    register_user,
+)
+from api.routes_conversations import (  # noqa: E402,F401
+    ConversationSaveRequest,
+    delete_conversation,
+    get_conversations,
+    purge_conversations,
+    save_conversation,
+)
+from api.routes_sessions import (  # noqa: E402,F401
+    CheckpointDeleteResponse,
+    CheckpointListResponse,
+    CheckpointRestoreRequest,
+    CheckpointRestoreResponse,
+    SessionCloseResponse,
+    SessionCreateRequest,
+    SessionCreateResponse,
+    SessionHistoryResponse,
+    SessionMetadataResponse,
+    close_session,
+    create_session,
+    delete_checkpoints,
+    get_session_history,
+    get_session_metadata,
+    list_checkpoints,
+    restore_checkpoint,
+)

@@ -325,11 +325,23 @@ class RuntimeEngine:
                 raise SecurityValidationError(violations)
 
         # Step 2: Rate limiting
+        # Tier 0.4: provider identity was hardcoded to "default" and user_id
+        # was never populated, so every token bucket shared one anonymous
+        # key and limiting never actually bound anyone. Derive the provider
+        # from the strategy's primary model for this role and fall back to
+        # the passport's authenticated user when the caller passed none.
         provider_name = "default"
+        try:
+            chain = strategy.get_model_chain(role)
+            if chain:
+                provider_name = str(chain[0]).split("/", 1)[0]
+        except Exception:  # noqa: BLE001 — unknown role/strategy shape keeps legacy key
+            pass
+        effective_user_id = user_id or (passport.user_id if passport is not None else None)
         acquired = False
         if self.resource_manager is not None:
             acquired = await self.resource_manager.acquire_resources(
-                provider=provider_name, user_id=user_id
+                provider=provider_name, user_id=effective_user_id
             )
             if not acquired:
                 if contract.require_streaming and self.streaming_manager is not None:

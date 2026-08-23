@@ -207,7 +207,8 @@ def init_conversation_context(
     conversation_director: Any,
     session_id: str | None,
     logger_instance: Any = None,
-) -> tuple[Any, list[dict[str, str]] | None, dict[str, Any] | None]:
+    owner_email: str | None = None,
+) -> tuple[list[dict[str, str]] | None, dict[str, Any] | None]:
     """Initialize conversation context for a pipeline run.
 
     Replaces the duplicate conversation initialization block found in
@@ -215,8 +216,11 @@ def init_conversation_context(
 
     Args:
         conversation_director: ConversationDirector instance (or None).
-        session_id: Session identifier (or None).
+        session_id: Session identifier or None.
         logger_instance: Optional logger to use (defaults to module logger).
+        owner_email: Authenticated user's email. Passed to session
+            auto-creation so pipeline-created sessions are owned (HIGH-015);
+            unowned sessions defeat per-principal memory scoping.
 
     Returns:
         Tuple of (history, conversation_metadata).
@@ -233,8 +237,17 @@ def init_conversation_context(
 
         session = conversation_director.get_session(session_id)
         if session is None:
-            conversation_director.create_session(session_id)
-            log.info("Created new conversation session: %s", session_id)
+            if owner_email:
+                conversation_director.create_session(session_id, owner_email=owner_email)
+            else:
+                # Duck-typed directors may not accept the owner kwarg; the
+                # unowned legacy path stays available (logged below).
+                conversation_director.create_session(session_id)
+            log.info(
+                "Created new conversation session: %s (owner=%s)",
+                session_id,
+                owner_email or "<legacy>",
+            )
 
         history = conversation_director.get_history(session_id)
 

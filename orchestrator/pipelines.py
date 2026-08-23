@@ -114,6 +114,7 @@ async def run_micro_mode(
     conversation_director: Any | None = None,
     session_id: str | None = None,
     flags: FeatureFlags | None = None,
+    user_id: str | None = None,
 ) -> MicroModeResult:
     """
     Execute the **micro-mode** pipeline.
@@ -121,14 +122,16 @@ async def run_micro_mode(
     When *decision_engine* is provided the pipeline delegates gate and
     generation logic to the :class:`DecisionEngine` instead of running
     inline Breaker/parallel-generation code.  An optional *passport*
-    tracks the request lifecycle across all components.
+    tracks the request lifecycle across all components. *user_id*
+    (authenticated user's email, when available) scopes failure-memory
+    access so lessons never cross accounts.
     """
     logger.info("Micro-mode pipeline started for query: %.120s", user_query)
     claim_manager = claim_manager or ClaimManager()
 
     # ── Conversation context (Task 21.5) ────────────────────────────
     stored_history, conversation_metadata = init_conversation_context(
-        conversation_director, session_id, logger
+        conversation_director, session_id, logger, owner_email=user_id
     )
     if stored_history:
         history = stored_history
@@ -155,6 +158,7 @@ async def run_micro_mode(
             session_id=session_id,
             conversation_metadata=conversation_metadata,
             flags=flags,
+            user_id=user_id,
         )
 
     # CRIT-001: the DecisionEngine path is the sole execution path.
@@ -165,10 +169,16 @@ async def run_micro_mode(
 
 
 def _build_frontend_payload(result: MicroModeResult) -> dict[str, Any]:
-    """Convert a MicroModeResult into the shape the frontend expects."""
+    """Convert a MicroModeResult into the shape the frontend expects.
+
+    Deep-copies before mutating: normalising score_a/score_b in place would
+    corrupt the shared judge_decision dict for replay stores and passports
+    that hold a reference to the same object.
+    """
+    import copy
     import re
 
-    serialized: dict[str, Any] = dict(result)
+    serialized: dict[str, Any] = copy.deepcopy(dict(result))
     for key in ("logician_output", "creative_output"):
         val = serialized.get(key)
         if val is not None and hasattr(val, "model_dump"):
@@ -358,12 +368,14 @@ async def _run_with_decision_engine(
     session_id: str | None = None,
     conversation_metadata: dict[str, Any] | None = None,
     flags: FeatureFlags | None = None,
+    user_id: str | None = None,
 ) -> MicroModeResult:
     """Execute the pipeline using the :class:`DecisionEngine` gate architecture.
 
     This is the Task 21.3 integration path that delegates Breaker,
     generation, and Judge logic to the DecisionEngine while tracking
-    state via the ExecutionPassport.
+    state via the ExecutionPassport. *user_id* scopes failure-memory
+    writes and reads so one account's lessons never surface for another.
     """
     from orchestrator.streaming import EventType, StreamEvent
     claim_manager = claim_manager or ClaimManager()
@@ -540,10 +552,11 @@ async def _run_with_decision_engine(
         passport.update_stage("evaluating")
 
     # Retrieve failure patterns from reasoning graph
+    owner = user_id or ""
     lessons = knowledge.lessons if knowledge is not None else ""
     if knowledge is None:
         if reasoning_graph is not None:
-            patterns = reasoning_graph.get_failure_patterns(user_query)
+            patterns = reasoning_graph.get_failure_patterns(user_query, owner=owner)
             if patterns:
                 lesson_parts = [
                     f"Past failure for similar query: {p.get('explanation', '')} "
@@ -555,7 +568,7 @@ async def _run_with_decision_engine(
                     "Retrieved %d failure pattern(s) from reasoning graph.",
                     len(patterns),
                 )
-        em_lessons = epistemic_memory.get_lessons_learned(user_query)
+        em_lessons = epistemic_memory.get_lessons_learned(user_query, owner=owner)
         if em_lessons:
             lessons = f"{lessons}; {em_lessons}" if lessons else em_lessons
 
@@ -613,6 +626,7 @@ async def _run_with_decision_engine(
                 or "Low validation score."
             ),
             score=final_output.validation_score,
+            owner=owner,
         )
         if reasoning_graph is not None:
             agent_outputs = {}
@@ -636,6 +650,7 @@ async def _run_with_decision_engine(
                 ),
                 score=final_output.validation_score,
                 agent_outputs=agent_outputs,
+                owner=owner,
             )
 
     # ── Step 4: Assemble result ──────────────────────────────────────

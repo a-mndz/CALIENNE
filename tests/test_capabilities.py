@@ -38,8 +38,8 @@ def test_missing_files_fall_back_to_neutral_and_flag_failure() -> None:
     assert reg.capability_load_failed is True
     assert set(reg.load_errors)  # every section recorded a reason
     # Accessors degrade to documented defaults, never raise.
-    assert reg.model_weight("google/gemini-2.5-pro", "coding") == NEUTRAL_WEIGHT
-    assert reg.max_concurrency("google/gemini-2.5-pro") == DEFAULT_MAX_CONCURRENCY
+    assert reg.model_weight("google/gemini-pro-latest", "coding") == NEUTRAL_WEIGHT
+    assert reg.max_concurrency("google/gemini-pro-latest") == DEFAULT_MAX_CONCURRENCY
     assert reg.provider_parallel_limit("google") == DEFAULT_PROVIDER_LIMIT["parallel_limit"]
 
 
@@ -52,7 +52,7 @@ def test_malformed_json_records_error_and_neutral_weight() -> None:
     reg = CapabilityRegistry(capabilities_dir=d)
     assert "model_capabilities" in reg.load_errors
     assert reg.capability_load_failed is True
-    assert reg.model_weight("google/gemini-2.5-pro", "coding") == NEUTRAL_WEIGHT
+    assert reg.model_weight("google/gemini-pro-latest", "coding") == NEUTRAL_WEIGHT
 
 
 # ── Out-of-range weight ──────────────────────────────────────────────────
@@ -139,7 +139,7 @@ def test_meta_keys_are_stripped() -> None:
 def test_repo_config_loads_without_errors() -> None:
     reg = CapabilityRegistry()  # default dir = config/capabilities/
     assert reg.capability_load_failed is False, reg.load_errors
-    assert reg.max_concurrency("google/gemini-2.5-pro") == 4
+    assert reg.max_concurrency("google/gemini-pro-latest") == 4
     assert reg.provider_parallel_limit("google") == 8
 
 

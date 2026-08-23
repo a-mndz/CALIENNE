@@ -222,7 +222,7 @@ export default function AetherisDashboard({ onExitLanding = null }) {
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef(null);
 
-  const [stats, setStats] = useState({ agentsOnline: "6/6", tokens: 0, avgResponse: "1.2", successRate: "99.4", sparkline: [] });
+  const [stats, setStats] = useState({ agentsOnline: "6/6", tokens: 0, avgResponse: "—", successRate: "—", sparkline: [] });
   const [rightPanelLoaded, setRightPanelLoaded] = useState(false);
   const [studioOpen, setStudioOpen] = useState(false);
 
@@ -278,7 +278,7 @@ export default function AetherisDashboard({ onExitLanding = null }) {
       return;
     }
     const cleanId = name.split("/").pop().replace(/\./g, "").replace(/-/g, "");
-    const newModel = { id: cleanId || randId(), name: name.split("/").pop(), latency: "1.1s", active: true };
+    const newModel = { id: cleanId || randId(), name: name.split("/").pop(), latency: "—", active: true };
     try {
       const response = await fetch("/api/models/add", {
         method: "POST",

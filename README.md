@@ -41,14 +41,14 @@ Dedicated dark-mode glassmorphism login and registration page (`/login`) with JW
 
 * **Core Backend:** Python 3.11+ (`asyncio`, `httpx.AsyncClient`)
 * **API Framework:** FastAPI & Uvicorn for asynchronous server endpoints with strict CORS allowlists and CSRF origin checks
-* **Database & Persistence:** Async PostgreSQL via SQLAlchemy 2.0 (`asyncpg`) with automated schema initialization on startup
+* **Database & Persistence:** Async PostgreSQL via SQLAlchemy 2.0 (`asyncpg`) with an Alembic-managed schema (001→005) — startup verifies the database is at the required revision and refuses to boot on drift
 * **Security & Auth:** Secure JWT authentication via `httpOnly`, `SameSite=Strict` cookies, password strength verification, and IP-scoped rate limiting
 * **Data Validation:** Pydantic V2 & Pydantic-Settings for config validation and data contracts
 * **Output Processing:** `json-repair` for parsing and correcting malformed JSON LLM outputs
 * **Prompt Layout:** Strictly validated XML formats layered dynamically at runtime
 * **Frontend Web Dashboard:** Modern React 19 + Vite + GSAP 3 animation engine with triadic dark-mode glassmorphism (`frontend/`)
 * **Authentication UI:** Dedicated responsive HTML5/CSS3 cosmic dark-mode login interface (`aetheris_login.html`)
-* **LLM Providers:** Native integration with OpenRouter, Groq, NVIDIA NIM, GitHub Models, and local Ollama
+* **LLM Providers:** Native integration with OpenRouter, OpenAI, Google AI Studio, Groq, and custom/local gateways (Ollama / vLLM / LiteLLM). Model routes verified live 2026-08; dead routes (GitHub Models, Llama 3.x, Claude 3.5) are gone from the strategy maps
 
 ---
 
@@ -111,12 +111,16 @@ aetheris now incorporates the Adaptive Multi-Model Reasoning Orchestrator (AETHE
   * `/providers/health`, `/providers/{provider_name}/recovery` - Monitor and recover provider health.
   * `/telemetry` - Aggregated metrics for decision engine, resources, and security.
   * `/auth/login`, `/auth/register`, `/auth/logout`, `/auth/refresh` - Secure authentication routes with rate limiting.
+  * `/conversations` - List (ordered by recency) and save conversations; `DELETE /api/conversations/{id}` removes one, `DELETE /api/conversations` purges every conversation owned by the caller (GDPR Art. 17 erasure - sessions cascade to messages).
+  * `/metrics` - Prometheus exposition behind its own bearer token (mandatory in production).
+  * `/config/vault` - Masked provider-key status; **admin-only for both read and write**.
 * **New Request Parameters**: `session_id`, `user_id` for conversation tracking and rate limiting.
 * **New Response Fields**: `request_id`, `security_metadata`, `unverified_claims`, `conversation_metadata`, `firewall_result` (hallucination-firewall outcome), and `metrics` (execution passport + immutable manifest). See the Adaptive Runtime section for the firewall and manifest behavior.
 
-### 5. Persistent Storage & Security Layer
-* **PostgreSQL ORM Layer (`core/database.py` & `core/models.py`)**: Stores user accounts (`User`), active dialogue sessions (`ConversationSessionRecord`), and historical turns (`ConversationMessageRecord`) via SQLAlchemy 2.0 async sessions.
+### 5. Persistent Storage, Memory & Security Layer
+* **PostgreSQL ORM Layer (`core/database.py` & `core/models.py`)**: Stores user accounts (`User`), active dialogue sessions (`ConversationSessionRecord`), and historical turns (`ConversationMessageRecord`) via SQLAlchemy 2.0 async sessions. Sessions carry `owner_email` — per-user isolation is a row-level property (HIGH-015).
 * **Enterprise Auth & CSRF Protection (`core/security.py`)**: All sensitive operations enforce JWT authentication delivered via `httpOnly`, `SameSite=Strict` cookies, with automatic CSRF origin verification on state-changing requests.
+* **Owner-Scoped Turn Memory (`orchestrator/memory_search.py`)**: Stored turns are lexically searchable per user — PostgreSQL `tsvector` generated column + GIN index, no LLM extraction (ReFind pattern). When a query endpoint receives no client history, it is hydrated from the owner's recent plus topically relevant turns. Tenancy is enforced in SQL: every statement joins `conversation_sessions` and filters `owner_email`, and a missing owner returns nothing (fail-closed). Hydration itself is fail-open — a storage hiccup degrades to no memory, never a failed query. Requires migration 005 (`alembic upgrade head`).
 
 ---
 
@@ -136,6 +140,9 @@ These are behavioral changes to the pipeline every request already runs:
 * **Inbound request bodies are strict.** All public request models (`QueryRequest`, `Message`, auth, session, checkpoint, model-management, strategy) now inherit a `_StrictRequestModel` with `extra="forbid"` — unknown fields are rejected (fail-fast) instead of silently ignored. Response models stay permissive. (RFC-001 §4 critical-contract rule; a bridge until `AetherisBaseModel` fully lands.)
 * **Every request carries an immutable ExecutionManifest.** The `ExecutionPassport` gained `set_execution_manifest(...)`; the frozen manifest (SHA-256 graph fingerprint, host snapshot, version stamps) is serialized in `passport.to_dict()` and surfaced to the frontend as the `metrics` field of the response payload.
 * **The orchestrator package now lazy-loads.** `orchestrator/__init__.py` resolves its ~50 exports through `__getattr__`/`import_module`, so lightweight modules (e.g. `orchestrator.contracts`) import without pulling the full runtime graph into module initialization.
+* **Firewall verdicts are measured, not keyword luck.** `validate_claim` v2 scores evidence support as stemmed term coverage and gates verify/contradict at coverage ≥ 0.7 (a verbatim substring of at least 4 chars also counts); the score lands in claim provenance as `support_score`. Measured against the frozen gap corpus this resolved 12 of 14 known blind spots — the 2 semantic residuals are documented in `evals/firewall_known_gaps.md` as the acceptance case for a hosted entailment verifier rather than more lexical rules.
+* **Telemetry reports measurements, not estimates.** Token counts, cost, and latency are taken from provider usage records captured per call (`contextvars`-scoped, safe under async concurrency); DAG nodes record `measured_cost_usd`, and prediction calibration is fed actuals. Where nothing was measured, dashboards show "—" instead of a fabricated number.
+* **Conversations hydrate from durable memory.** Both query endpoints, when the client sends no history, pull the owner's turns from PostgreSQL (see §5 above).
 
 New response fields on the default path: `firewall_result`, `metrics` (passport/manifest). Frontend assets moved from `new ui/frontend/` to `frontend/`.
 
@@ -169,15 +176,46 @@ Capability data (model capabilities, provider limits, pricing, routing defaults,
 
 ---
 
+## Quality Gates & Measurement (`evals/`)
+
+Every quality claim is backed by a gate that runs without API keys, so it blocks in CI for every PR — including forks, which receive no secrets.
+
+**Blocking in CI (deterministic, zero-API):**
+
+| Gate | What it locks |
+|------|---------------|
+| G1 — prompt containment | 40 adversarial fixtures × 3 escape vectors cannot break out of the judge's delimited sections (`_delimit_safe`) |
+| G2 — consensus invariants | Weighted multi-judge math: weights sum to 1, monotonicity, tie handling |
+| G3 — frozen firewall corpus | 66 labeled rows; the matcher must reproduce every ground-truth verdict (`evals/validate`) |
+| G4 — hashed lockfile | `requirements.lock` fully pinned with hashes (`tools/check_pins.py`, 59/59) |
+| G5 — golden integrity | `evals/golden/v1.jsonl` verified against its SHA-256 manifest (n=50, 10 clusters) |
+
+**Stochastic — nightly workflow (`evals.yml`) + `run-evals` label, never a required check:**
+
+| Gate | What it measures |
+|------|------------------|
+| G6 — exact McNemar | Paired regression test on per-item outcomes; needs a captured baseline first |
+| G7 — noise floor | Run-to-run variance of the golden set |
+
+The dual-agent topology only earns its latency/cost when *exactly one* agent succeeds; `evals.beta` measures the co-failure ceiling β = P(both fail) with Wilson confidence intervals. First live capture (needs provider keys):
+
+```bash
+python -m evals.capture --label baseline
+```
+
+That baseline is also the evidence the parked DAG verdict (behind all-off flags) is waiting for. Audit history: `research/AUDIT_2026-08-22.md` (post-remediation audit, all findings fixed same day).
+
+---
+
 ## Advantages
 
 | Feature | Why it matters |
 |---------|---------------|
 | **Validation Arbitrage** | Two agents (Logician + Creative) reason independently; the Judge resolves contradictions and scores consistency. You get a confidence score, not just a guess. |
-| **Provider Resilience** | Supports OpenRouter, Groq, NVIDIA NIM, GitHub Models, and local Ollama. If one provider is down, the pipeline automatically tries the next. |
+| **Provider Resilience** | OpenRouter, OpenAI, Google AI Studio, Groq, and custom/local gateways. If one provider is down, the pipeline automatically tries the next. |
 | **Circuit Breaker + Cooldown** | Dead providers are automatically excluded. No manual intervention needed when a service is rate-limited or flaky. |
 | **Secure Auth & Identity** | Dedicated login & registration UI with `httpOnly` Strict SameSite cookie authentication, IP rate limiting, and CSRF origin enforcement. |
-| **Persistent Session Memory** | Async PostgreSQL database storage tracks multi-turn dialogue histories, user profiles, and session states across restarts. |
+| **Persistent Session Memory** | Async PostgreSQL storage tracks multi-turn dialogue, user profiles, and session state across restarts — plus owner-scoped lexical turn memory that hydrates context when a client sends none, with GDPR purge on request. |
 | **Zero-cost Testing** | Simulation mode works without any API keys. Test the full pipeline, UI, and error paths locally for free. |
 | **Structured, Typed Outputs** | Every agent response is validated against Pydantic V2 schemas. Malformed JSON is auto-repaired before validation. |
 | **Dark-mode Web UI** | A premium React 19 + GSAP glassmorphism interface with animated pipeline progress, expandable agent reasoning, telemetry dashboard, and responsive design. |
@@ -207,10 +245,16 @@ source .venv/bin/activate
 
 ### 3. Install dependencies
 ```bash
-pip install -r requirements.txt
+# Reproducible install — CI uses exactly this (G4-verified hashed pins):
+pip install -r requirements.lock --require-hashes
+
+# Contributors also need the dev toolchain (pytest, ruff):
+pip install -r requirements-dev.txt
 ```
 
 ### 4. Configure secrets and environment variables
+`.env.example` is the complete, annotated reference — all 23 Settings variables, every `AETHERIS_ENABLE_*` feature flag (13 gates, default off), and the operational overrides (replay retention, retrieval weights, capability paths), each with its default. Copying it enables nothing; everything optional is commented out.
+
 Provider API keys are loaded from the OS-native secret store through `secrets_bootstrap.py`, then exported into the `AETHERIS_*` environment variables expected by `core/config.py`. Keep live keys out of `.env` and out of version control.
 
 One-time setup per developer machine:
@@ -257,6 +301,13 @@ python main.py --web
 * **Main Reasoning Dashboard:** Open your browser at `http://localhost:8000/`
 * **Login & Authentication Portal:** Open your browser at `http://localhost:8000/login`
 
+The dashboard is served from `frontend/dist/` — build it first (`cd frontend && npm install && npm run build`) or run the Vite dev server against the API in development.
+
+### Deployment notes
+* Run `alembic upgrade head` before serving traffic — the chain runs 001→005 (004 adds `updated_at` for recency ordering; 005 adds the memory-search `tsvector` column + GIN/composite indexes). Startup verifies the schema revision and refuses to boot on drift, so a skipped migration fails loudly, not silently.
+* Production (`AETHERIS_ENVIRONMENT=production`) hard-requires: a real provider key (simulation fallback refused), `AETHERIS_METRICS_TOKEN` (the `/metrics` endpoint refuses to serve without it), `DATABASE_SSL=true`, and an explicit CORS origin allowlist (wildcards are rejected at startup).
+* Both `/api/config/vault` endpoints are admin-only; the frontend degrades gracefully for non-admins.
+
 ---
 
 ## Project Structure
@@ -266,7 +317,9 @@ aetheris/
 ├── main.py                    # CLI entry point (REPL + --web flag)
 ├── server.py                  # FastAPI web server & auth/page routing
 ├── aetheris_login.html        # Dedicated dark-mode login & sign-up UI (/login)
-├── requirements.txt           # Python backend dependencies
+├── requirements.txt           # Backend dependency ranges (starlette floor ≥0.47.2)
+├── requirements.lock          # Hashed pins — what CI installs (G4-verified)
+├── requirements-dev.txt       # pytest / ruff (contributors + CI)
 ├── .env                       # Environment variables (gitignored)
 ├── .gitignore
 │
@@ -288,10 +341,15 @@ aetheris/
 │
 ├── orchestrator/
 │   ├── pipelines.py           # Micro-Mode async execution pipeline (legacy, load-bearing)
-│   ├── evaluation.py          # Synthesis judge (arbitrate + validate)
+│   ├── evaluation.py          # Synthesis judge (arbitrate + validate, G1-delimited prompts)
+│   ├── claims.py              # Hallucination firewall: claim extraction + v2 measured
+│   │                          #   support scoring (coverage gate, frozen corpus G3)
+│   ├── memory_search.py       # Owner-scoped lexical turn search (tsvector + GIN) +
+│   │                          #   hydrate_history fallback for the query endpoints
+│   ├── reasoning_graph.py     # Failure-pattern graph (owner-scoped)
 │   ├── conversation.py        # Conversation state & dialogue tracking
 │   ├── streaming.py           # Real-time SSE event streaming
-│   ├── memory.py              # Epistemic failure-tracking bus
+│   ├── memory.py              # Epistemic failure-tracking bus (owner-scoped)
 │   │                          # --- Adaptive v1 runtime (flag-gated, default off) ---
 │   ├── feature_flags.py       # Typed AETHERIS_ENABLE_* accessor (env > file > off)
 │   ├── strategic_planner.py   # LLM-assisted decomposition → StrategicPlan
@@ -328,10 +386,22 @@ aetheris/
 │   └── capabilities/          # model_capabilities, provider_limits, pricing,
 │                              # routing_defaults, prediction_calibration
 │
+├── migrations/                # Alembic chain 001 → 005 (005: memory-search
+│                              #   tsvector + GIN + (session_id, timestamp DESC))
+├── tools/                     # CI checkers: check_pins (G4 lockfile),
+│                              #   generate_api_reference (docs/api.md gate)
+│
 ├── telemetry/
-│   └── observer.py            # Token/cost tracking & session reports
+│   └── observer.py            # Token/cost tracking (provider-measured usage),
+│                              #   estimate_cost_usd, session reports
 │
 ├── frontend/                  # Modern React 19 + Vite + GSAP web dashboard
+│                              #   (the product frontend — served by server.py,
+│                              #    cookie-auth, built + linted in CI)
+├── evals/                     # Measurement layer: golden set (n=50) + frozen
+│                              #   firewall corpus (66 rows) + exact McNemar gate,
+│                              #   β tooling, live capture (`python -m evals.capture`)
+│                              #   and integrity validator (`python -m evals.validate`)
 │
 └── docs/
     ├── images/                # Visual UI screenshots & previews
@@ -351,11 +421,19 @@ aetheris/
 
 ## Operating Modes
 
-| Mode | Models Used | Cost | Best For |
-|------|------------|------|----------|
-| `FREE` | Llama 3, Mistral, Gemma | $0 | Testing, development, low-stakes queries |
-| `HYBRID` | Claude 3.5 Sonnet + GPT-4o-mini + Llama 3 fallback | Low | Balanced quality and cost |
-| `PAID` | Claude 3.5 Sonnet + GPT-4o + Llama 3.1 70B | Higher | Maximum accuracy, production use |
+Fallback chains verified live 2026-08 (`api_gateway/strategy.py`); per-million-token pricing in `config/capabilities/pricing.json`.
+
+| Mode | Fallback chain (generation role) | Cost | Best For |
+|------|----------------------------------|------|----------|
+| `FREE` | Gemini 3.5 Flash-Lite → GPT-OSS-120B → GPT-OSS-20B | Lowest | Testing, development, low-stakes queries |
+| `HYBRID` | Gemini 3.7 Flash → GPT-OSS-120B → Gemini 3.5 Flash-Lite | Low | Balanced quality and cost |
+| `PAID` | Claude Sonnet 5 → Gemini Pro (latest) → Gemini 3.7 Flash | Higher | Maximum accuracy, production use |
+
+Routes re-verified live on the first live capture (2026-08-22): the Gemini 2.5
+line is unavailable to new API keys and `unli/*` returns 401 — both removed
+from every map. Groq accepts ~20KB request bodies but rejects ~30KB (HTTP
+413); the per-call runtime-contract layer was slimmed to the output-shaping
+contracts so Groq stays a viable fallback.
 
 ---
 
@@ -363,10 +441,11 @@ aetheris/
 
 | Problem | Solution |
 |---------|----------|
-| `ImportError: No module named 'json_repair'` | Run `pip install -r requirements.txt` |
+| `ImportError: No module named 'json_repair'` | Run `pip install -r requirements.lock --require-hashes` |
 | All queries return `"KNOWLEDGE ABSENCE DETECTED"` | The Breaker agent is conservative. Try queries with more factual grounding. |
 | Provider shows `DEAD` in status | The provider hit 3 failures. It will auto-recover after 60 seconds. Check your API key. |
-| Web UI shows 404 | Ensure `web/index.html` exists. The server serves it from the `web/` directory. |
+| Server exits: "PostgreSQL is unreachable or not at the required Alembic revision" | Run `alembic upgrade head` (chain 001→005), then restart. Startup verifies the schema on purpose — it fails loudly instead of serving against drift. |
+| Web UI shows 404 | The dashboard is served from `frontend/dist/` — build it: `cd frontend && npm install && npm run build`. In development you can also run the Vite dev server against the API. |
 
 ---
 

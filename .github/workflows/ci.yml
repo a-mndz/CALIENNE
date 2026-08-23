@@ -15,7 +15,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.13"
+          python-version: "3.11"
       - name: Decision register
         run: python tools/check_decision_register.py
       - name: RFC index
@@ -27,6 +27,8 @@ jobs:
         run: |
           git fetch origin "${{ github.base_ref }}"
           python tools/check_architecture_version.py --base-ref "origin/${{ github.base_ref }}"
+      - name: Dependency pinning (G4)
+        run: python tools/check_pins.py
 
   backend:
     name: Backend lint and tests
@@ -44,12 +46,18 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.13"
+          python-version: "3.11"
           cache: pip
       - name: Install dependencies
-        run: pip install -r requirements.txt -r requirements-dev.txt
+        # requirements.lock is the hashed, fully-pinned resolution of
+        # requirements.txt (uv pip compile). Installing it makes CI
+        # reproducible; regenerate with:
+        #   uv pip compile requirements.txt -o requirements.lock --generate-hashes
+        run: pip install -r requirements.lock -r requirements-dev.txt
       - name: Ruff
         run: python -m ruff check .
+      - name: Golden-set + corpus integrity (G5)
+        run: python -m evals.validate
       - name: API reference up to date
         run: python tools/generate_api_reference.py --check
       - name: Tests (non-slow)
@@ -84,9 +92,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.13"
+          python-version: "3.11"
           cache: pip
       - name: Install dependencies
-        run: pip install -r requirements.txt -r requirements-dev.txt
+        run: pip install -r requirements.lock -r requirements-dev.txt
       - name: Slow integration tests (testcontainers PostgreSQL)
         run: python -m pytest -m "slow" -q

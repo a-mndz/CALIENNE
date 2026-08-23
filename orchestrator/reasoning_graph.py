@@ -127,9 +127,15 @@ class ReasoningGraph:
         explanation: str,
         score: float,
         agent_outputs: dict[str, Any],
+        *,
+        owner: str = "",
     ) -> str:
         """
         Record a pipeline failure as a query node with failure edges.
+
+        *owner* scopes the pattern to one identity (e.g. the authenticated
+        user's email) so query content and agent outputs recorded for one
+        account are never replayed into another account's prompts.
 
         Returns the query node_id.
         """
@@ -141,6 +147,7 @@ class ReasoningGraph:
                 "explanation": explanation,
                 "score": score,
                 "agent_outputs": agent_outputs,
+                "owner": owner,
             },
         )
         self.add_node(query_node)
@@ -164,18 +171,22 @@ class ReasoningGraph:
         )
         return query_node.node_id
 
-    def get_failure_patterns(self, query: str) -> list[dict[str, Any]]:
+    def get_failure_patterns(self, query: str, *, owner: str = "") -> list[dict[str, Any]]:
         """
         Retrieve relevant failure patterns for similar queries.
 
         Uses case-insensitive substring containment matching, same as
-        EpistemicMemory for backward compatibility.
+        EpistemicMemory for backward compatibility. Only nodes whose
+        recorded *owner* matches are visible, so one account's failure
+        patterns never surface for another account's query.
         """
         query_normalised = query.strip().lower()
         patterns: list[dict[str, Any]] = []
 
         for node in self._nodes.values():
             if node.node_type != NodeType.QUERY:
+                continue
+            if node.metadata.get("owner", "") != owner:
                 continue
             content_lower = node.content.strip().lower()
             if (

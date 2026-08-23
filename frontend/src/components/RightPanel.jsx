@@ -38,11 +38,11 @@ const RightPanel = memo(function RightPanel({ open, stats, models, conversations
                 </div>
                 <div className="stat-tile">
                   <div className="stat-label">Avg. Response</div>
-                  <div className="stat-value">{stats.avgResponse}s</div>
+                  <div className="stat-value">{stats.avgResponse}{stats.avgResponse !== "—" && "s"}</div>
                 </div>
                 <div className="stat-tile">
                   <div className="stat-label">Success Rate</div>
-                  <div className="stat-value">{stats.successRate}%</div>
+                  <div className="stat-value">{stats.successRate}{stats.successRate !== "—" && "%"}</div>
                 </div>
               </>
             ) : (

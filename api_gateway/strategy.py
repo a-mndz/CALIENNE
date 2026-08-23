@@ -81,55 +81,73 @@ class StrategyMode(str, Enum):
 # Models are specified as OpenRouter-style identifiers so the downstream
 # ``provider_pool`` can route them to the correct gateway.
 
+# Verified alive 2026-08-21 (research/AETHERIS_RESEARCH_2026-08-21.md, Tier 0.3):
+# - github/* routes retired 30 Jul 2026 — removed.
+# - Groq's production list contains no Llama models; llama-3.3-70b-versatile and
+#   llama-3.1-8b-instant 404. Replaced with Groq-hosted openai/gpt-oss-*,
+#   which are also the only Groq models eligible for the 50% cached-input
+#   discount (min 128–1,024 token prefix, 2h TTL).
+# - openrouter/anthropic/claude-3.5-sonnet retired 28 Oct 2025. PAID primary
+#   repointed to claude-sonnet-5 (generation/breaker) and claude-opus-5 (judge).
+# Live-verified 2026-08-22 (first live capture attempt — see
+# research/AUDIT_2026-08-22-live-capture notes):
+# - google/gemini-2.5-* is "no longer available to new users" per the API;
+#   this key's live text models are the 3.x line (verified via /v1beta/models).
+# - unli/* returns HTTP 401 on every model (stale key) — dropped everywhere.
+# - openai/gpt-4o-mini returned HTTP 429 (quota) on the same night; kept only
+#   as a PAID breaker middle hop.
+# - Groq accepts ~20KB request bodies but rejects ~30KB (HTTP 413): the
+#   per-call runtime-contract layer was slimmed to the output-shaping
+#   contracts (agents/prompt_manager.py) so Groq stays a viable fallback.
+# - Google endpoints accept the full layered prompt.
 FREE_MODELS: Dict[str, List[str]] = {
     "generation": [
-        "google/gemini-2.5-flash",
-        "github/meta-llama-3.1-70b-instruct",
-        "groq/llama-3.3-70b-versatile",
+        "google/gemini-3.5-flash-lite",
+        "groq/openai/gpt-oss-120b",
+        "groq/openai/gpt-oss-20b",
     ],
     "breaker": [
-        "google/gemini-2.5-flash",
-        "groq/llama-3.1-8b-instant",
+        "google/gemini-3.5-flash-lite",
+        "groq/openai/gpt-oss-20b",
     ],
     "judge": [
-        "google/gemini-2.5-pro",
-        "github/meta-llama-3.1-70b-instruct",
+        "google/gemini-3.5-flash-lite",
+        "groq/openai/gpt-oss-120b",
     ],
 }
 
 HYBRID_MODELS: Dict[str, List[str]] = {
     "generation": [
-        "groq/llama-3.3-70b-versatile",
-        "unli/deepseek-chat",
-        "openai/gpt-4o-mini",
+        "google/gemini-3.7-flash",
+        "groq/openai/gpt-oss-120b",
+        "google/gemini-3.5-flash-lite",
     ],
     "breaker": [
-        "unli/gpt-4o-mini",
-        "groq/llama-3.1-8b-instant",
-        "openai/gpt-4o-mini",
+        "google/gemini-3.5-flash-lite",
+        "groq/openai/gpt-oss-20b",
     ],
     "judge": [
-        "groq/llama-3.3-70b-versatile",
-        "unli/deepseek-chat",
-        "unli/gpt-4o-mini",
+        "google/gemini-3.7-flash",
+        "groq/openai/gpt-oss-120b",
+        "google/gemini-3.5-flash-lite",
     ],
 }
 
 PAID_MODELS: Dict[str, List[str]] = {
     "generation": [
-        "openrouter/anthropic/claude-3.5-sonnet",
-        "openai/gpt-4o",
-        "unli/deepseek-chat",
+        "openrouter/anthropic/claude-sonnet-5",
+        "google/gemini-pro-latest",
+        "google/gemini-3.7-flash",
     ],
     "breaker": [
+        "google/gemini-3.5-flash-lite",
         "openai/gpt-4o-mini",
-        "unli/gpt-4o-mini",
-        "openrouter/anthropic/claude-3.5-sonnet",
+        "openrouter/anthropic/claude-sonnet-5",
     ],
     "judge": [
-        "openrouter/anthropic/claude-3.5-sonnet",
-        "openai/gpt-4o",
-        "unli/gpt-4o",
+        "openrouter/anthropic/claude-opus-5",
+        "google/gemini-pro-latest",
+        "google/gemini-3.7-flash",
     ],
 }
 
