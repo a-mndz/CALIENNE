@@ -25,7 +25,7 @@ def _scratch_file(name: str) -> Path:
 
 
 def test_architecture_version_constant() -> None:
-    assert architecture_version == "0.1.7"
+    assert architecture_version == "0.1.8"
 
 
 def test_capture_environment_snapshot_returns_all_four_keys() -> None:

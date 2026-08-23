@@ -39,7 +39,6 @@ from pathlib import Path
 # (found the hard way 2026-08-22: the first "baseline" was byte-identical
 # across different prompts).
 import secrets_bootstrap  # noqa: F401  (side-effecting import)
-
 from api_gateway.rate_limiter import AsyncAPIGateway, ProviderPool
 from api_gateway.strategy import ProviderStrategy
 from orchestrator.aetheris_orchestrator import (

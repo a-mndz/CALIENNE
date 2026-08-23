@@ -898,7 +898,9 @@ class AsyncAPIGateway:
                 )
 
             try:
-                response = await self._guarded_call(model, prompt, system_prompt, history, max_tokens=max_tokens)
+                response = await self._guarded_call(
+                    model, prompt, system_prompt, history, max_tokens=max_tokens
+                )
                 usage = get_last_provider_usage()
                 latency_ms = (
                     float(usage.get("latency_s", 0.0)) * 1000.0
@@ -969,7 +971,9 @@ class AsyncAPIGateway:
                     if self._call_fn:
                         response = await self._call_fn(model, prompt, system_prompt, history)
                     else:
-                        response = await self._client.post_request(model, prompt, system_prompt, history, max_tokens=max_tokens)
+                        response = await self._client.post_request(
+                            model, prompt, system_prompt, history, max_tokens=max_tokens
+                        )
 
                     elapsed = time.monotonic() - start
                     logger.debug("Model '%s' responded in %.2fs.", model, elapsed)
