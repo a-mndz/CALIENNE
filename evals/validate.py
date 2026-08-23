@@ -34,11 +34,8 @@ SHINGLE_LEN = 40
 
 
 def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with open(path, "rb") as fh:
-        for chunk in iter(lambda: fh.read(65536), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    content = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(content).hexdigest()
 
 
 def load_golden(version: str = "v1") -> tuple[list[dict], dict]:
