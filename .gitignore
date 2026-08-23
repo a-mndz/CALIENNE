@@ -79,6 +79,7 @@ PROJECT_ANALYSIS_2026-07-11.md
 findings.md
 CHANGELOG.md
 calienne-ui
+aetheris-ui
 
 # Local config & tooling
 # NOTE: pytest.ini, .ruff.toml and alembic.ini must stay tracked — CI's backend
