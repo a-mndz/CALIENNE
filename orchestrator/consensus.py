@@ -1,6 +1,6 @@
 """Weighted consensus engine + dynamic judge allocation (RFC-003 §8/§10).
 
-Gate: AETHERIS_ENABLE_CONSENSUS.
+Gate: CALIENNE_ENABLE_CONSENSUS.
 
 Inputs: outputs from multiple models or judges.
 Outputs: raw + weighted agreement, agreement matrix, disagreement clusters,
@@ -19,7 +19,7 @@ from typing import Any
 
 from pydantic import Field as PydanticField
 
-from core.base import AetherisBaseModel
+from core.base import CalienneBaseModel
 
 LOGGER = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ _FALLBACK_WEIGHT = 0.5
 # ── Schemas ───────────────────────────────────────────────────────────
 
 
-class MinorityView(AetherisBaseModel):
+class MinorityView(CalienneBaseModel):
     """A dissenting position from a minority judge (RFC-003 §10)."""
 
     claim: str = ""
@@ -41,7 +41,7 @@ class MinorityView(AetherisBaseModel):
     reason: str = ""
 
 
-class JudgePlan(AetherisBaseModel):
+class JudgePlan(CalienneBaseModel):
     """Dynamic judge allocation plan (RFC-003 §8)."""
 
     judge_count: int = 1
@@ -50,7 +50,7 @@ class JudgePlan(AetherisBaseModel):
     model_weighting_strategy: str = "equal"
 
 
-class ConsensusResult(AetherisBaseModel):
+class ConsensusResult(CalienneBaseModel):
     """Full consensus output from the engine."""
 
     raw_agreement: float = 0.0

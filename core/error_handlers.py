@@ -1,9 +1,9 @@
 """
-Shared error handling utilities for AETHERIS components.
+Shared error handling utilities for CALIENNE components.
 
 This module provides common error handling patterns extracted from
 duplicate code across the codebase, including:
-- Base exception classes for AETHERIS errors
+- Base exception classes for CALIENNE errors
 - Decorators for API gateway and pipeline error handling
 - Timeout handling utilities
 - Error recording helpers for ExecutionPassport
@@ -26,8 +26,8 @@ T = TypeVar("T")
 # ── Base Exception Classes ──────────────────────────────────────────────
 
 
-class AETHERISException(Exception):
-    """Base exception for all AETHERIS component errors."""
+class CALIENNEException(Exception):
+    """Base exception for all CALIENNE component errors."""
 
     def __init__(self, message: str, component: str = "", details: dict | None = None):
         self.component = component
@@ -44,14 +44,14 @@ class AETHERISException(Exception):
 from core.security import SecurityValidationError  # noqa: E402,F401
 
 
-class PipelineError(AETHERISException):
+class PipelineError(CALIENNEException):
     """Raised when a pipeline stage encounters an error."""
 
     def __init__(self, stage: str, message: str, details: dict | None = None):
         super().__init__(message, component=f"pipeline.{stage}", details=details)
 
 
-class TimeoutError(AETHERISException):
+class TimeoutError(CALIENNEException):
     """Raised when an operation exceeds its timeout."""
 
     def __init__(self, operation: str, timeout_sec: float, component: str = ""):
@@ -62,7 +62,7 @@ class TimeoutError(AETHERISException):
         )
 
 
-class ProviderError(AETHERISException):
+class ProviderError(CALIENNEException):
     """Raised when a provider operation fails."""
 
     def __init__(self, provider: str, message: str, details: dict | None = None):

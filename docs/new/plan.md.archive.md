@@ -1,4 +1,4 @@
-# Adaptive AETHERIS Pipeline Plan
+# Adaptive CALIENNE Pipeline Plan
 
 ## Current Findings
 
@@ -55,7 +55,7 @@ This makes later improvements data-driven instead of guesswork.
 
 ### 2. Add shared decision and graph schemas
 
-Extend `core/schemas.py` with small, reusable contracts while preserving backward compatibility for existing `AgentOutput` and `aetherisOutput` parsing.
+Extend `core/schemas.py` with small, reusable contracts while preserving backward compatibility for existing `AgentOutput` and `calienneOutput` parsing.
 
 Add `TaskProfile`:
 
@@ -779,14 +779,14 @@ Use this compromise:
 - Unit tests for reflection/repair loop stopping at `max_repairs`.
 - Unit tests for consensus agreement matrix and weighted agreement.
 - Unit tests for hallucination firewall removing or qualifying unsupported claims.
-- Regression tests for existing `AgentOutput` and `aetherisOutput` parsing.
+- Regression tests for existing `AgentOutput` and `calienneOutput` parsing.
 - Integration test for `/api/query` proving passport metrics are returned.
 - Integration test for streaming events proving graph/node stages are emitted.
 - Integration test proving deterministic fallback is used when planner output is invalid.
 
 ## Clarifying Choices
 
-- Should this be implemented behind a feature flag first, such as `AETHERIS_ADAPTIVE_PIPELINE_ENABLED=true`, or should it replace the current `DecisionEngine` path directly?
+- Should this be implemented behind a feature flag first, such as `CALIENNE_ADAPTIVE_PIPELINE_ENABLED=true`, or should it replace the current `DecisionEngine` path directly?
 - Do you want the first implementation to prioritize cost savings, answer quality, latency, or dashboard visibility?
 - Should `Critical -> Full Pipeline` be reserved for safety-sensitive/high-risk tasks only, or should users be able to force it manually?
 - Should the planner agent be enabled only for high/critical tasks at first, with deterministic templates for low/medium tasks?
@@ -860,7 +860,7 @@ Replay modes:
 - `shadow` (use recorded outputs where available, recompute the rest).
 - `simulate` (use recorded outputs everywhere, no provider calls) — for debugging and tests.
 
-Stored under `telemetry/`, indexed by `(graph_version, prompt_fingerprint)`. Retention: **configurable, default 30 days** (Q6). Add a `/api/debug/replay/{trace_id}` endpoint gated by `AETHERIS_ENABLE_REPLAY`.
+Stored under `telemetry/`, indexed by `(graph_version, prompt_fingerprint)`. Retention: **configurable, default 30 days** (Q6). Add a `/api/debug/replay/{trace_id}` endpoint gated by `CALIENNE_ENABLE_REPLAY`.
 
 ### P2-5. Better Prediction
 
@@ -891,7 +891,7 @@ New `orchestrator/meta_reasoner.py`:
 - Runs after `ExecutionPlanner` produces a graph, and again at any `NodeCompleted` transition (cheap re-check).
 - Checks: redundancy, parallelism opportunities, stage skipping, contract compatibility, resource waste, budget pressure, consensus overkill.
 - Mutates the graph via a constrained `GraphMutation` API: `merge_nodes`, `skip_stage`, `downgrade_tier`, `cancel_branch`, `reorder` (Q7).
-- **No upgrade authority.** Upgrading model tier is reserved for `PredictionLayer` + `ResourceManager`. Future gate: `AETHERIS_ENABLE_META_ESCALATION` (default off; locked naming per OQ2).
+- **No upgrade authority.** Upgrading model tier is reserved for `PredictionLayer` + `ResourceManager`. Future gate: `CALIENNE_ENABLE_META_ESCALATION` (default off; locked naming per OQ2).
 - Bounded: max N mutations per run; mutation budget consumed from the critique/repair budget. Records a `mutation_audit_trail` on the trace.
 
 ### P2-8. Knowledge / Reasoning / Validation Separation
@@ -902,7 +902,7 @@ Three explicit layers, each a module:
 - `orchestrator/reasoning_layer.py`: consumes knowledge, runs plan + agents, produces candidate outputs. No retrieval calls; no judging.
 - `orchestrator/validation_layer.py`: judge, consensus, repair, firewall. Owns `StageAssessment` and `ClarificationRequest`.
 
-Today these are smeared across RAG (item 18) and `DecisionEngine`; this is a refactor, not a rewrite, staged behind `AETHERIS_ENABLE_KNOWLEDGE_LAYER`.
+Today these are smeared across RAG (item 18) and `DecisionEngine`; this is a refactor, not a rewrite, staged behind `CALIENNE_ENABLE_KNOWLEDGE_LAYER`.
 
 ### P2-9. Experience Database
 
@@ -917,7 +917,7 @@ Feeds:
 - `PredictionLayer` (calibration priors).
 - `RoutingFeedback` (offline policy tuning).
 
-**Strictly offline-only in v1 (Q8).** Promotion pipeline: `Experience DB → Offline Evaluation → Benchmark → Shadow Run → Manual Review → Merge → Release`. No live rerouting. Gated by `AETHERIS_ENABLE_EXPERIENCE_DB`.
+**Strictly offline-only in v1 (Q8).** Promotion pipeline: `Experience DB → Offline Evaluation → Benchmark → Shadow Run → Manual Review → Merge → Release`. No live rerouting. Gated by `CALIENNE_ENABLE_EXPERIENCE_DB`.
 
 ### P2-10. Agent Contracts (Input + Output + Failure)
 
@@ -933,7 +933,7 @@ New `orchestrator/contracts.py`:
 - `validate_outputs(node, produced)` — runs after a node completes.
 - `to_failure_response(node, failure)` — emits the structured failure event.
 
-All three contract types are Pydantic models. They are **backward-compatible** (Guardrail 2): fields are `Optional` with explicit defaults, and the models inherit from `AetherisBaseModel` (global `extra="ignore"`, see Guardrail 2). Nodes become interchangeable: a different agent that satisfies the same triple can be swapped without graph changes.
+All three contract types are Pydantic models. They are **backward-compatible** (Guardrail 2): fields are `Optional` with explicit defaults, and the models inherit from `CalienneBaseModel` (global `extra="ignore"`, see Guardrail 2). Nodes become interchangeable: a different agent that satisfies the same triple can be swapped without graph changes.
 
 ## Guardrails (Phase 1.5 — apply during implementation)
 
@@ -949,12 +949,12 @@ The event-driven scheduler (P2-6) is the only consumer of the ready-set. Concurr
 
 ### G2. Pydantic Schema Policy
 
-All schemas in `core/schemas.py` (and any new schema file) inherit from a shared `AetherisBaseModel` with `model_config = ConfigDict(extra="ignore")`. This is a **global** safety net (Path E / option (b) from the planning thread): upstream orchestration components may emit rich adaptive fields that a legacy downstream node hasn't been refactored to parse yet, and the global ignore prevents structural validation failure during incremental migration.
+All schemas in `core/schemas.py` (and any new schema file) inherit from a shared `CalienneBaseModel` with `model_config = ConfigDict(extra="ignore")`. This is a **global** safety net (Path E / option (b) from the planning thread): upstream orchestration components may emit rich adaptive fields that a legacy downstream node hasn't been refactored to parse yet, and the global ignore prevents structural validation failure during incremental migration.
 
 Critical contracts opt into `extra="forbid"` explicitly:
 
 ```python
-class ProviderConfig(AetherisBaseModel):
+class ProviderConfig(CalienneBaseModel):
     model_config = ConfigDict(extra="forbid")
     ...
 ```
@@ -976,7 +976,7 @@ Capability files live under `config/capabilities/` (split layout, Path E). Never
 - `config/capabilities/routing_defaults.json` — default orchestration policies (per-route `preferred_model_tier`, `max_judges`, `allow_repair`, `target_latency_ms`, `requires_rag`, `minimum_sources`).
 - `config/capabilities/prediction_calibration.json` — `(route, complexity, prompt_fingerprint_bucket) -> probability` priors.
 
-Loader contract: `api_gateway/capabilities.py` reads on import and on a config-reload signal. Override path: `AETHERIS_CAPABILITIES_PATH=/abs/path/to/dir` for tests and per-env overrides. On load failure (missing file, malformed JSON, out-of-range weights, unknown `task_type`): log a warning, fall back to a neutral default of `0.5` for the affected model, and emit a `capability_load_failed` metric. **Never** raise into the request path. Validate at load: every weight in `[0.0, 1.0]`; every `task_type` in an allowlist; reject duplicate model IDs.
+Loader contract: `api_gateway/capabilities.py` reads on import and on a config-reload signal. Override path: `CALIENNE_CAPABILITIES_PATH=/abs/path/to/dir` for tests and per-env overrides. On load failure (missing file, malformed JSON, out-of-range weights, unknown `task_type`): log a warning, fall back to a neutral default of `0.5` for the affected model, and emit a `capability_load_failed` metric. **Never** raise into the request path. Validate at load: every weight in `[0.0, 1.0]`; every `task_type` in an allowlist; reject duplicate model IDs.
 
 Tests must not depend on the real config; pass a temp directory or use a `monkeypatch`-able loader.
 
@@ -994,9 +994,9 @@ Experience DB
   -> Release
 ```
 
-`AETHERIS_ENABLE_SELF_LEARNING` exists but only gates adaptive routing in v2; it does **not** auto-promote in v1. No `AETHERIS_AUTO_CALIBRATE` flag.
+`CALIENNE_ENABLE_SELF_LEARNING` exists but only gates adaptive routing in v2; it does **not** auto-promote in v1. No `CALIENNE_AUTO_CALIBRATE` flag.
 
-A nightly CLI (`python -m aetheris calibrate --since 30d`) compares predicted vs actual per `(model, task_type)` and writes a *proposed* `*.proposed.json`; promotion is a PR. `ProviderStrategy.version` reads the matrix's `version` field; a bump invalidates in-flight graphs whose `strategy_version` doesn't match.
+A nightly CLI (`python -m calienne calibrate --since 30d`) compares predicted vs actual per `(model, task_type)` and writes a *proposed* `*.proposed.json`; promotion is a PR. `ProviderStrategy.version` reads the matrix's `version` field; a bump invalidates in-flight graphs whose `strategy_version` doesn't match.
 
 ### G5. Concurrency Source (Provider + Model + Runtime)
 
@@ -1028,23 +1028,23 @@ Every important decision is versioned and stamped onto the graph/experience. Req
 
 Stored on `VersionStamp`, attached to `TaskGraph`, `StrategicPlan`, every `Experience`, every `ExecutionTrace`, and the request `ExecutionPassport`. A bug report must be answerable from the trace alone: "which planner/scheduler/capabilities/prompt version produced this output?" Rollback rule: a version bump invalidates in-flight graphs whose stamp doesn't match; existing graphs continue to completion under their stamped versions.
 
-Implementation: `orchestrator/versioning.py` owns all of the above. Per-skill `prompt_versions` are stored in `config/prompt_versions.json` (not in `skills.py`), loaded with the same env-override pattern as the capabilities files (`AETHERIS_PROMPT_VERSIONS_PATH` → default `config/prompt_versions.json` → `skills.py` built-in defaults with a warning). Resolution order: env override → default config → built-in safe defaults.
+Implementation: `orchestrator/versioning.py` owns all of the above. Per-skill `prompt_versions` are stored in `config/prompt_versions.json` (not in `skills.py`), loaded with the same env-override pattern as the capabilities files (`CALIENNE_PROMPT_VERSIONS_PATH` → default `config/prompt_versions.json` → `skills.py` built-in defaults with a warning). Resolution order: env override → default config → built-in safe defaults.
 
 ### G7. Feature Flags
 
-Per-subsystem flags using the `AETHERIS_ENABLE_<SUBSYSTEM>` namespace, defaulting to **off** for every new subsystem in v1:
+Per-subsystem flags using the `CALIENNE_ENABLE_<SUBSYSTEM>` namespace, defaulting to **off** for every new subsystem in v1:
 
-- `AETHERIS_ENABLE_PLANNER`
-- `AETHERIS_ENABLE_DAG`
-- `AETHERIS_ENABLE_CONSENSUS`
-- `AETHERIS_ENABLE_RAG`
-- `AETHERIS_ENABLE_REPAIR`
-- `AETHERIS_ENABLE_PREDICTION`
-- `AETHERIS_ENABLE_CONTEXT`
-- `AETHERIS_ENABLE_SKILLS`
-- `AETHERIS_ENABLE_EXPERIENCE_DB`
-- `AETHERIS_ENABLE_META_ESCALATION` (default off; reserved for future; MetaReasoner never escalates in v1)
-- `AETHERIS_ENABLE_SELF_LEARNING` (default off; gates adaptive routing in v2; never auto-promotes)
+- `CALIENNE_ENABLE_PLANNER`
+- `CALIENNE_ENABLE_DAG`
+- `CALIENNE_ENABLE_CONSENSUS`
+- `CALIENNE_ENABLE_RAG`
+- `CALIENNE_ENABLE_REPAIR`
+- `CALIENNE_ENABLE_PREDICTION`
+- `CALIENNE_ENABLE_CONTEXT`
+- `CALIENNE_ENABLE_SKILLS`
+- `CALIENNE_ENABLE_EXPERIENCE_DB`
+- `CALIENNE_ENABLE_META_ESCALATION` (default off; reserved for future; MetaReasoner never escalates in v1)
+- `CALIENNE_ENABLE_SELF_LEARNING` (default off; gates adaptive routing in v2; never auto-promotes)
 
 Implementation: single `orchestrator/feature_flags.py` with a typed accessor (`flags.planner`, `flags.dag`, ...) so the code reads `if flags.planner:` not `if os.getenv(...)`. Flags load from env with precedence: env > `config/feature_flags.json` > hardcoded default. The `ExecutionManifest` (G9) snapshots the **full set with explicit booleans**, not just the enabled ones, to preserve "disabled" vs "didn't exist" vs "wasn't loaded" distinctions.
 
@@ -1056,7 +1056,7 @@ Implementation: single `orchestrator/feature_flags.py` with a typed accessor (`f
 
 ```python
 git_commit = (
-    os.getenv("AETHERIS_GIT_COMMIT")
+    os.getenv("CALIENNE_GIT_COMMIT")
     or os.getenv("GIT_COMMIT")
     or _read_ci_metadata()  # reads .git_commit_sha
     or "unknown"
@@ -1079,11 +1079,11 @@ A single immutable `ExecutionManifest` per request, attached to `TaskGraph`, `Ex
   "capabilities_version": "4",
   "prompt_versions": { "coder": "7", "security": "5" },
   "feature_flags": {
-    "AETHERIS_ENABLE_PLANNER": true,
-    "AETHERIS_ENABLE_DAG": true,
-    "AETHERIS_ENABLE_CONSENSUS": false,
-    "AETHERIS_ENABLE_REPAIR": true,
-    "AETHERIS_ENABLE_SELF_LEARNING": false
+    "CALIENNE_ENABLE_PLANNER": true,
+    "CALIENNE_ENABLE_DAG": true,
+    "CALIENNE_ENABLE_CONSENSUS": false,
+    "CALIENNE_ENABLE_REPAIR": true,
+    "CALIENNE_ENABLE_SELF_LEARNING": false
   },
   "git_commit": "4f8e9ab"
 }
@@ -1121,22 +1121,22 @@ Implementation: `tools/check_architecture_version.py` invoked from CI; same scri
 
 | Question | Decision |
 | --- | --- |
-| Q1 Pydantic scope | Global `AetherisBaseModel` with `extra="ignore"`; critical contracts opt into `extra="forbid"`. |
+| Q1 Pydantic scope | Global `CalienneBaseModel` with `extra="ignore"`; critical contracts opt into `extra="forbid"`. |
 | Q2 Capability file layout | Split: `config/capabilities/{model_capabilities,provider_limits,pricing,routing_defaults}.json` (+ `prediction_calibration.json`). |
 | Q3 Concurrency source | Both — provider limits in `provider_limits.json`; per-model `max_concurrency` in `model_capabilities.json`; `ResourceManager` reconciles to `effective_parallel`. |
 | Q4 Strategic Planner | Hybrid: deterministic complexity router → `needs_decomposition` → LLM planner; otherwise template graph. |
 | Q5 Resource Manager scope | Global with per-route overrides; no per-tenant in v1. |
 | Q6 Replay retention | Configurable, default 30 days. |
-| Q7 MetaReasoner permissions | Merge / skip / downgrade / reorder only; no upgrade. `AETHERIS_ENABLE_META_ESCALATION` is the future-gate name. |
+| Q7 MetaReasoner permissions | Merge / skip / downgrade / reorder only; no upgrade. `CALIENNE_ENABLE_META_ESCALATION` is the future-gate name. |
 | Q8 Experience DB utilization | Strictly offline-only in v1. Manual-PR promotion only. |
-| Q9 Feature-flag naming | `AETHERIS_ENABLE_<SUBSYSTEM>` namespace. |
+| Q9 Feature-flag naming | `CALIENNE_ENABLE_<SUBSYSTEM>` namespace. |
 | Q10 Prompt template versioning | Per-skill granularity, stored in `config/prompt_versions.json`. |
 | OQ1 Resource-policy file name | `config/capabilities/routing_defaults.json` — route policy only. |
-| OQ2 Meta-escalation flag name | `AETHERIS_ENABLE_META_ESCALATION`. |
+| OQ2 Meta-escalation flag name | `CALIENNE_ENABLE_META_ESCALATION`. |
 | OQ3 Initial `architecture_version` | `0.1.0`. |
-| OQ4 `git_commit` capture | `AETHERIS_GIT_COMMIT` → `GIT_COMMIT` → CI file → `"unknown"`. No subprocess at request time. |
-| OQ5 Prompt version storage | `config/prompt_versions.json` with `AETHERIS_PROMPT_VERSIONS_PATH` override; env → default → `skills.py` fallback. |
-| OQ-A `git_commit` precedence | AETHERIS-namespaced var wins. |
+| OQ4 `git_commit` capture | `CALIENNE_GIT_COMMIT` → `GIT_COMMIT` → CI file → `"unknown"`. No subprocess at request time. |
+| OQ5 Prompt version storage | `config/prompt_versions.json` with `CALIENNE_PROMPT_VERSIONS_PATH` override; env → default → `skills.py` fallback. |
+| OQ-A `git_commit` precedence | CALIENNE-namespaced var wins. |
 | OQ-B `prompt_versions.json` override | Yes; same pattern as `capabilities.json`. |
 | OQ-C `architecture_version` enforcement | Hard CI fail, scoped to architectural files only. |
 | OQ-D `ExecutionManifest` immutability | Frozen Pydantic model (`ConfigDict(frozen=True)`). |
@@ -1147,12 +1147,12 @@ Implementation: `tools/check_architecture_version.py` invoked from CI; same scri
 | OQ-I CI architectural-file scope | See G4-enforcement watchlist. |
 | OQ-J CI lint location | `tools/check_architecture_version.py` invoked from CI; same script usable locally. |
 | OQ-K "Relevant" feature flags | Every flag declared in `orchestrator/feature_flags.py`'s typed accessor. |
-| OQ-L `AETHERIS_ENABLE_META_ESCALATION` default | Off; requires deliberate flip. |
+| OQ-L `CALIENNE_ENABLE_META_ESCALATION` default | Off; requires deliberate flip. |
 | New (this thread) | `manifest_schema_version` decoupled from `architecture_version`. |
 
 ## Open Implementation Details (non-blocking)
 
-- **ID-1.** `AetherisBaseModel` location: `core/schemas.py` (where all schemas live) or a new `core/base.py`? My recommendation: `core/base.py`, imported by `core/schemas.py` and any future schema file.
+- **ID-1.** `CalienneBaseModel` location: `core/schemas.py` (where all schemas live) or a new `core/base.py`? My recommendation: `core/base.py`, imported by `core/schemas.py` and any future schema file.
 - **ID-2.** `feature_flags.py` typed accessor: class with attributes vs. Pydantic model vs. `dataclass(frozen=True)`. My recommendation: `dataclass(frozen=True)` for minimal overhead and immutability by default.
 - **ID-3.** VersionRegistry storage: in-memory dict at process start, or persisted to `telemetry/version_registry.jsonl`? My recommendation: in-memory for v1; persist once we have replay (P2-4) so traces can be cross-referenced after restarts.
 - **ID-4.** `config/feature_flags.json` schema: top-level dict keyed by flag name, or per-flag objects with metadata? My recommendation: dict keyed by flag name for v1 simplicity; metadata can be added later without breaking.
@@ -1161,22 +1161,22 @@ Implementation: `tools/check_architecture_version.py` invoked from CI; same scri
 
 ## Relevant Files
 
-- `C:\Users\amand\Downloads\AETHERIS\plan.md` — this document.
-- `C:\Users\amand\Downloads\AETHERIS\orchestrator\pipelines.py` — current `run_micro_mode` entry path; legacy pipeline toggle `aetheris_LEGACY_PIPELINE_ENABLED`; `_is_claim_extraction_enabled` default-off; CRIT-001 enforces `DecisionEngine` as sole path.
-- `C:\Users\amand\Downloads\AETHERIS\orchestrator\decisions.py` — `DecisionEngine`, `DecisionStrategy` (PARALLEL/SEQUENTIAL/CONDITIONAL), agent wrappers, decision metrics.
-- `C:\Users\amand\Downloads\AETHERIS\orchestrator\evaluation.py` — `arbitrate_and_synthesize` judge call.
-- `C:\Users\amand\Downloads\AETHERIS\orchestrator\memory.py` — `EpistemicMemory` failure tracking.
-- `C:\Users\amand\Downloads\AETHERIS\orchestrator\memory_manager.py` — `MemoryManager` token compression, `SummarizationStrategy` enum.
-- `C:\Users\amand\Downloads\AETHERIS\orchestrator\streaming.py` — SSE event types and `StreamingManager`.
-- `C:\Users\amand\Downloads\AETHERIS\core\schemas.py` — `AgentOutput` and `aetherisOutput` Pydantic contracts to extend; `AetherisBaseModel` lives here (or in `core/base.py` per ID-1).
-- `C:\Users\amand\Downloads\AETHERIS\core\runtime.py` — `RuntimeEngine`, `RuntimeContract`, metrics reporting.
-- `C:\Users\amand\Downloads\AETHERIS\core\passport.py` — `ExecutionPassport` for request tracking.
-- `C:\Users\amand\Downloads\AETHERIS\api_gateway\strategy.py` — `ProviderStrategy`, `StrategyMode` (FREE/HYBRID/PAID), role-keyed fallback chains; target of capability-weight matrix and new roles.
-- `C:\Users\amand\Downloads\AETHERIS\api_gateway\client.py` — model client used by orchestrator.
-- `C:\Users\amand\Downloads\AETHERIS\api_gateway\rate_limiter.py` — `ResourceManager`, health metrics; extended by `orchestrator/resource_manager.py` (P2-2).
-- `C:\Users\amand\Downloads\AETHERIS\agents\prompt_utils.py` — `assemble_*_prompt` helpers and `build_decision_dict`; integration point for skill fragments.
-- `C:\Users\amand\Downloads\AETHERIS\server.py` — `/api/query` creates passport but does not pass it to `run_micro_mode`; streaming path uses `stream_micro_mode`.
-- `C:\Users\amand\Downloads\AETHERIS\tests\test_pipeline.py`, `test_pipeline_repair.py`, `test_validators.py`, `test_state_machine.py`, `test_security.py`, `test_runtime_repair.py`, `test_providers_repair.py`, `test_phase2_cleanup.py`, `test_passport.py`, `test_database_repair.py`, `test_crit003_checkpoint_db.py`, `test_conversation.py`, `test_auth_repair.py` — existing regression tests; test plan in this document aligns new tests with these conventions.
+- `C:\Users\amand\Downloads\CALIENNE\plan.md` — this document.
+- `C:\Users\amand\Downloads\CALIENNE\orchestrator\pipelines.py` — current `run_micro_mode` entry path; legacy pipeline toggle `calienne_LEGACY_PIPELINE_ENABLED`; `_is_claim_extraction_enabled` default-off; CRIT-001 enforces `DecisionEngine` as sole path.
+- `C:\Users\amand\Downloads\CALIENNE\orchestrator\decisions.py` — `DecisionEngine`, `DecisionStrategy` (PARALLEL/SEQUENTIAL/CONDITIONAL), agent wrappers, decision metrics.
+- `C:\Users\amand\Downloads\CALIENNE\orchestrator\evaluation.py` — `arbitrate_and_synthesize` judge call.
+- `C:\Users\amand\Downloads\CALIENNE\orchestrator\memory.py` — `EpistemicMemory` failure tracking.
+- `C:\Users\amand\Downloads\CALIENNE\orchestrator\memory_manager.py` — `MemoryManager` token compression, `SummarizationStrategy` enum.
+- `C:\Users\amand\Downloads\CALIENNE\orchestrator\streaming.py` — SSE event types and `StreamingManager`.
+- `C:\Users\amand\Downloads\CALIENNE\core\schemas.py` — `AgentOutput` and `calienneOutput` Pydantic contracts to extend; `CalienneBaseModel` lives here (or in `core/base.py` per ID-1).
+- `C:\Users\amand\Downloads\CALIENNE\core\runtime.py` — `RuntimeEngine`, `RuntimeContract`, metrics reporting.
+- `C:\Users\amand\Downloads\CALIENNE\core\passport.py` — `ExecutionPassport` for request tracking.
+- `C:\Users\amand\Downloads\CALIENNE\api_gateway\strategy.py` — `ProviderStrategy`, `StrategyMode` (FREE/HYBRID/PAID), role-keyed fallback chains; target of capability-weight matrix and new roles.
+- `C:\Users\amand\Downloads\CALIENNE\api_gateway\client.py` — model client used by orchestrator.
+- `C:\Users\amand\Downloads\CALIENNE\api_gateway\rate_limiter.py` — `ResourceManager`, health metrics; extended by `orchestrator/resource_manager.py` (P2-2).
+- `C:\Users\amand\Downloads\CALIENNE\agents\prompt_utils.py` — `assemble_*_prompt` helpers and `build_decision_dict`; integration point for skill fragments.
+- `C:\Users\amand\Downloads\CALIENNE\server.py` — `/api/query` creates passport but does not pass it to `run_micro_mode`; streaming path uses `stream_micro_mode`.
+- `C:\Users\amand\Downloads\CALIENNE\tests\test_pipeline.py`, `test_pipeline_repair.py`, `test_validators.py`, `test_state_machine.py`, `test_security.py`, `test_runtime_repair.py`, `test_providers_repair.py`, `test_phase2_cleanup.py`, `test_passport.py`, `test_database_repair.py`, `test_crit003_checkpoint_db.py`, `test_conversation.py`, `test_auth_repair.py` — existing regression tests; test plan in this document aligns new tests with these conventions.
 - **New artifacts to be created during implementation:**
   - `config/capabilities/{model_capabilities,provider_limits,pricing,routing_defaults,prediction_calibration}.json`
   - `config/prompt_versions.json`

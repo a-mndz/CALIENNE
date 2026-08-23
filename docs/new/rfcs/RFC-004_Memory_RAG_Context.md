@@ -33,7 +33,7 @@ Layers:
 
 Wire this gradually into `ContextManager` and `ExecutionManager`, not
 directly into every agent. The hierarchy is gated by
-`AETHERIS_ENABLE_CONTEXT` (RFC-006).
+`CALIENNE_ENABLE_CONTEXT` (RFC-006).
 
 ## 3. Smart RAG
 
@@ -42,7 +42,7 @@ directly into every agent. The hierarchy is gated by
 ### 3.1 `SourceCandidate` schema
 
 ```python
-class SourceCandidate(AetherisBaseModel):
+class SourceCandidate(CalienneBaseModel):
     url: str | None = None
     title: str | None = None
     excerpt: str
@@ -140,7 +140,7 @@ Configurable, **default 30 days** (per DEC-006's discussion).
 ### 6.4 Endpoint
 
 `/api/debug/replay/{trace_id}` gated by
-`AETHERIS_ENABLE_REPLAY` (RFC-006).
+`CALIENNE_ENABLE_REPLAY` (RFC-006).
 
 ## 7. Experience Database (PostgreSQL, Two Tables)
 
@@ -206,8 +206,8 @@ Experience DB
 ```
 
 No live rerouting in v1 (DEC-005). Gated by
-`AETHERIS_ENABLE_EXPERIENCE_DB` (RFC-006) for writes; the
-`AETHERIS_ENABLE_SELF_LEARNING` flag (default off) gates adaptive
+`CALIENNE_ENABLE_EXPERIENCE_DB` (RFC-006) for writes; the
+`CALIENNE_ENABLE_SELF_LEARNING` flag (default off) gates adaptive
 routing in v2 only.
 
 ### 7.6 Vector memory (deferred to v2)

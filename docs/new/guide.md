@@ -1,4 +1,4 @@
-# AETHERIS Build Guide — Step-by-Step Implementation Plan
+# CALIENNE Build Guide — Step-by-Step Implementation Plan
 
 > **What this is.** A practical, ordered checklist for building the v1
 > adaptive runtime described in `plan.md`, the eight RFCs, and the eight
@@ -16,7 +16,7 @@
 
 ## 0. Orientation — the mental model before you touch code
 
-AETHERIS is moving **from** a linear pipeline
+CALIENNE is moving **from** a linear pipeline
 (`Breaker → Logician/Creative → Judge`, today in `orchestrator/pipelines.py`
 via `run_micro_mode`) **to** a planner-driven, DAG-based, async-first
 runtime. Every new subsystem ships **behind a feature flag that defaults to
@@ -65,7 +65,7 @@ separate, recorded decision.
 Keep these pinned; breaking any one is a breaking change requiring an ADR +
 `decision_register.md` entry:
 
-1. **Every schema** inherits from `AetherisBaseModel` (`extra="ignore"`);
+1. **Every schema** inherits from `CalienneBaseModel` (`extra="ignore"`);
    critical contracts opt into `extra="forbid"`. (ADR-001)
 2. **Async-first**: every orchestrator component is async; sync SDKs wrapped
    in `asyncio.to_thread(...)`. (ADR-002)
@@ -90,7 +90,7 @@ Keep these pinned; breaking any one is a breaking change requiring an ADR +
 | `docs/new/` RFCs + ADRs + registers | ✅ Present | The spec. This guide lives beside them. |
 | `tools/check_*.py` (4 CI scripts) | ✅ **Verified green 2026-07-13** | `check_rfc_index`, `check_adr_index`, `check_decision_register`, `check_architecture_version`. **Bug found & fixed:** all four hardcoded `DOCS = repo/"docs"` but the specs live in `docs/new/` — so `check_rfc_index`/`check_adr_index` were passing *vacuously* (dirs absent → early-return) while `check_decision_register` hard-failed. Repointed `DOCS` at `docs/new` in the three doc-reading scripts; now non-vacuous (validates 8 real RFCs). `check_architecture_version` is diff-driven — run with `--stdin`/`--changed-files`, not bare. |
 | `orchestrator/` legacy modules | ✅ Present | `pipelines.py`, `decisions.py`, `evaluation.py`, `memory.py`, `memory_manager.py`, `streaming.py`, `state_machine.py`, etc. These are the anchors you wrap, not rewrite. |
-| `core/` (`schemas.py`, `passport.py`, `runtime.py`) | ✅ Present | `AetherisBaseModel` target lives in a new `core/base.py`. |
+| `core/` (`schemas.py`, `passport.py`, `runtime.py`) | ✅ Present | `CalienneBaseModel` target lives in a new `core/base.py`. |
 | `api_gateway/` (`strategy.py`, `rate_limiter.py`, `client.py`) | ✅ Present | `ResourceManager` extends `rate_limiter.py`; capabilities loader is new. |
 | `migrations/` + `alembic.ini` | ✅ Present | PostgreSQL Alembic chain already scaffolded. |
 | `tests/` (13 regression suites) | ✅ Present | Must keep passing **unchanged** (ADR-001). |
@@ -138,7 +138,7 @@ Phase F  Versioning, replay, contracts Steps 18–22     (PR-019 … PR-022)
 ```
 
 > **Feature-flag discipline (every step):** land the code behind its
-> `AETHERIS_ENABLE_*` flag defaulted **off**. Flipping a flag on is a
+> `CALIENNE_ENABLE_*` flag defaulted **off**. Flipping a flag on is a
 > *separate* PR with its own `decision_register.md` note. This keeps `main`
 > shippable at every step.
 
@@ -209,12 +209,12 @@ exist. This is the backbone everything else hangs on.*
 Split into two commits so review is tractable:
 
 **2a — the base class + backward-compat proof**
-- [x] Add `core/base.py` with `AetherisBaseModel`
+- [x] Add `core/base.py` with `CalienneBaseModel`
       (`ConfigDict(extra="ignore")`). (RFC-001 §3)
 - [x] Make **every** schema in `core/schemas.py` inherit from it. (ponytail:
       `passport.py` uses `@dataclass` with `threading.Lock` by design — not a
       Pydantic schema; converting would break threading. Skipped with note.)
-- [x] Add a test proving every legacy `AgentOutput` / `aetherisOutput`
+- [x] Add a test proving every legacy `AgentOutput` / `calienneOutput`
       fixture still parses unchanged. This is the ADR-001 safety net.
 
 **2b — the new schemas** (all fields `Optional` with documented defaults;
@@ -265,17 +265,17 @@ passed.
 - [x] `orchestrator/versioning.py`: `architecture_version = "0.1.0"`
       constant + `git_commit` capture chain (env → CI → `"unknown"`,
       captured once at process start). (RFC-005 §2.2) — *fingerprint /
-      registry come in Step 18.* — verified: `AETHERIS_GIT_COMMIT` >
+      registry come in Step 18.* — verified: `CALIENNE_GIT_COMMIT` >
       `GIT_COMMIT` > CI env > `.git_commit_sha` file > `"unknown"`.
-- [x] `AETHERIS_ENABLE_META_ESCALATION` and
-      `AETHERIS_ENABLE_SELF_LEARNING` log a warning + do nothing in v1
+- [x] `CALIENNE_ENABLE_META_ESCALATION` and
+      `CALIENNE_ENABLE_SELF_LEARNING` log a warning + do nothing in v1
       (reserved for v2 per DEC-003/015).
 
 **Exit gate (met):** flag-precedence unit test passes
 (`tests/test_feature_flags.py`: 2 tests — env-over-file precedence,
 v2-reserved-flag warning); `git_commit` fallback-chain test passes
 (`tests/test_versioning.py`: 5 tests — architecture_version constant,
-AETHERIS_GIT_COMMIT > GIT_COMMIT > CI env > file > unknown). Full
+CALIENNE_GIT_COMMIT > GIT_COMMIT > CI env > file > unknown). Full
 regression green: `pytest -q` = 159 passed (147 original + 12 new).
 
 ### ☑ Step 5 — Graph planner + event-driven scheduler (PR-005, RFC-007 §Step 4) *(completed 2026-07-13)*
@@ -302,13 +302,13 @@ The heart of the system. Split into three:
 
 **5c — `ExecutionManager`**
 - [x] `orchestrator/execution_manager.py` owns the event loop and the
-      request entry point; wraps `DecisionEngine`; when `AETHERIS_ENABLE_DAG`
+      request entry point; wraps `DecisionEngine`; when `CALIENNE_ENABLE_DAG`
       is off, falls back to `run_micro_mode` unchanged. (RFC-002 §3)
 
 **Exit gate (met):** dependency-aware scheduling-order test +
 parallel-eligibility test pass; the integration test proving
 `asyncio.Condition` doesn't block siblings on a slow LLM call passes;
-`AETHERIS_ENABLE_DAG=false` falls back to `run_micro_mode` unchanged.
+`CALIENNE_ENABLE_DAG=false` falls back to `run_micro_mode` unchanged.
 (`tests/test_execution_manager.py`: 5 tests — dependency order, parallel
 zero-dep nodes, non-blocking siblings, DAG-off fallback, DAG-on graph
 execution). Full regression green: `pytest -q` = 159 passed.
@@ -338,7 +338,7 @@ context per node.*
 - [x] Wired Step 6 into `ExecutionManager`: DAG runs now materialize a
       request budget, apply history compression pressure decisions, and
       emit prediction telemetry only when
-      `AETHERIS_ENABLE_PREDICTION=true`. With the flag off, execution stays
+      `CALIENNE_ENABLE_PREDICTION=true`. With the flag off, execution stays
       deterministic and unchanged apart from carrying the budget object.
 - [x] Hardened token counting fallback: if `tiktoken` cannot initialize in a
       restricted environment, `MemoryManager` now falls back to the existing
@@ -364,7 +364,7 @@ prediction-mode integration; `tests/test_schemas.py` still covers
       `task_profile`, `strategic_plan`, dependency outputs) so future
       `validate_inputs(...)` wiring has the right substrate. (RFC-004 §5)
 - [x] Wired the context path into `ExecutionManager` behind
-      `AETHERIS_ENABLE_CONTEXT`: DAG nodes now receive a rich per-node
+      `CALIENNE_ENABLE_CONTEXT`: DAG nodes now receive a rich per-node
       `ContextWindow` when the flag is on, and a deterministic minimal window
       when it is off. Retrieval remains route-gated (`research` on by default;
       other routes off unless future logic enables them), keeping full RAG
@@ -400,11 +400,11 @@ consensus, firewall. Each is independently flag-gated.*
       force/block lists. Incompatible forced bundles fail loudly; non-forced
       conflicts resolve deterministically by priority.
 - [x] Wired skill composition into `ExecutionPlanner` / `ExecutionManager`
-      behind `AETHERIS_ENABLE_SKILLS`. When the flag is off, nodes keep their
+      behind `CALIENNE_ENABLE_SKILLS`. When the flag is off, nodes keep their
       pre-Step-8 skill lists unchanged; when on, the DAG result includes a
       resolved per-node `skill_plan`.
 - [x] `config/prompt_versions.json` now fully participates in the RFC-005
-      resolution order: env (`AETHERIS_PROMPT_VERSIONS_PATH`) → default config
+      resolution order: env (`CALIENNE_PROMPT_VERSIONS_PATH`) → default config
       → `skills.py` built-in defaults with a warning. Loaders ignore `_`-
       prefixed metadata keys and merge partial config overrides onto the
       built-in registry.
@@ -476,9 +476,9 @@ passed.
       (`contradiction`, `unsupported_claim`, `failed_code_check`,
       `math_error`, `missing_requirement`, `validation_error`); Token Budget
       Manager is the circuit breaker; bypass + synthesize-with-caveats if over
-      budget. Gate: `AETHERIS_ENABLE_REPAIR`. (RFC-003 §9)
+      budget. Gate: `CALIENNE_ENABLE_REPAIR`. (RFC-003 §9)
 - [x] Wired repair into `ExecutionManager`: DAG requests now run the repair
-      loop after the scheduler completes when `AETHERIS_ENABLE_REPAIR=true`.
+      loop after the scheduler completes when `CALIENNE_ENABLE_REPAIR=true`.
       With the flag off, `repair_result` is `None` and behavior is unchanged.
       Judge/critique integration is a deterministic stub — real LLM-based
       judging lands in Step 12 (consensus/multi-judge).
@@ -501,7 +501,7 @@ suite green: `.venv\Scripts\python.exe -m pytest -q` = 197 passed.
       matrix, disagreement clusters, `MinorityView{claim,model_id,
       confidence,reason}` + derived `minority_should_influence_final`.
       Weights from `config/capabilities/model_capabilities.json` (neutral
-      0.5 fallback on load failure). Gate: `AETHERIS_ENABLE_CONSENSUS`.
+      0.5 fallback on load failure). Gate: `CALIENNE_ENABLE_CONSENSUS`.
       (RFC-003 §10) — wired into `ExecutionManager._run_consensus` (was
       **called but undefined** — enabling the flag would `AttributeError`;
       added a deterministic judge stub, real multi-model judges land with LLM
@@ -546,7 +546,7 @@ unrelated to this step).
       claims now link to request-scoped source/context/code/math/reasoning
       evidence, unsupported claims are marked explicitly, and contradicted
       claims remain visible as non-verified outputs. The old
-      `aetheris_DISABLE_CLAIM_EXTRACTION` env var is now an emergency bypass,
+      `calienne_DISABLE_CLAIM_EXTRACTION` env var is now an emergency bypass,
       not the default path. (RFC-003 §12)
 - [x] Wired the firewall into both runtime entry points: legacy
       `run_micro_mode` / DecisionEngine synthesis in `orchestrator/pipelines.py`
@@ -579,7 +579,7 @@ ceiling become load-bearing.*
       `final_score = relevance*0.4 + credibility*0.25 + freshness*0.15 +
       consensus*0.2`; top-by-score (not fixed 3–5). Route-gated: required
       research, optional general, off coding/math/creative unless
-      uncertainty-triggered. Gate: `AETHERIS_ENABLE_RAG`. (RFC-004 §3)
+      uncertainty-triggered. Gate: `CALIENNE_ENABLE_RAG`. (RFC-004 §3)
 - [x] Pluggable async provider protocol (`RetrievalProvider`); v1 ships
       `DeterministicRetrievalProvider` (default, no network), plus
       `InMemoryRetrievalProvider` and `StaticOverrideProvider` for tests
@@ -588,8 +588,8 @@ ceiling become load-bearing.*
       with a descriptive `retrieval_skipped_reason` (ADR-007
       deterministic-fallback discipline).
 - [x] Loader precedence (per RFC-008 §8 / ADR-005):
-      `AETHERIS_RETRIEVAL_WEIGHTS_JSON` env var → file at
-      `AETHERIS_RETRIEVAL_WEIGHTS_PATH` → repo
+      `CALIENNE_RETRIEVAL_WEIGHTS_JSON` env var → file at
+      `CALIENNE_RETRIEVAL_WEIGHTS_PATH` → repo
       `config/capabilities/routing_defaults.json` →
       `DEFAULT_RANKING_WEIGHTS` (normalized to sum to 1.0). Route-gating
       table loadable from the same `retrieval.route_gating` block; falls
@@ -602,7 +602,7 @@ ceiling become load-bearing.*
       `RetrievalResult` to downstream callers; legacy `retrieval_provider`
       hook still works (back-compat).
 - [x] `ExecutionManager` instantiates a `RetrievalService` when
-      `AETHERIS_ENABLE_RAG` is on (using `load_routing_weights()` /
+      `CALIENNE_ENABLE_RAG` is on (using `load_routing_weights()` /
       `load_route_gating()`), passes it into `ContextManager`, and
       aggregates per-node retrieval results into a top-level
       `rag_telemetry` block (`status`, `nodes_attempted`,
@@ -645,7 +645,7 @@ errors (the 2 pre-existing Windows `tmp_path` permission glitches in
       All read/write paths are async-first (ADR-002) and fail-safe
       (ADR-007 — never raise into the request path).
 - [x] Wired the hierarchy into `ContextManager` and `ExecutionManager`
-      behind `AETHERIS_ENABLE_CONTEXT` (the existing context flag per
+      behind `CALIENNE_ENABLE_CONTEXT` (the existing context flag per
       RFC-004 §2). When the flag is off, no hierarchy is instantiated and
       `ExecutionManager` emits `memory_telemetry = {"status": "disabled"}`.
       When the flag is on, `ContextManager.assemble_window` merges
@@ -739,7 +739,7 @@ correctly flags the four watchlist changes against the recorded bump.
 - [x] `api_gateway/capabilities.py`: `CapabilityRegistry` loads
       `config/capabilities/*.json` (`model_capabilities`, `provider_limits`,
       `pricing`, `routing_defaults`, `prediction_calibration`); override dir
-      via `AETHERIS_CAPABILITIES_PATH`; `_meta`/`_`-prefixed keys stripped.
+      via `CALIENNE_CAPABILITIES_PATH`; `_meta`/`_`-prefixed keys stripped.
       Every accessor degrades to a documented default on missing file /
       malformed JSON / out-of-range value (`NEUTRAL_WEIGHT = 0.5`,
       `DEFAULT_MAX_CONCURRENCY = 5`, `DEFAULT_PROVIDER_LIMIT`) and records the
@@ -769,7 +769,7 @@ correctly flags the four watchlist changes against the recorded bump.
 
 **Exit gate (met):** `tests/test_capabilities.py` (7 tests) covers missing
 files, malformed JSON, out-of-range weight → neutral, unknown task_type /
-model → neutral, `AETHERIS_CAPABILITIES_PATH` override (incl. singleton
+model → neutral, `CALIENNE_CAPABILITIES_PATH` override (incl. singleton
 refresh + restore), `_meta` strip, and the real repo config loading clean.
 `tests/test_resource_manager.py` (14 tests) covers `effective_parallel`
 honoring **both** provider and model limits (plus budget/rate-limit/floor),
@@ -779,7 +779,7 @@ and the capability-load-failure degradation path. `tests/test_strategy.py`
 (8 tests) covers `get_model_chain_for_plan` (cheaper/shorter for `low`,
 full-depth for `critical`, coding re-rank, unknown-route degrade,
 missing-attr defaults) and confirms `get_model_chain` is unchanged. No new
-feature flag — sits behind the existing `AETHERIS_ENABLE_DAG` (traceability
+feature flag — sits behind the existing `CALIENNE_ENABLE_DAG` (traceability
 row 18 flag column stays `—`). `architecture_version` bumped `0.1.3` →
 `0.1.4` (watchlist files `capabilities.py`, `resource_manager.py`,
 `strategy.py`, `execution_manager.py`, `versioning.py`); recorded as DEC-019;
@@ -858,7 +858,7 @@ Split — replay first (no DB), then persistence:
       modes `replay` / `shadow` / `simulate`; store under `telemetry/`
       indexed by `(graph_version, prompt_fingerprint)`; default 30-day
       retention; `/api/debug/replay/{trace_id}` gated by
-      `AETHERIS_ENABLE_REPLAY`; PII redaction before storage. (RFC-004 §6)
+      `CALIENNE_ENABLE_REPLAY`; PII redaction before storage. (RFC-004 §6)
 
 **20b — Experience DB** (add `testcontainers` + `pgvector` driver to
 `requirements.txt` first)
@@ -867,7 +867,7 @@ Split — replay first (no DB), then persistence:
 - [x] `orchestrator/experience_db.py`: `ExperienceRepository`
       (`record_operational/record_learning/query_*/prune`) — **no module
       touches raw SQL**. Connection pool owned by `ResourceManager`. Gate:
-      `AETHERIS_ENABLE_EXPERIENCE_DB` (writes). `pgvector` installed but
+      `CALIENNE_ENABLE_EXPERIENCE_DB` (writes). `pgvector` installed but
       unused (DEC-007). (RFC-004 §7, ADR-008)
 
 **Exit gate (met):** `tests/test_execution_replay.py` proves the replay
@@ -879,7 +879,7 @@ trace — plus fingerprint determinism/whitespace-normalization, PII scrub
 the `ReplayStore` filesystem round-trip + retention prune. Replay is wired
 flag-gated into `ExecutionManager` (11 RFC-004 §6 event emissions;
 `_finalize_replay` + `replay_trace_id` on both the success and
-needs-clarification branches) and `aetheris_orchestrator.py` (store stood
+needs-clarification branches) and `calienne_orchestrator.py` (store stood
 up only when the flag is on); `GET /api/debug/replay/{trace_id}` (admin)
 returns 503 when disabled. `tests/test_experience_db.py` covers all four
 repo methods (`record_operational`/`record_learning`/`query_*`/`prune`)
@@ -900,13 +900,13 @@ request path (ADR-007). `architecture_version` bumped `0.1.5` → `0.1.6`
       `reasoning_layer.py` (generation, no retrieval/judging),
       `validation_layer.py` (judge/consensus/repair/firewall, owns
       `StageAssessment`/`ClarificationRequest`). Gate:
-      `AETHERIS_ENABLE_KNOWLEDGE_LAYER`; merged behavior when off. (RFC-001 §2)
+      `CALIENNE_ENABLE_KNOWLEDGE_LAYER`; merged behavior when off. (RFC-001 §2)
 
 **Exit gate (met):** `tests/test_layers.py` covers retrieval provenance,
 DecisionEngine contract-preserving reasoning wrappers, and Validation Layer
 ownership of firewall + stage assessment. `tests/test_pipeline.py` proves the
 flag-on path preserves the legacy `MicroModeResult` payload; existing schema
-tests still parse legacy `AgentOutput` / `aetherisOutput` payloads. DAG
+tests still parse legacy `AgentOutput` / `calienneOutput` payloads. DAG
 assessment, uncertainty clarification, consensus, repair, and firewall now
 route through `ValidationLayer`; flag-off `run_micro_mode` remains unchanged.
 `ProviderConfig` now closes RFC-001's remaining critical-contract gap with
@@ -933,14 +933,14 @@ implementation task.
 input satisfaction, missing-output detection, recoverable/non-recoverable
 failure classification (unlisted modes fail safe), and the structured
 `to_failure_response` shape. Validation reports violations as telemetry
-rather than aborting — the DAG path is flag-off (`AETHERIS_ENABLE_DAG`) and
+rather than aborting — the DAG path is flag-off (`CALIENNE_ENABLE_DAG`) and
 a hard abort would break template graphs whose declared input chains are
 intentionally loose (e.g. the spliced `judge` node). Upgrade path: promote
 `contract_violation` to a scheduler `NodeFailed` when the DAG runtime owns
 retries.
 
 > **Step 22 (self-learning safeguards, RFC-007 §Step 22) is a v2 concern.**
-> `AETHERIS_ENABLE_SELF_LEARNING` stays off and inert in v1; the offline
+> `CALIENNE_ENABLE_SELF_LEARNING` stays off and inert in v1; the offline
 > promotion pipeline (Experience DB → Offline Eval → Benchmark → Shadow →
 > Manual Review → Merge → Release) is manual-PR only (DEC-015). Do not build
 > auto-promotion.
@@ -960,7 +960,7 @@ retries.
 3. **Flags + version constant (Step 4), then the classifier (Step 3).** Now
    you can gate code and route requests deterministically.
 4. **The spine (Step 5).** Planners + async scheduler + `ExecutionManager`,
-   all behind `AETHERIS_ENABLE_DAG=off`. When this merges with the
+   all behind `CALIENNE_ENABLE_DAG=off`. When this merges with the
    fallback-to-`run_micro_mode` test green, you have the architecture; the
    rest is filling in adaptive behavior one flag at a time.
 
@@ -971,7 +971,7 @@ advanced to `Experimental`.
 
 ## 4. Per-step definition of done (apply to every step)
 
-- [ ] Code lands behind its `AETHERIS_ENABLE_*` flag, default **off**.
+- [ ] Code lands behind its `CALIENNE_ENABLE_*` flag, default **off**.
 - [ ] The step's exit-gate tests (above) pass; the named tests in RFC-007 §4
       are covered.
 - [ ] All 13 existing regression suites still pass **unchanged** (ADR-001).

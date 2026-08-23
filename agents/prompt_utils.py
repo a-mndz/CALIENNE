@@ -1,5 +1,5 @@
 """
-Shared prompt assembly utilities for AETHERIS agents.
+Shared prompt assembly utilities for CALIENNE agents.
 
 Centralizes common prompt assembly patterns to eliminate duplicate code
 across orchestrator/pipelines.py, orchestrator/decisions.py, and

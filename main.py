@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 Main entry point: async CLI REPL.
 
 Initialises the infrastructure layer (ProviderPool, ProviderStrategy,
@@ -21,22 +21,22 @@ from typing import Any
 # CRIT-007: load provider API keys from the OS secret store BEFORE
 # anything that transitively imports ``core.config`` (which validates
 # the keys at construction time).  This module is a no-op if the
-# keyring is empty or unavailable, in which case ``aetherisConfig``
+# keyring is empty or unavailable, in which case ``calienneConfig``
 # falls through to Simulation Mode.
 import secrets_bootstrap  # noqa: F401  (side-effecting import)
 from api_gateway import AllModelsExhaustedError, AsyncAPIGateway, ProviderPool, ProviderStrategy
 from api_gateway.rate_limiter import extract_provider_key
 from core.config import configure_logging, get_settings
 from core.passport import ExecutionPassport
-from orchestrator.aetheris_orchestrator import (
+from orchestrator.calienne_orchestrator import (
     create_request_passport,
-    initialize_aetheris_components,
+    initialize_calienne_components,
 )
 from telemetry.observer import observer
 
 # ── Logging ──────────────────────────────────────────────────────────────
 
-logger = logging.getLogger("aetheris")
+logger = logging.getLogger("calienne")
 
 # ── ANSI colours (for pretty-printing) ───────────────────────────────────
 
@@ -97,7 +97,7 @@ def _pretty_print_result(result: dict[str, Any]) -> None:
     colour = status_colours.get(status, _DIM)
     print(
         f"\n{_BOLD}{'═' * 72}{_RESET}\n"
-        f"  {_BOLD}aetheris Micro-Mode Result{_RESET}   "
+        f"  {_BOLD}calienne Micro-Mode Result{_RESET}   "
         f"[{colour}{status.upper()}{_RESET}]\n"
         f"{_BOLD}{'═' * 72}{_RESET}"
     )
@@ -182,28 +182,28 @@ async def main() -> None:
     # ── Settings & logging ───────────────────────────────────────────
     settings = get_settings()
     configure_logging(settings)
-    logger.info("aetheris starting up …")
+    logger.info("calienne starting up …")
 
     # ── Infrastructure ───────────────────────────────────────────────
     strategy = ProviderStrategy(mode="HYBRID")
     pool = _bootstrap_provider_pool(strategy)
     gateway = AsyncAPIGateway()
 
-    # ── AETHERIS Components ────────────────────────────────────────────
-    aetheris = initialize_aetheris_components()
+    # ── CALIENNE Components ────────────────────────────────────────────
+    calienne = initialize_calienne_components()
 
     logger.info(
-        "Infrastructure ready — strategy=%s, providers=%d, gateway=OK, aetheris=%s.",
+        "Infrastructure ready — strategy=%s, providers=%d, gateway=OK, calienne=%s.",
         strategy.mode.value,
         len(pool.get_all_statuses()),
-        ", ".join(sorted(aetheris.keys())),
+        ", ".join(sorted(calienne.keys())),
     )
 
     # ── CLI banner ───────────────────────────────────────────────────
     print(
         f"\n{_BOLD}{_CYAN}"
         "    ╔═══════════════════════════════════════════════════╗\n"
-        "    ║  aetheris — Adaptive Multi-Model Reasoning Orchestrator  ║\n"
+        "    ║  calienne — Adaptive Multi-Model Reasoning Orchestrator  ║\n"
         "    ║  Mode: HYBRID  │  Pipeline: Micro-Mode           ║\n"
         "    ╚═══════════════════════════════════════════════════╝"
         f"{_RESET}\n"
@@ -214,7 +214,7 @@ async def main() -> None:
     try:
         while True:
             try:
-                user_input = input(f"  {_BOLD}aetheris ▶{_RESET} ").strip()
+                user_input = input(f"  {_BOLD}calienne ▶{_RESET} ").strip()
             except (KeyboardInterrupt, EOFError):
                 print(f"\n  {_DIM}Goodbye.{_RESET}\n")
                 break
@@ -242,17 +242,17 @@ async def main() -> None:
                 session_id = str(uuid.uuid4())
 
                 result = await asyncio.wait_for(
-                    aetheris["execution_manager"].execute(
+                    calienne["execution_manager"].execute(
                         user_query=user_input,
                         gateway=gateway,
                         strategy=strategy,
                         pool=pool,
                         passport=passport,
-                        decision_engine=aetheris["decision_engine"],
-                        reasoning_graph=aetheris["reasoning_graph"],
-                        claim_manager=aetheris["claim_manager"],
-                        streaming_manager=aetheris["streaming_manager"],
-                        conversation_director=aetheris["conversation_director"],
+                        decision_engine=calienne["decision_engine"],
+                        reasoning_graph=calienne["reasoning_graph"],
+                        claim_manager=calienne["claim_manager"],
+                        streaming_manager=calienne["streaming_manager"],
+                        conversation_director=calienne["conversation_director"],
                         session_id=session_id,
                     ),
                     timeout=_PIPELINE_TIMEOUT_SEC,
@@ -334,7 +334,7 @@ def _print_pool_status(pool: ProviderPool) -> None:
 # ── Synchronous entry point ─────────────────────────────────────────────
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="aetheris — Adaptive Multi-Model Reasoning Orchestrator")
+    parser = argparse.ArgumentParser(description="calienne — Adaptive Multi-Model Reasoning Orchestrator")
     parser.add_argument("--web", action="store_true", help="Launch web UI instead of terminal REPL")
     parser.add_argument("--port", type=int, default=8000, help="Port for web server (default: 8000)")
     parser.add_argument("--host", default="127.0.0.1", help="Host for web server (default: 127.0.0.1)")
@@ -346,7 +346,7 @@ if __name__ == "__main__":
         from server import app
         print(
             f"\n{_BOLD}{_CYAN}"
-            "    aetheris Web UI starting...\n"
+            "    calienne Web UI starting...\n"
             f"    Open  http://{args.host}:{args.port}  in your browser."
             f"{_RESET}\n"
         )

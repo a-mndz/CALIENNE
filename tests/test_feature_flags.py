@@ -19,9 +19,9 @@ def test_load_flags_precedence_env_over_file_over_default() -> None:
         """
         {
           "flags": {
-            "AETHERIS_ENABLE_PLANNER": false,
-            "AETHERIS_ENABLE_DAG": true,
-            "AETHERIS_ENABLE_CONTEXT": true
+            "CALIENNE_ENABLE_PLANNER": false,
+            "CALIENNE_ENABLE_DAG": true,
+            "CALIENNE_ENABLE_CONTEXT": true
           }
         }
         """.strip(),
@@ -30,8 +30,8 @@ def test_load_flags_precedence_env_over_file_over_default() -> None:
 
     flags = load_flags(
         {
-            "AETHERIS_ENABLE_PLANNER": "true",
-            "AETHERIS_ENABLE_DAG": "false",
+            "CALIENNE_ENABLE_PLANNER": "true",
+            "CALIENNE_ENABLE_DAG": "false",
         },
         config_path=config_path,
     )
@@ -49,13 +49,13 @@ def test_reserved_v2_flags_warn_and_remain_disabled(caplog) -> None:
     with caplog.at_level(logging.WARNING):
         flags = load_flags(
             {
-                "AETHERIS_ENABLE_META_ESCALATION": "true",
-                "AETHERIS_ENABLE_SELF_LEARNING": "1",
+                "CALIENNE_ENABLE_META_ESCALATION": "true",
+                "CALIENNE_ENABLE_SELF_LEARNING": "1",
             },
             config_path=config_path,
         )
 
     assert flags.meta_escalation is False
     assert flags.self_learning is False
-    assert "AETHERIS_ENABLE_META_ESCALATION is reserved for v2" in caplog.text
-    assert "AETHERIS_ENABLE_SELF_LEARNING is reserved for v2" in caplog.text
+    assert "CALIENNE_ENABLE_META_ESCALATION is reserved for v2" in caplog.text
+    assert "CALIENNE_ENABLE_SELF_LEARNING is reserved for v2" in caplog.text

@@ -21,11 +21,11 @@ class TestCRIT007LiveKeyRejection:
     def test_live_openrouter_key_rejected_via_validator(self, monkeypatch) -> None:
         from pydantic import ValidationError
 
-        from core.config import aetherisConfig
-        monkeypatch.delenv("AETHERIS_ALLOW_LIVE_KEYS", raising=False)
+        from core.config import calienneConfig
+        monkeypatch.delenv("CALIENNE_ALLOW_LIVE_KEYS", raising=False)
         # Use kwargs and disable .env so explicit kwargs take precedence.
         with pytest.raises(ValidationError) as exc:
-            aetherisConfig(
+            calienneConfig(
                 _env_file=None,
                 JWT_SECRET_KEY="strong-validator-test-secret-not-real-12345",
                 OPENROUTER_API_KEY="sk-or-v1-aaaaaaaaaaaaaaaaaaa",
@@ -43,10 +43,10 @@ class TestCRIT007LiveKeyRejection:
     def test_live_nvidia_key_rejected(self, monkeypatch) -> None:
         from pydantic import ValidationError
 
-        from core.config import aetherisConfig
-        monkeypatch.delenv("AETHERIS_ALLOW_LIVE_KEYS", raising=False)
+        from core.config import calienneConfig
+        monkeypatch.delenv("CALIENNE_ALLOW_LIVE_KEYS", raising=False)
         with pytest.raises(ValidationError):
-            aetherisConfig(
+            calienneConfig(
                 _env_file=None,
                 JWT_SECRET_KEY="strong-validator-test-secret-not-real-12345",
                 OPENROUTER_API_KEY="",
@@ -61,8 +61,8 @@ class TestCRIT007LiveKeyRejection:
             )
 
     def test_empty_keys_pass(self) -> None:
-        from core.config import aetherisConfig
-        s = aetherisConfig(
+        from core.config import calienneConfig
+        s = calienneConfig(
             _env_file=None,
             JWT_SECRET_KEY="strong-validator-test-secret-not-real-12345",
             OPENROUTER_API_KEY="",
@@ -81,18 +81,18 @@ class TestCRIT007LiveKeyRejection:
 class TestCRIT005JWTSecretHardening:
     @staticmethod
     def _construct(**overrides):
-        old = os.environ.pop("AETHERIS_JWT_SECRET_KEY", None)
+        old = os.environ.pop("CALIENNE_JWT_SECRET_KEY", None)
         try:
-            from core.config import aetherisConfig
-            return aetherisConfig(_env_file=None, **overrides)
+            from core.config import calienneConfig
+            return calienneConfig(_env_file=None, **overrides)
         finally:
             if old is not None:
-                os.environ["AETHERIS_JWT_SECRET_KEY"] = old
+                os.environ["CALIENNE_JWT_SECRET_KEY"] = old
 
     def test_empty_secret_rejected(self) -> None:
         from pydantic import ValidationError
 
-        from core.config import aetherisConfig
+        from core.config import calienneConfig
         with pytest.raises(ValidationError) as exc:
             self._construct(
                 JWT_SECRET_KEY="",
@@ -141,10 +141,10 @@ class TestCRIT005JWTSecretHardening:
             )
 
     def test_strong_secret_accepted(self) -> None:
-        os.environ["AETHERIS_JWT_SECRET_KEY"] = "strong-operator-managed-32char-secret-12345"
+        os.environ["CALIENNE_JWT_SECRET_KEY"] = "strong-operator-managed-32char-secret-12345"
         try:
-            from core.config import aetherisConfig
-            s = aetherisConfig(
+            from core.config import calienneConfig
+            s = calienneConfig(
                 _env_file=None,
                 OPENROUTER_API_KEY="",
                 NVIDIA_NIM_API_KEY="",
@@ -157,7 +157,7 @@ class TestCRIT005JWTSecretHardening:
                 UNLI_DEV_API_KEY="",
             )
         finally:
-            os.environ["AETHERIS_JWT_SECRET_KEY"] = os.environ.get("AETHERIS_JWT_SECRET_KEY", "test-only-do-not-use-in-production-32chars-min")  # noqa: E501
+            os.environ["CALIENNE_JWT_SECRET_KEY"] = os.environ.get("CALIENNE_JWT_SECRET_KEY", "test-only-do-not-use-in-production-32chars-min")  # noqa: E501
         assert "strong-" in s.JWT_SECRET_KEY
 
 
@@ -236,7 +236,7 @@ class TestHIGH013HttpOnlyCookie:
         cookie_header = response.headers.get("set-cookie", "")
         assert "HttpOnly" in cookie_header
         assert "SameSite=strict" in cookie_header or "samesite=strict" in cookie_header.lower()
-        assert "aetheris_auth=" in cookie_header
+        assert "calienne_auth=" in cookie_header or "calienne_auth=" in cookie_header
 
 
 class TestMED021AuthInputValidation:

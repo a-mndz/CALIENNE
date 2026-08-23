@@ -71,12 +71,12 @@ Experience DB
   -> Release
 ```
 
-`AETHERIS_ENABLE_SELF_LEARNING` exists but only gates adaptive
+`CALIENNE_ENABLE_SELF_LEARNING` exists but only gates adaptive
 routing in v2; it does **not** auto-promote in v1. No
-`AETHERIS_AUTO_CALIBRATE` flag exists; auto-promotion in production
+`CALIENNE_AUTO_CALIBRATE` flag exists; auto-promotion in production
 is dangerous, especially for routing.
 
-A nightly CLI (`python -m aetheris calibrate --since 30d`) compares
+A nightly CLI (`python -m calienne calibrate --since 30d`) compares
 predicted vs actual per `(model, task_type)` and writes a *proposed*
 `*.proposed.json`; promotion is a PR. `ProviderStrategy.version`
 reads the matrix's `version` field; a bump invalidates in-flight
@@ -234,7 +234,7 @@ records the deprecation date and the replacing RFC.
 ## 10. Invariants Owned by This RFC
 
 - Calibration promotion is manual-PR only, always (DEC-015).
-- `AETHERIS_ENABLE_SELF_LEARNING` gates adaptive routing in v2 and
+- `CALIENNE_ENABLE_SELF_LEARNING` gates adaptive routing in v2 and
   does not auto-promote in v1 (DEC-005).
 - Hard CI fail on architectural change without `architecture_version`
   bump (DEC-014).
@@ -260,8 +260,8 @@ true:
 - [ ] The architectural watchlist (§2.2) is the actual list enforced
       by `tools/check_architecture_version.py`.
 - [ ] The nightly calibration CLI exists (or is a documented
-      no-op with a warning if `AETHERIS_ENABLE_EXPERIENCE_DB=false`).
-- [ ] `AETHERIS_ENABLE_SELF_LEARNING` exists but logs a warning when
+      no-op with a warning if `CALIENNE_ENABLE_EXPERIENCE_DB=false`).
+- [ ] `CALIENNE_ENABLE_SELF_LEARNING` exists but logs a warning when
       set to `True` in v1; no behavioral effect.
 - [ ] `docs/decision_register.md` rows for DEC-005, DEC-014,
       DEC-015 are `Implemented? Yes`; `docs/maturity.md` row for

@@ -1,4 +1,4 @@
-"""Shared pytest fixtures and configuration for aetheris backend tests.
+"""Shared pytest fixtures and configuration for calienne backend tests.
 
 Provides:
 - Fastapi dependency overrides (database, JWT)
@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, AsyncGenerator, Optional
 
-# Ensure tests can import aetheris modules regardless of cwd.
+# Ensure tests can import calienne modules regardless of cwd.
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 VENV_SCRIPTS = ROOT / ".venv" / "Scripts"
@@ -29,9 +29,9 @@ if VENV_SCRIPTS.is_dir():
 # Note: pydantic-settings with case_sensitive=True and uppercase prefix reads
 # ``UPPERCASE`` env vars; we set both forms for backwards compatibility.
 _TEST_SECRET = "test-only-do-not-use-in-production-32chars-min"
-os.environ.setdefault("AETHERIS_JWT_SECRET_KEY", _TEST_SECRET)
-os.environ.setdefault("aetheris_JWT_SECRET_KEY", _TEST_SECRET)
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/aetheris_test")
+os.environ.setdefault("CALIENNE_JWT_SECRET_KEY", _TEST_SECRET)
+os.environ.setdefault("calienne_JWT_SECRET_KEY", _TEST_SECRET)
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/calienne_test")
 for _key in (
     "OPENROUTER_API_KEY",
     "NVIDIA_NIM_API_KEY",
@@ -43,8 +43,8 @@ for _key in (
     "KIE_API_KEY",
     "UNLI_DEV_API_KEY",
 ):
-    os.environ.setdefault(f"AETHERIS_{_key}", "")
-    os.environ.setdefault(f"aetheris_{_key}", "")
+    os.environ.setdefault(f"CALIENNE_{_key}", "")
+    os.environ.setdefault(f"calienne_{_key}", "")
 
 import pytest
 

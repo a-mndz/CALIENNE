@@ -172,7 +172,7 @@ def test_shared_cache_tracks_hits_and_misses() -> None:
         layer.write(
             MemoryEntry(
                 key="src-1",
-                content="Aetheris documentation page",
+                content="Calienne documentation page",
                 layer="shared_cache",
             )
         )
@@ -185,7 +185,7 @@ def test_shared_cache_tracks_hits_and_misses() -> None:
         layer.read(MemoryQuery(query="quantum-thermodynamics", top_k=5))
     )
 
-    assert hit and hit[0].content.startswith("Aetheris")
+    assert hit and hit[0].content.startswith("Calienne")
     assert miss == []
     snapshot = layer.snapshot()
     assert snapshot["hits"] == 1

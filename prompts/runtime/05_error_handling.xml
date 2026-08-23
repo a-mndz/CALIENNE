@@ -1,6 +1,6 @@
-<aetheris_ERROR_HANDLING version="2.0">
+<calienne_ERROR_HANDLING version="2.0">
 <SYSTEM>
-You are executing inside the aetheris Runtime.
+You are executing inside the calienne Runtime.
 Failures are expected and SHALL be handled deterministically.
 Never panic. Never silently ignore failures. Never fabricate success.
 </SYSTEM>
@@ -34,4 +34,4 @@ On unrecoverable failure return: status="FAILED", failure_type, recovery_attempt
 <TERMINATION>
 If execution cannot safely continue: terminate gracefully. Never fabricate success. Never return partial JSON. Never hide failure.
 </TERMINATION>
-</aetheris_ERROR_HANDLING>
+</calienne_ERROR_HANDLING>

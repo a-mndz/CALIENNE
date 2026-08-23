@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from core.base import AetherisBaseModel
+from core.base import CalienneBaseModel
 from core.schemas import (
     AgentOutput,
     ClarificationRequest,
@@ -14,7 +14,7 @@ from core.schemas import (
     TaskNode,
     TaskProfile,
     VersionStamp,
-    aetherisOutput,
+    calienneOutput,
 )
 
 
@@ -38,18 +38,18 @@ def test_agent_output_legacy_missing_reasoning_steps() -> None:
     assert "step 1" in out.reasoning_steps[0]
 
 
-def test_aetheris_output_legacy_summary() -> None:
-    """aetherisOutput maps summary -> final_answer (legacy format)."""
-    out = aetherisOutput(
+def test_calienne_output_legacy_summary() -> None:
+    """calienneOutput maps summary -> final_answer (legacy format)."""
+    out = calienneOutput(
         summary="legacy summary", confidence=0.9, warnings=[]
     )
     assert out.final_answer == "legacy summary"
     assert out.validation_score > 0
 
 
-def test_aetheris_output_confidence_to_label() -> None:
+def test_calienne_output_confidence_to_label() -> None:
     """Float confidence mapped to overall_confidence label."""
-    out = aetherisOutput(
+    out = calienneOutput(
         final_answer="test", overall_confidence="High",
         overall_bias_risk="Low", disagreement_notes=[], validation_score=9.0,
     )
@@ -57,13 +57,13 @@ def test_aetheris_output_confidence_to_label() -> None:
 
 
 def test_all_schemas_inherit_base_model() -> None:
-    """Every schema inherits from AetherisBaseModel (ADR-001)."""
+    """Every schema inherits from CalienneBaseModel (ADR-001)."""
     for cls in [
-        AgentOutput, aetherisOutput, StageAssessment,
+        AgentOutput, calienneOutput, StageAssessment,
         TaskProfile, TaskNode, TaskGraph, PipelineBudget,
         PredictionInterval, Prediction, ClarificationRequest, VersionStamp,
     ]:
-        assert issubclass(cls, AetherisBaseModel), f"{cls.__name__} must inherit AetherisBaseModel"
+        assert issubclass(cls, CalienneBaseModel), f"{cls.__name__} must inherit CalienneBaseModel"
 
 
 def test_stage_assessment_from_minimal() -> None:

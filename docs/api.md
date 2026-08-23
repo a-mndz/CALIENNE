@@ -1,4 +1,4 @@
-# aetheris API Reference
+# calienne API Reference
 
 <!-- GENERATED FILE — do not edit by hand.
      Regenerate with: python tools/generate_api_reference.py -->
@@ -7,7 +7,7 @@ Generated from the live FastAPI OpenAPI schema (`app.openapi()` in
 `server.py`). Run `python tools/generate_api_reference.py` after changing
 routes; CI fails if this file is stale.
 
-**Title:** aetheris  
+**Title:** calienne  
 **Version:** 1.0.0
 
 ## `GET /`
@@ -20,7 +20,7 @@ Serve the main HTML page.
 
 - `200` Successful Response
 
-## `GET /aetheris_hero_video_graded.mp4`
+## `GET /calienne_hero_video_graded.mp4`
 
 Serve Login Hero Video
 
@@ -171,7 +171,7 @@ Get Replay Trace
 
 Return a recorded execution trace for offline replay/debugging.
 
-Gated by ``AETHERIS_ENABLE_REPLAY`` — when the flag is off the
+Gated by ``CALIENNE_ENABLE_REPLAY`` — when the flag is off the
 ``replay_store`` component is ``None`` and this reports 503 rather
 than fabricating an empty trace (ADR-007).
 
@@ -444,7 +444,7 @@ Prometheus Metrics
 Prometheus text exposition of decision and provider-health metrics.
 
 Auth: a scraper cannot present the httpOnly JWT cookie the admin endpoints
-rely on, so this path uses its own bearer token (``AETHERIS_METRICS_TOKEN``).
+rely on, so this path uses its own bearer token (``CALIENNE_METRICS_TOKEN``).
 In production the token is mandatory — an unset token means the endpoint
 refuses to serve rather than silently exposing internals. Outside production
 an unset token leaves it open so local scraping needs no setup.

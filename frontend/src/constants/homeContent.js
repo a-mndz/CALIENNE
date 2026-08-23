@@ -10,7 +10,7 @@ export const HOME_BENTO_CARDS = [
   {
     id: "media",
     title: "See how a conclusion holds up once pressure, evidence, and synthesis stop agreeing by accident.",
-    body: "Aetheris keeps the debate visible long enough to expose what would normally be softened away in a status call.",
+    body: "Calienne keeps the debate visible long enough to expose what would normally be softened away in a status call.",
     span: "span-5",
     image: "signal-loom",
   },
@@ -81,7 +81,7 @@ export const HOME_TESTIMONIALS = [
     image: "portrait-ilan",
   },
   {
-    quote: "Aetheris made our research readouts less theatrical and more useful. Every disagreement became explicit enough to work with.",
+    quote: "Calienne made our research readouts less theatrical and more useful. Every disagreement became explicit enough to work with.",
     author: "Sana Cho",
     role: "Research Lead, Halide Studio",
     image: "portrait-sana",

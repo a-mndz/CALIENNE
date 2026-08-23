@@ -17,7 +17,7 @@ Layers (per RFC-004 §2):
   term-frequency vectors in v1; pgvector in v2).
 
 The whole module is gated by :class:`~orchestrator.feature_flags.FeatureFlags.context`
-(``AETHERIS_ENABLE_CONTEXT``). When the flag is off, callers must not
+(``CALIENNE_ENABLE_CONTEXT``). When the flag is off, callers must not
 instantiate the hierarchy and should fall back to the deterministic
 ``ContextManager.minimal_window`` path.
 

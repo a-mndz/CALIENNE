@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import Field
 
-from core.base import AetherisBaseModel
+from core.base import CalienneBaseModel
 from core.schemas import PipelineBudget, StrategicPlan, TaskNode, TaskProfile
 from orchestrator.contracts import InputContract
 from orchestrator.memory_hierarchy import MemoryHierarchy
@@ -24,7 +24,7 @@ from orchestrator.retrieval import (
 RetrievalCallable = Callable[..., list[dict[str, Any]] | list[str]]
 
 
-class RetrievedSnippet(AetherisBaseModel):
+class RetrievedSnippet(CalienneBaseModel):
     """A retrieved or injected snippet carried into a node context window."""
 
     source: str = "memory"
@@ -32,7 +32,7 @@ class RetrievedSnippet(AetherisBaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class ContextWindow(AetherisBaseModel):
+class ContextWindow(CalienneBaseModel):
     """Bounded context prepared for a single node execution."""
 
     node_id: str = ""

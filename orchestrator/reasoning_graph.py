@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 Reasoning Knowledge Graph: tracks epistemic failures, claim relationships,
 and reasoning patterns using a graph structure.
 

@@ -1,4 +1,4 @@
-"""Prometheus exposition for AETHERIS runtime metrics.
+"""Prometheus exposition for CALIENNE runtime metrics.
 
 The numbers already exist — ``DecisionEngine`` keeps 100-entry rolling windows
 (``decisions.py``) and ``ProviderPool`` tracks per-provider health
@@ -26,46 +26,46 @@ try:
 except ImportError:  # pragma: no cover - declared dependency
     PROMETHEUS_AVAILABLE = False
 
-# A private registry keeps AETHERIS series out of the process-global default,
+# A private registry keeps CALIENNE series out of the process-global default,
 # so importing this module twice (or under pytest) cannot raise "Duplicated
 # timeseries" and a scrape returns only our metrics.
 if PROMETHEUS_AVAILABLE:
     REGISTRY = CollectorRegistry()
 
     BREAKER_PASS_RATE = Gauge(
-        "aetheris_breaker_pass_rate",
+        "calienne_breaker_pass_rate",
         "Fraction of the last 100 requests the breaker gate let through.",
         registry=REGISTRY,
     )
     JUDGE_AGREEMENT_RATE = Gauge(
-        "aetheris_judge_agreement_rate",
+        "calienne_judge_agreement_rate",
         "Fraction of the last 100 judgements scoring at or above the agreement threshold.",
         registry=REGISTRY,
     )
     SYNTHESIS_QUALITY_AVG = Gauge(
-        "aetheris_synthesis_quality_avg",
+        "calienne_synthesis_quality_avg",
         "Mean judge validation score (0-10) over the last 100 syntheses.",
         registry=REGISTRY,
     )
     TOTAL_DECISIONS = Gauge(
-        "aetheris_total_decisions",
+        "calienne_total_decisions",
         "Decisions executed since process start.",
         registry=REGISTRY,
     )
     PROVIDER_HEALTH = Gauge(
-        "aetheris_provider_health",
+        "calienne_provider_health",
         "1 when the provider is in this status, 0 otherwise.",
         ["provider", "status"],
         registry=REGISTRY,
     )
     PROVIDER_CONSECUTIVE_FAILURES = Gauge(
-        "aetheris_provider_consecutive_failures",
+        "calienne_provider_consecutive_failures",
         "Consecutive failures on a provider; the circuit breaker trips at 3.",
         ["provider"],
         registry=REGISTRY,
     )
     PROVIDER_AVAILABLE = Gauge(
-        "aetheris_provider_available",
+        "calienne_provider_available",
         "1 when the provider is currently eligible for routing, 0 otherwise.",
         ["provider"],
         registry=REGISTRY,
@@ -164,16 +164,16 @@ def demo() -> None:
     refresh(decision_engine=_Engine(), pool=_Pool())
     text = render().decode()
 
-    assert "aetheris_breaker_pass_rate 0.92" in text
-    assert "aetheris_synthesis_quality_avg 8.25" in text
-    assert "aetheris_total_decisions 143.0" in text
+    assert "calienne_breaker_pass_rate 0.92" in text
+    assert "calienne_synthesis_quality_avg 8.25" in text
+    assert "calienne_total_decisions 143.0" in text
     # The live status reads 1 and every other status is present at 0, so a
     # `status="dead"` alert has a series to evaluate even while healthy.
-    assert 'aetheris_provider_health{provider="groq/llama3",status="healthy"} 1.0' in text
-    assert 'aetheris_provider_health{provider="groq/llama3",status="dead"} 0.0' in text
-    assert 'aetheris_provider_health{provider="openrouter/gpt-4o",status="dead"} 1.0' in text
-    assert 'aetheris_provider_available{provider="openrouter/gpt-4o"} 0.0' in text
-    assert 'aetheris_provider_consecutive_failures{provider="openrouter/gpt-4o"} 3.0' in text
+    assert 'calienne_provider_health{provider="groq/llama3",status="healthy"} 1.0' in text
+    assert 'calienne_provider_health{provider="groq/llama3",status="dead"} 0.0' in text
+    assert 'calienne_provider_health{provider="openrouter/gpt-4o",status="dead"} 1.0' in text
+    assert 'calienne_provider_available{provider="openrouter/gpt-4o"} 0.0' in text
+    assert 'calienne_provider_consecutive_failures{provider="openrouter/gpt-4o"} 3.0' in text
 
     # Missing components must degrade, not raise.
     refresh(decision_engine=None, pool=None)
@@ -183,7 +183,7 @@ def demo() -> None:
             raise RuntimeError("engine exploded")
 
     refresh(decision_engine=_Broken(), pool=None)
-    assert "aetheris_breaker_pass_rate 0.92" in render().decode()
+    assert "calienne_breaker_pass_rate 0.92" in render().decode()
 
     print("orchestrator/metrics.py OK")
 

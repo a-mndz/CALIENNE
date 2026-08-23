@@ -19,7 +19,7 @@ class TestCRIT001LegacyPathBlocked:
     def test_missing_decision_engine_raises(
         self, monkeypatch: pytest.MonkeyPatch, stub_gateway, stub_strategy, stub_pool
     ) -> None:
-        monkeypatch.delenv("aetheris_LEGACY_PIPELINE_ENABLED", raising=False)
+        monkeypatch.delenv("calienne_LEGACY_PIPELINE_ENABLED", raising=False)
         from orchestrator.pipelines import run_micro_mode
 
         with pytest.raises(RuntimeError) as exc:
@@ -40,7 +40,7 @@ class TestCRIT001LegacyPathBlocked:
         """The legacy inline branch is deleted — the env var must not resurrect it."""
         from orchestrator import pipelines
 
-        monkeypatch.setenv("aetheris_LEGACY_PIPELINE_ENABLED", "true")
+        monkeypatch.setenv("calienne_LEGACY_PIPELINE_ENABLED", "true")
         assert not hasattr(pipelines, "_is_legacy_pipeline_opted_in")
         assert not hasattr(pipelines, "_legacy_pipeline_blocked_msg")
 
@@ -59,22 +59,22 @@ class TestHIGH019ClaimExtractionToggle:
     """Step 14 — firewall is on by default and env var is now an emergency bypass."""
 
     def test_disabled_by_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("aetheris_DISABLE_CLAIM_EXTRACTION", raising=False)
+        monkeypatch.delenv("calienne_DISABLE_CLAIM_EXTRACTION", raising=False)
         from orchestrator.pipelines import _is_claim_extraction_enabled
         assert _is_claim_extraction_enabled() is True
 
     def test_enabled_when_explicit(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("aetheris_DISABLE_CLAIM_EXTRACTION", "0")
+        monkeypatch.setenv("calienne_DISABLE_CLAIM_EXTRACTION", "0")
         from orchestrator.pipelines import _is_claim_extraction_enabled
         assert _is_claim_extraction_enabled() is True
 
     def test_enabled_when_off_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("aetheris_DISABLE_CLAIM_EXTRACTION", "off")
+        monkeypatch.setenv("calienne_DISABLE_CLAIM_EXTRACTION", "off")
         from orchestrator.pipelines import _is_claim_extraction_enabled
         assert _is_claim_extraction_enabled() is True
 
     def test_disabled_when_explicit_bypass_enabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("aetheris_DISABLE_CLAIM_EXTRACTION", "1")
+        monkeypatch.setenv("calienne_DISABLE_CLAIM_EXTRACTION", "1")
         from orchestrator.pipelines import _is_claim_extraction_enabled
         assert _is_claim_extraction_enabled() is False
 

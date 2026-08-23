@@ -41,9 +41,9 @@ from pathlib import Path
 import secrets_bootstrap  # noqa: F401  (side-effecting import)
 from api_gateway.rate_limiter import AsyncAPIGateway, ProviderPool
 from api_gateway.strategy import ProviderStrategy
-from orchestrator.aetheris_orchestrator import (
+from orchestrator.calienne_orchestrator import (
     create_request_passport,
-    initialize_aetheris_components,
+    initialize_calienne_components,
 )
 from orchestrator.execution_replay import redact_pii
 
@@ -112,7 +112,7 @@ async def capture(
     strategy = ProviderStrategy(mode=mode)
     pool = ProviderPool()
     gateway = AsyncAPIGateway()
-    components = initialize_aetheris_components()
+    components = initialize_calienne_components()
 
     selected = items[: limit] if limit else items
     budget = len(selected) * reruns * 4  # breaker + 2 agents + judge per item
@@ -225,7 +225,7 @@ def main(argv: list[str] | None = None) -> int:
     live_keys = [
         name
         for name in os.environ
-        if name.startswith("AETHERIS_")
+        if name.startswith("CALIENNE_")
         and name.endswith(("_API_KEY", "_TOKEN"))
         and os.environ[name].strip()
     ]

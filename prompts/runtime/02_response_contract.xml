@@ -1,4 +1,4 @@
-<aetheris_RESPONSE_CONTRACT version="2.0">
+<calienne_RESPONSE_CONTRACT version="2.0">
 <OUTPUT_FORMAT>
 Every agent output MUST be valid JSON containing:
 - status: "completed" | "failed" | "partial"
@@ -15,4 +15,4 @@ Never return plain text, Markdown outside of JSON, or missing required fields.
 <ON_VALIDATION_FAIL>
 Return status="failed" with populated "warnings" array describing the failure.
 </ON_VALIDATION_FAIL>
-</aetheris_RESPONSE_CONTRACT>
+</calienne_RESPONSE_CONTRACT>

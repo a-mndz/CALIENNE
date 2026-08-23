@@ -7,7 +7,7 @@
 
 ## 1. Purpose
 
-This RFC defines the **layer separation** for the AETHERIS adaptive
+This RFC defines the **layer separation** for the CALIENNE adaptive
 runtime, the **base schema class** all Pydantic models inherit from,
 and the **critical contracts** that opt out of the global
 `extra="ignore"` policy. It does not define execution mechanics
@@ -37,7 +37,7 @@ Validation Layer  (orchestrator/validation_layer.py)
 ```
 
 This replaces the current smeared RAG + `DecisionEngine` flow and is
-staged behind `AETHERIS_ENABLE_KNOWLEDGE_LAYER`. The refactor is a
+staged behind `CALIENNE_ENABLE_KNOWLEDGE_LAYER`. The refactor is a
 constraint, not a rewrite: the existing `DecisionEngine` (in
 `orchestrator/decisions.py`) continues to function and is wrapped by
 the new layers until each is feature-complete.
@@ -48,16 +48,16 @@ the new layers until each is feature-complete.
 # core/base.py
 from pydantic import BaseModel, ConfigDict
 
-class AetherisBaseModel(BaseModel):
-    """All AETHERIS schemas inherit from this. Critical contracts opt
+class CalienneBaseModel(BaseModel):
+    """All CALIENNE schemas inherit from this. Critical contracts opt
     into extra='forbid' explicitly via model_config = ConfigDict(extra='forbid').
     """
     model_config = ConfigDict(extra="ignore")
 ```
 
 All schemas in `core/schemas.py`, `core/passport.py`, and any new
-schema file must inherit from `AetherisBaseModel`. Adding a Pydantic
-model that does **not** inherit from `AetherisBaseModel` is a
+schema file must inherit from `CalienneBaseModel`. Adding a Pydantic
+model that does **not** inherit from `CalienneBaseModel` is a
 breaking change and is caught by `tools/check_architecture_version.py`
 in CI.
 
@@ -86,7 +86,7 @@ Gating fields default to `None`, not optimistic values.
 ### 5.1 `StageAssessment`
 
 ```python
-class StageAssessment(AetherisBaseModel):
+class StageAssessment(CalienneBaseModel):
     confidence: float
     calibration: float | None = None
     evidence_strength: float | None = None
@@ -115,7 +115,7 @@ for `VersionStamp`, `ExecutionManifest`. See RFC-004 §3 for
 
 ## 6. Invariants Owned by This RFC
 
-- All schemas inherit from `AetherisBaseModel` (ADR-001).
+- All schemas inherit from `CalienneBaseModel` (ADR-001).
 - Every adaptive decision has a deterministic fallback (DEC-012).
 - All adaptive behavior must be observable (telemetry; per `plan.md`
   §7 invariant viii).
@@ -128,21 +128,21 @@ for `VersionStamp`, `ExecutionManifest`. See RFC-004 §3 for
 This RFC is considered **Implemented** when ALL of the following are
 true:
 
-- [x] `core/base.py` exists with `AetherisBaseModel`.
-- [x] Every schema in `core/schemas.py` inherits from `AetherisBaseModel`.
+- [x] `core/base.py` exists with `CalienneBaseModel`.
+- [x] Every schema in `core/schemas.py` inherits from `CalienneBaseModel`.
 - [x] `StageAssessment.from_minimal(...)` exists and is unit-tested.
 - [x] Every extended field in `StageAssessment` is `Optional` with the
       documented default.
 - [x] The list of critical contracts in §4 is exhaustive and each
       listed contract opts into `extra="forbid"`.
 - [x] Knowledge / Reasoning / Validation layer modules exist with their
-      documented responsibilities; `AETHERIS_ENABLE_KNOWLEDGE_LAYER`
+      documented responsibilities; `CALIENNE_ENABLE_KNOWLEDGE_LAYER`
       flag exists (RFC-006) and defaults to off.
 - [x] Unit tests pass: every existing regression test that parsed a
-      legacy `AgentOutput` / `aetherisOutput` payload still parses
+      legacy `AgentOutput` / `calienneOutput` payload still parses
       unchanged.
 - [x] `tools/check_architecture_version.py` flags any new schema that
-      does not inherit from `AetherisBaseModel`.
+      does not inherit from `CalienneBaseModel`.
 - [x] Documentation updated: `docs/decision_register.md` rows for
       DEC-010, DEC-012 are `Implemented? Yes`; `docs/maturity.md`
       row for this RFC moves to `Experimental`.

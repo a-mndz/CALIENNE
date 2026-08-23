@@ -34,14 +34,14 @@ jobs:
     name: Backend lint and tests
     runs-on: ubuntu-latest
     env:
-      # generate_api_reference.py imports server.py, which builds aetherisConfig
+      # generate_api_reference.py imports server.py, which builds calienneConfig
       # at module scope. Without a JWT secret the config validator refuses to
       # construct and the step dies before rendering any OpenAPI. tests/conftest.py
       # sets its own value, so this is only needed for the doc-freshness step.
-      # Only the uppercase form: env_prefix is "AETHERIS_", and Actions treats
+      # Only the uppercase form: env_prefix is "CALIENNE_", and Actions treats
       # env keys case-insensitively, so adding the lowercase twin is a duplicate-key
       # error that invalidates the whole workflow file.
-      AETHERIS_JWT_SECRET_KEY: ci-only-not-a-real-secret-32chars-minimum
+      CALIENNE_JWT_SECRET_KEY: ci-only-not-a-real-secret-32chars-minimum
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7

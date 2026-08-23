@@ -128,7 +128,7 @@ function HomeHero({ onQuickPrompt, onFocusInput, onOpenSettings, onOpenTelemetry
     <div className="home-experience" ref={rootRef}>
       <section className="hero-stage chapter">
         <div className="hero-copy">
-          <p className="hero-kicker hero-animate">Aetheris turns high-stakes questions into visible reasoning.</p>
+          <p className="hero-kicker hero-animate">Calienne turns high-stakes questions into visible reasoning.</p>
           <h1 className="hero-title hero-animate">
             Pressure-test a decision <span className="inline-pill-image" style={{ backgroundImage: `url(${picsum("ink-current", 320, 160)})` }} aria-hidden="true" /> before consensus <span className="inline-pill-image" style={{ backgroundImage: `url(${picsum("glass-current", 320, 160)})` }} aria-hidden="true" /> hardens.
           </h1>

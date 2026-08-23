@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-13
-- **Deciders:** AETHERIS architecture working group
+- **Deciders:** CALIENNE architecture working group
 - **Related RFCs:** RFC-002, RFC-005
 
 ## Context
@@ -46,7 +46,7 @@ prompts are not capabilities).
 
 A loader in `api_gateway/capabilities.py` reads on import and on a
 config-reload signal, with the override path
-`AETHERIS_CAPABILITIES_PATH=/abs/path/to/dir` for tests and per-env
+`CALIENNE_CAPABILITIES_PATH=/abs/path/to/dir` for tests and per-env
 overrides. On load failure (missing file, malformed JSON, out-of-range
 weight, unknown `task_type`): log a warning, fall back to a neutral
 default of `0.5` for the affected model, and emit a

@@ -39,7 +39,7 @@ def _configure(monkeypatch, environment: str):
     import core.config as cfg
 
     cfg._settings = None
-    monkeypatch.setenv("AETHERIS_ENVIRONMENT", environment)
+    monkeypatch.setenv("CALIENNE_ENVIRONMENT", environment)
     cfg.configure_logging(force=True)
     return logging.getLogger()
 
@@ -51,7 +51,7 @@ class TestStructuredLogging:
         _configure(monkeypatch, "production")
 
         # A stdlib logger with %-style args — the shape the whole codebase uses.
-        logging.getLogger("aetheris.demo").info(
+        logging.getLogger("calienne.demo").info(
             "provider call ok provider=%s latency=%d", "groq", 42
         )
 
@@ -59,14 +59,14 @@ class TestStructuredLogging:
         payload = json.loads(line)
         assert payload["event"] == "provider call ok provider=groq latency=42"
         assert payload["level"] == "info"
-        assert payload["logger"] == "aetheris.demo"
+        assert payload["logger"] == "calienne.demo"
         assert "timestamp" in payload
 
     def test_development_is_not_json(
         self, monkeypatch: pytest.MonkeyPatch, capsys, restore_root_logging
     ) -> None:
         _configure(monkeypatch, "development")
-        logging.getLogger("aetheris.demo").info("human readable please")
+        logging.getLogger("calienne.demo").info("human readable please")
 
         line = capsys.readouterr().err.strip().splitlines()[-1]
         assert "human readable please" in line
@@ -90,7 +90,7 @@ class TestStructuredLogging:
         try:
             inner()
         except ValueError:
-            logging.getLogger("aetheris.demo").exception("call failed")
+            logging.getLogger("calienne.demo").exception("call failed")
 
         captured = capsys.readouterr().err
         assert "sk-secret-must-not-be-logged" not in captured
@@ -139,8 +139,8 @@ class TestPrometheusExposition:
         metrics.refresh(decision_engine=_Engine(), pool=_Pool())
         text = metrics.render().decode()
 
-        assert "aetheris_breaker_pass_rate 0.5" in text
-        assert "aetheris_synthesis_quality_avg 7.5" in text
+        assert "calienne_breaker_pass_rate 0.5" in text
+        assert "calienne_synthesis_quality_avg 7.5" in text
         assert 'provider="groq/llama3",status="degraded"} 1.0' in text
         # Inactive statuses must still be emitted, otherwise a status="dead"
         # alert has no series to evaluate and can never fire.
@@ -157,7 +157,7 @@ class TestPrometheusExposition:
                 raise RuntimeError("not ready")
 
         metrics.refresh(decision_engine=_Broken(), pool=_Broken())
-        assert b"aetheris_breaker_pass_rate" in metrics.render()
+        assert b"calienne_breaker_pass_rate" in metrics.render()
 
     def test_self_check_passes(self) -> None:
         from orchestrator import metrics
@@ -188,8 +188,8 @@ class TestMetricsEndpointAuth:
         import server
 
         cfg._settings = None
-        monkeypatch.setenv("AETHERIS_ENVIRONMENT", environment)
-        monkeypatch.setenv("AETHERIS_METRICS_TOKEN", token)
+        monkeypatch.setenv("CALIENNE_ENVIRONMENT", environment)
+        monkeypatch.setenv("CALIENNE_METRICS_TOKEN", token)
         try:
             return asyncio.run(server.prometheus_metrics(self._request(authorization)))
         finally:
@@ -200,7 +200,7 @@ class TestMetricsEndpointAuth:
     ) -> None:
         response = self._call(monkeypatch, "development", "")
         assert response.status_code == 200
-        assert b"aetheris_breaker_pass_rate" in response.body
+        assert b"calienne_breaker_pass_rate" in response.body
 
     def test_production_refuses_when_token_unset(
         self, monkeypatch: pytest.MonkeyPatch

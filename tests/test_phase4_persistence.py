@@ -118,7 +118,7 @@ def test_alembic_postgres_upgrade_and_downgrade() -> None:
         env = {
             **os.environ,
             "DATABASE_URL": database_url,
-            "AETHERIS_JWT_SECRET_KEY": "test-only-do-not-use-in-production-32chars-min",
+            "CALIENNE_JWT_SECRET_KEY": "test-only-do-not-use-in-production-32chars-min",
         }
         subprocess.run(
             [sys.executable, "-m", "alembic", "upgrade", "head"],

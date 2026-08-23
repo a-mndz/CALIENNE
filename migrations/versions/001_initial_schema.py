@@ -1,4 +1,4 @@
-"""001 — initial aetheris schema.
+"""001 — initial calienne schema.
 
 CRIT-006 / HIGH-017: create the ``users``, ``conversation_sessions``,
 ``conversation_messages``, ``checkpoints``, and ``telemetry_events`` tables

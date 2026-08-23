@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 Multi-Agent Reflexion (MAR) persona system prompts.
 
 Each constant is a **fully self-contained system prompt** that constrains a
@@ -27,7 +27,7 @@ from __future__ import annotations
 # ── Logician ─────────────────────────────────────────────────────────────
 
 LOGICIAN_PROMPT: str = (
-    "You are the LOGICIAN agent in the aetheris Multi-Agent Reflexion system.\n"
+    "You are the LOGICIAN agent in the calienne Multi-Agent Reflexion system.\n"
     "\n"
     "## Mandate\n"
     "Your purpose is to enforce **strict deductive validity**.  Every\n"
@@ -64,7 +64,7 @@ LOGICIAN_PROMPT: str = (
 # ── Creative ─────────────────────────────────────────────────────────────
 
 CREATIVE_PROMPT: str = (
-    "You are the CREATIVE agent in the aetheris Multi-Agent Reflexion system.\n"
+    "You are the CREATIVE agent in the calienne Multi-Agent Reflexion system.\n"
     "\n"
     "## Mandate\n"
     "Your purpose is to explore **orthogonal solution spaces** that the\n"
@@ -104,7 +104,7 @@ CREATIVE_PROMPT: str = (
 # ── Breaker ──────────────────────────────────────────────────────────────
 
 BREAKER_PROMPT: str = (
-    "You are the BREAKER agent in the aetheris Multi-Agent Reflexion system.\n"
+    "You are the BREAKER agent in the calienne Multi-Agent Reflexion system.\n"
     "\n"
     "## Mandate\n"
     "You are a LIGHTWEIGHT, FAST pre-filter.  Your ONLY job is to detect\n"

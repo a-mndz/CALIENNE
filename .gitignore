@@ -7,6 +7,9 @@
 *.crt
 *.p12
 *.pfx
+calienne_keys_backup.txt
+*keys*.txt
+
 
 # Python
 .venv/
@@ -75,7 +78,7 @@ recovered_*.txt
 PROJECT_ANALYSIS_2026-07-11.md
 findings.md
 CHANGELOG.md
-aetheris-ui
+calienne-ui
 
 # Local config & tooling
 # NOTE: pytest.ini, .ruff.toml and alembic.ini must stay tracked — CI's backend
@@ -86,7 +89,7 @@ aetheris-ui
 # Reference documentation & repair reports
 # NOTE: docs/api.md must stay tracked — CI runs
 # `generate_api_reference.py --check`, which fails when the file is absent.
-docs/aetheris_architecture.md
+docs/calienne_architecture.md
 docs/deployment.md
 docs/PROJECT_BIBLE.md
 evals/runs/

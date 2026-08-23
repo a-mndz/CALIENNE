@@ -1,4 +1,4 @@
-# aetheris — api_gateway sub-package
+# calienne — api_gateway sub-package
 
 from api_gateway.client import AsyncHTTPClient
 from api_gateway.rate_limiter import (

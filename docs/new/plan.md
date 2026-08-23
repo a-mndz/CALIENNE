@@ -1,6 +1,6 @@
-# AETHERIS Plan — Master Roadmap & Invariant Index
+# CALIENNE Plan — Master Roadmap & Invariant Index
 
-> This document is the **master index** for the AETHERIS adaptive architecture.
+> This document is the **master index** for the CALIENNE adaptive architecture.
 > It is intentionally thin. Detailed design lives in the RFCs; settled
 > decisions live in the ADRs; the running decision log lives in
 > `docs/decision_register.md`; per-subsystem maturity lives in
@@ -12,7 +12,7 @@
 
 ## 1. Executive Summary
 
-AETHERIS is moving from a linear, hard-coded pipeline to a **planner-driven,
+CALIENNE is moving from a linear, hard-coded pipeline to a **planner-driven,
 DAG-based, async-first orchestration runtime** that is observable, replayable,
 versioned, and feature-flagged end-to-end. The v1 build introduces:
 
@@ -40,12 +40,12 @@ Every section below points at the RFC, ADR, or ledger that owns the design.
 
 | RFC | Title | Owns | Status | Exit Criteria |
 | --- | --- | --- | --- | --- |
-| RFC-001 | System Architecture | Layer separation (K/R/V), `core/base.py`, `AetherisBaseModel` (global `extra="ignore"`), `extra="forbid"` opt-in for critical contracts, `StageAssessment.from_minimal` | Experimental | Step 21 landed 2026-07-16 behind `AETHERIS_ENABLE_KNOWLEDGE_LAYER`: explicit Knowledge / Reasoning / Validation owners wrap the stable `DecisionEngine`; flag-off behavior and legacy payload parsing remain unchanged. `architecture_version` bumped to `0.1.7` (DEC-022). RFC-001 implementation exit gate met. |
+| RFC-001 | System Architecture | Layer separation (K/R/V), `core/base.py`, `CalienneBaseModel` (global `extra="ignore"`), `extra="forbid"` opt-in for critical contracts, `StageAssessment.from_minimal` | Experimental | Step 21 landed 2026-07-16 behind `CALIENNE_ENABLE_KNOWLEDGE_LAYER`: explicit Knowledge / Reasoning / Validation owners wrap the stable `DecisionEngine`; flag-off behavior and legacy payload parsing remain unchanged. `architecture_version` bumped to `0.1.7` (DEC-022). RFC-001 implementation exit gate met. |
 | RFC-002 | Execution Pipeline | `IntentAnalyzer`, `ExecutionManager`, `ResourceManager` ceiling rules, `asyncio.to_thread` boundary for sync providers, dynamic topological release | Not Started | See RFC-002 §Exit Criteria |
 | RFC-003 | Planner & Scheduler | `StrategicPlanner` + `ExecutionPlanner` split, event-driven `Scheduler`, `MetaReasoner` (merge/skip/downgrade/reorder only), 60s starvation guard, async DAG trap | Not Started | See RFC-003 §Exit Criteria |
 | RFC-004 | Memory / RAG / Context | Memory hierarchy (short/long-term/user/agent/shared cache/vector), `SourceCandidate` + ranking formula, `ContextManager` window assembly | Not Started | See RFC-004 §Exit Criteria |
 | RFC-005 | Versioning & Execution Manifest | `VersionStamp`, `architecture_version: "0.1.0"`, `graph_fingerprint` (SHA-256) + `graph_version` (monotonic), `manifest_schema_version` decoupling, **metric namespace spec** (`execution.*`, `quality.*`, `resources.*`, `prediction.*`, `learning.*`, `environment.*`, `manifest.*`, `scheduler.*`, `planner.*`), `git_commit` capture (env → CI → `"unknown"`) | Experimental | Step 19 landed 2026-07-14 — canonical SHA-256 fingerprint via `TopologyNormalizer`, monotonic `VersionRegistry`, frozen `ExecutionManifest` (`extra="forbid"`, `manifest_schema_version` decoupled), process-start `HostPrimitives`, manifest attached to `TaskGraph` / `ExecutionPassport` / DAG response payload. `architecture_version` bumped to `0.1.5` (DEC-020). RFC-005 exit gate met. |
-| RFC-006 | Feature Flags | `AETHERIS_ENABLE_<SUBSYSTEM>` namespace, per-subsystem default off, typed accessor in `orchestrator/feature_flags.py`, full flag snapshot in manifest | Not Started | See RFC-006 §Exit Criteria |
+| RFC-006 | Feature Flags | `CALIENNE_ENABLE_<SUBSYSTEM>` namespace, per-subsystem default off, typed accessor in `orchestrator/feature_flags.py`, full flag snapshot in manifest | Not Started | See RFC-006 §Exit Criteria |
 | RFC-007 | Implementation Roadmap | 22-step sequenced build order, test manifest, PR grouping (PR-001a/b foundation, PR-002..005 per RFC, then implementation PRs) | Not Started | See RFC-007 §Exit Criteria |
 | RFC-008 | Governance | Hard CI fail on architectural change without `architecture_version` bump, manual-PR-only calibration promotion, `Decision Register` lifecycle, `Maturity Matrix` lifecycle, Experience DB promotion policy, replay retention, deprecation policy | Not Started | See RFC-008 §Exit Criteria |
 
@@ -110,7 +110,7 @@ The implementation roadmap is owned by `RFC-007`. The high-level milestone
 plan, in dependency order:
 
 1. **Documentation Foundation** — PR-001a (Governance) + PR-001b (Architecture/Versioning).
-2. **Guardrail Foundation** — `AetherisBaseModel`, `feature_flags.py`,
+2. **Guardrail Foundation** — `CalienneBaseModel`, `feature_flags.py`,
    `versioning.py`, `git_commit` capture, manifest schema. PR-002.
 3. **Schema and Assessment** — `TaskProfile`, `StageAssessment`,
    `PipelineBudget`, `PipelinePlan`, `TaskNode`, `TaskGraph`,
@@ -165,7 +165,7 @@ Each implementation PR must reference `Implements RFC-NNN` and
 These invariants hold across all RFCs. Breaking any of them is a breaking
 change and must be recorded in `docs/decision_register.md` and an ADR.
 
-1. **Pydantic policy** — all schemas inherit from `AetherisBaseModel` with
+1. **Pydantic policy** — all schemas inherit from `CalienneBaseModel` with
    `model_config = ConfigDict(extra="ignore")`; critical contracts opt into
    `extra="forbid"` explicitly. (ADR-001)
 2. **Async-first runtime** — every orchestrator component is async; sync
@@ -187,7 +187,7 @@ change and must be recorded in `docs/decision_register.md` and an ADR.
 10. **Every adaptive decision has a deterministic fallback.** Never LLM-only;
     always `LLM → Validation → Fallback`. (ADR-007)
 11. **Calibration promotion is manual-PR only**, always.
-    `AETHERIS_ENABLE_SELF_LEARNING` gates adaptive routing in v2 and does not
+    `CALIENNE_ENABLE_SELF_LEARNING` gates adaptive routing in v2 and does not
     auto-promote. (ADR-008)
 12. **`manifest_schema_version` is decoupled from `architecture_version`.**
     The manifest can evolve without forcing an architecture bump.
@@ -201,7 +201,7 @@ re-debate them without context.
 
 - **Online learning via Experience DB.** Strictly offline in v1 (ADR-008).
 - **MetaReasoner model-tier escalation.** `merge`/`skip`/`downgrade`/`reorder`
-  only in v1; escalation gated by `AETHERIS_ENABLE_META_ESCALATION` (default
+  only in v1; escalation gated by `CALIENNE_ENABLE_META_ESCALATION` (default
   off, reserved for v2).
 - **Validation skip on fingerprint hit.** Rejected for v1; any future
   bypass needs a dedicated RFC (e.g. `RFC-009 Execution Cache`) with shadow
@@ -210,7 +210,7 @@ re-debate them without context.
   up in v2 against the same `experience_learning` table. (ADR-008)
 - **Multi-tenant ResourceManager.** Global + per-route only in v1.
 - **Automatic calibration promotion.** Manual-PR only in v1; gated by
-  `AETHERIS_ENABLE_SELF_LEARNING`. (ADR-008)
+  `CALIENNE_ENABLE_SELF_LEARNING`. (ADR-008)
 - **Continuous hardware-level optimization mapping** (e.g. dynamic offloading
   profiles for mixed CPU/GPU contexts like Intel i5 HX / RTX 3050).
 - **Distributed Execution** — multiple workers, shared queue, coordinator.
@@ -282,7 +282,7 @@ All four tools run in CI; any failure blocks merge.
   — CI verification scripts.
 - Existing code anchors (referenced by RFCs, not modified by this plan):
   - `orchestrator/pipelines.py` (current `run_micro_mode` entry path;
-    legacy pipeline toggle `aetheris_LEGACY_PIPELINE_ENABLED`;
+    legacy pipeline toggle `calienne_LEGACY_PIPELINE_ENABLED`;
     `_is_claim_extraction_enabled` default-off; CRIT-001 enforces
     `DecisionEngine` as sole path).
   - `orchestrator/decisions.py` (`DecisionEngine`, `DecisionStrategy`).
@@ -290,8 +290,8 @@ All four tools run in CI; any failure blocks merge.
   - `orchestrator/memory.py` (`EpistemicMemory` failure tracking).
   - `orchestrator/memory_manager.py` (`MemoryManager` token compression).
   - `orchestrator/streaming.py` (SSE event types, `StreamingManager`).
-  - `core/schemas.py` (`AgentOutput`, `aetherisOutput`,
-    `AetherisBaseModel`).
+  - `core/schemas.py` (`AgentOutput`, `calienneOutput`,
+    `CalienneBaseModel`).
   - `core/runtime.py` (`RuntimeEngine`, `RuntimeContract`).
   - `core/passport.py` (`ExecutionPassport`).
   - `api_gateway/strategy.py` (`ProviderStrategy`, `StrategyMode`).

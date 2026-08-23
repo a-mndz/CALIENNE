@@ -1,5 +1,5 @@
 """
-Background cleanup tasks for AETHERIS components.
+Background cleanup tasks for CALIENNE components.
 
 This module defines periodic background tasks that maintain system health
 by cleaning up expired sessions, checkpoints, reasoning graph patterns,
@@ -115,7 +115,7 @@ def create_background_tasks(
     Parameters
     ----------
     components:
-        Dictionary mapping component names to instances (from initialize_aetheris_components).
+        Dictionary mapping component names to instances (from initialize_calienne_components).
 
     Returns
     -------
@@ -194,7 +194,7 @@ async def cancel_background_tasks(tasks: list[asyncio.Task]) -> None:
 # from orchestrator.background_tasks import create_background_tasks, cancel_background_tasks
 #
 # # During startup:
-# components = initialize_aetheris_components()
+# components = initialize_calienne_components()
 # background_tasks = create_background_tasks(components)
 #
 # # During shutdown:

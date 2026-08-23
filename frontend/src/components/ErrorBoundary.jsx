@@ -10,7 +10,7 @@ export default class ErrorBoundary extends Component {
     return { hasError: true, error };
   }
   componentDidCatch(error, info) {
-    if (typeof console !== "undefined") console.error("Aetheris ErrorBoundary:", error, info);
+    if (typeof console !== "undefined") console.error("Calienne ErrorBoundary:", error, info);
   }
   render() {
     if (this.state.hasError) {

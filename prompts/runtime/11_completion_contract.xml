@@ -1,6 +1,6 @@
-<aetheris_COMPLETION_CONTRACT version="2.0">
+<calienne_COMPLETION_CONTRACT version="2.0">
 <SYSTEM>
-The Completion Contract defines how aetheris finishes every execution.
+The Completion Contract defines how calienne finishes every execution.
 It SHALL NOT perform reasoning or modify pipeline results. It SHALL ensure deterministic pipeline shutdown. Every execution SHALL terminate through this contract.
 </SYSTEM>
 <PHILOSOPHY>
@@ -42,4 +42,4 @@ After completion: no further reasoning, no new claims, no graph modifications, n
 <RETURN>
 Return to the Conversation Director: completion_state, decision_contract, output_payload, execution_summary, resource_summary, audit_reference, checkpoint_reference, runtime_metrics.
 </RETURN>
-</aetheris_COMPLETION_CONTRACT>
+</calienne_COMPLETION_CONTRACT>

@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 Pipeline: Micro-Mode execution path.
 """
 
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 # ── Phase 1 Configuration Knobs ─────────────────────────────────────────
 
 
-_DISABLE_CLAIMS_ENV = "aetheris_DISABLE_CLAIM_EXTRACTION"
+_DISABLE_CLAIMS_ENV = "calienne_DISABLE_CLAIM_EXTRACTION"
 
 
 def _is_claim_extraction_enabled() -> bool:

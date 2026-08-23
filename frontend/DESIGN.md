@@ -1,6 +1,6 @@
 ---
 version: 2.0
-name: Aetheris — Adaptive Multi-Model Reasoning Orchestrator
+name: Calienne — Adaptive Multi-Model Reasoning Orchestrator
 description: Adaptive Multi-Model Reasoning Orchestrator and synthesis decision room.
 tagline: "Reasoning, arbitrated."
 visual_mode: "Dark Developer / Builder"
@@ -97,13 +97,13 @@ components:
     padding: "6px 10px"
 ---
 
-# Design System: Aetheris
+# Design System: Calienne
 
 ## 1. Overview
 
 **Creative North Star: "The Pressure Chamber"**
 
-Aetheris should feel like a room built for consequential thinking, not a friendly productivity sandbox. The visual system is dark, technical, and controlled: near-black fields, disciplined chrome, sparse use of high-signal color, and typography that feels inspected rather than decorated. The landing page sells trust through atmosphere and restraint; the dashboard turns that same identity into a working instrument where dissent, confidence, and synthesis stay legible under load.
+Calienne should feel like a room built for consequential thinking, not a friendly productivity sandbox. The visual system is dark, technical, and controlled: near-black fields, disciplined chrome, sparse use of high-signal color, and typography that feels inspected rather than decorated. The landing page sells trust through atmosphere and restraint; the dashboard turns that same identity into a working instrument where dissent, confidence, and synthesis stay legible under load.
 
 This system is intentionally split across two accents with one shared temperament. Teal is the invitation surface: the calm, credible promise that there is rigor underneath. Red is the decision surface: pressure, challenge, and active interrogation. Blue, green, and amber only appear as secondary telemetry signals inside the workspace. What ties both surfaces together is the same hard-edged editorial posture: precise copy, dark tactical layering, mono metadata, and visible structure rather than decorative flourish.
 
@@ -167,7 +167,7 @@ The palette is built from near-black infrastructure and tightly rationed signal 
 
 ## 4. Elevation
 
-Aetheris uses a hybrid depth model. The landing surface uses soft atmospheric lift, with large blurred shadows and translucent shells to create cinematic depth around key framed blocks. The dashboard is much flatter: hierarchy comes primarily from tonal layering, border contrast, and occasional state-driven shadow rather than ambient floating cards. The product surface should feel machined and functional, not glossy.
+Calienne uses a hybrid depth model. The landing surface uses soft atmospheric lift, with large blurred shadows and translucent shells to create cinematic depth around key framed blocks. The dashboard is much flatter: hierarchy comes primarily from tonal layering, border contrast, and occasional state-driven shadow rather than ambient floating cards. The product surface should feel machined and functional, not glossy.
 
 ### Shadow Vocabulary
 - **Landing shell lift** (`0 26px 70px rgba(9, 35, 27, 0.34)`): Use on major framed landing surfaces where the interface needs to feel suspended inside the dark field.
@@ -179,7 +179,7 @@ Aetheris uses a hybrid depth model. The landing surface uses soft atmospheric li
 
 ## 5. Components
 
-Every component should feel utilitarian, exact, and slightly severe. Aetheris does not use soft consumer-app components.
+Every component should feel utilitarian, exact, and slightly severe. Calienne does not use soft consumer-app components.
 
 ### Buttons
 - **Shape:** Landing calls to action are full-pill (`999px`). Dashboard buttons are square-cornered (`0px`).

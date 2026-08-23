@@ -1,5 +1,5 @@
 """
-Shared validation utilities for AETHERIS components.
+Shared validation utilities for CALIENNE components.
 
 This module provides common validation patterns extracted from
 duplicate code across the codebase, including:

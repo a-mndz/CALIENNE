@@ -17,16 +17,16 @@ pytestmark = pytest.mark.unit
 class TestHIGH016DatabaseSSLConfigurable:
     def test_default_ssl_is_false(self) -> None:
         os.environ.pop("DATABASE_SSL", None)
-        from core.config import aetherisConfig
-        s = aetherisConfig(_env_file=None, JWT_SECRET_KEY=os.environ["AETHERIS_JWT_SECRET_KEY"])
+        from core.config import calienneConfig
+        s = calienneConfig(_env_file=None, JWT_SECRET_KEY=os.environ["CALIENNE_JWT_SECRET_KEY"])
         assert s.DATABASE_SSL is False
 
     def test_ssl_can_be_enabled(self) -> None:
-        from core.config import aetherisConfig
-        s = aetherisConfig(
+        from core.config import calienneConfig
+        s = calienneConfig(
             _env_file=None,
             DATABASE_SSL=True,
-            JWT_SECRET_KEY=os.environ["AETHERIS_JWT_SECRET_KEY"],
+            JWT_SECRET_KEY=os.environ["CALIENNE_JWT_SECRET_KEY"],
         )
         assert s.DATABASE_SSL is True
 

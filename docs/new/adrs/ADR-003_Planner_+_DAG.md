@@ -2,12 +2,12 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-13
-- **Deciders:** AETHERIS architecture working group
+- **Deciders:** CALIENNE architecture working group
 - **Related RFCs:** RFC-003
 
 ## Context
 
-AETHERIS's v1 orchestration is a linear pipeline
+CALIENNE's v1 orchestration is a linear pipeline
 (`Breaker → Logician/Creative → Judge`) that does not decompose
 multi-part requests, does not run independent work in parallel, and
 cannot represent dependencies between sub-tasks. As requests grow
@@ -30,7 +30,7 @@ Three plausible next architectures were considered:
 
 ## Decision
 
-AETHERIS uses a **two-step planner producing a validated DAG**:
+CALIENNE uses a **two-step planner producing a validated DAG**:
 
 - **`IntentAnalyzer` (deterministic, token-free).** Detects whether the
   request needs decomposition at all, and what kind of work it is.
@@ -52,7 +52,7 @@ AETHERIS uses a **two-step planner producing a validated DAG**:
 The DAG is the **only** internal representation of "what work needs to
 happen." The scheduler consumes the DAG and runs it as an event-driven
 async graph (RFC-003). Determinism is preserved at the boundaries: the
-planner is gated by `AETHERIS_ENABLE_PLANNER`; without it, route
+planner is gated by `CALIENNE_ENABLE_PLANNER`; without it, route
 templates and the deterministic fallback handle every request.
 
 ## Consequences
@@ -88,4 +88,4 @@ Harder:
   parallelism, decomposition, or contract-based node composition.
 - **Workflow engine (Airflow / Temporal).** Rejected: external
   dependency, heavyweight deployment, doesn't match the in-process
-  orchestration model AETHERIS already has.
+  orchestration model CALIENNE already has.

@@ -52,10 +52,10 @@ class _StubDecisionEngine:
 
     def __init__(self) -> None:
         import orchestrator.pipelines as pipelines_mod
-        from core.schemas import aetherisOutput
+        from core.schemas import calienneOutput
 
         self._AgentOutput = pipelines_mod.AgentOutput
-        self._aetherisOutput = aetherisOutput
+        self._calienneOutput = calienneOutput
 
     async def execute_breaker_gate(self, *, query, gateway, strategy, pool, passport, history=None):
         return True, self._AgentOutput(reasoning_steps=["ok"], answer="continue", confidence=0.9)
@@ -68,7 +68,7 @@ class _StubDecisionEngine:
         self, *, query, logician_output, creative_output, gateway, strategy, pool,
         passport, lessons="", history=None,
     ):
-        return self._aetherisOutput(
+        return self._calienneOutput(
             final_answer="stub verdict",
             overall_confidence="High",
             overall_bias_risk="Low",
@@ -82,7 +82,7 @@ class _UnsupportedClaimDecisionEngine(_StubDecisionEngine):
         self, *, query, logician_output, creative_output, gateway, strategy, pool,
         passport, lessons="", history=None,
     ):
-        return self._aetherisOutput(
+        return self._calienneOutput(
             final_answer="The API timeout is 90 seconds.",
             overall_confidence="High",
             overall_bias_risk="Low",
@@ -247,7 +247,7 @@ async def test_wired_path_emits_no_answer_prose_before_firewall(
 
     class _ProseJudge(_StubDecisionEngine):
         async def execute_judge_synthesis(self, **kwargs):
-            return self._aetherisOutput(
+            return self._calienneOutput(
                 final_answer=prose,
                 overall_confidence="High",
                 overall_bias_risk="Low",
@@ -278,7 +278,7 @@ async def test_wired_path_emits_no_answer_prose_before_firewall(
 async def test_knowledge_layer_flag_preserves_legacy_payload(
     monkeypatch, stub_gateway, stub_strategy, stub_pool, stub_streaming
 ) -> None:
-    monkeypatch.setenv("AETHERIS_ENABLE_KNOWLEDGE_LAYER", "true")
+    monkeypatch.setenv("CALIENNE_ENABLE_KNOWLEDGE_LAYER", "true")
     result = await run_micro_mode(
         user_query="hello",
         gateway=stub_gateway,

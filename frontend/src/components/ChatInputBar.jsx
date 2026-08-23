@@ -24,17 +24,17 @@ function ChatInputBar({
     <div className="input-bar">
       <div className="input-bar-inner">
         <div className="input-row">
-          <label htmlFor="aetheris-input" className="sr-only">Ask Aetheris anything</label>
+          <label htmlFor="calienne-input" className="sr-only">Ask Calienne anything</label>
           <textarea
-            id="aetheris-input"
+            id="calienne-input"
             ref={inputRef}
             rows={1}
-            placeholder="Ask Aetheris anything..."
+            placeholder="Ask Calienne anything..."
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
             maxLength={MAX_MESSAGE_CHARS}
-            aria-label="Message Aetheris"
+            aria-label="Message Calienne"
           />
           {streaming ? (
             <button className="send-btn stop" onClick={onStop} aria-label="Stop generating">

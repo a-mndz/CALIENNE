@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-13
-- **Deciders:** AETHERIS architecture working group
+- **Deciders:** CALIENNE architecture working group
 - **Related RFCs:** RFC-002
 
 ## Context

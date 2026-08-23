@@ -1,11 +1,11 @@
 """
-Thread-safe request tracking for the AETHERIS execution pipeline.
+Thread-safe request tracking for the CALIENNE execution pipeline.
 
 The execution passport is intentionally implemented with dataclasses so it can
 be passed between synchronous and asynchronous components without coupling the
 runtime state to a validation framework.
 
-ponytail: Not converted to AetherisBaseModel — dataclasses + threading.Lock
+ponytail: Not converted to CalienneBaseModel — dataclasses + threading.Lock
 are the correct tool for mutable runtime state. Pydantic adds overhead and
 breaks the threading contract. (See ADR-001 carve-out: this is not a "schema"
 in the RFC sense.)
@@ -100,7 +100,7 @@ class ExecutionState:
 @dataclass
 class ExecutionPassport:
     """
-    Request identity and audit state shared across AETHERIS components.
+    Request identity and audit state shared across CALIENNE components.
 
     All mutation helpers use a ``threading.Lock``. Limits are enforced by
     retaining the first configured number of entries; existing agent outputs

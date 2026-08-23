@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 Core data contracts (Pydantic V2 strict models).
 
 These schemas define the structured I/O boundaries between agents,
@@ -14,12 +14,12 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
-from core.base import AetherisBaseModel
+from core.base import CalienneBaseModel
 
 # ── Agent Output ─────────────────────────────────────────────────────────
 
 
-class AgentOutput(AetherisBaseModel):
+class AgentOutput(CalienneBaseModel):
     """
     Structured output contract that every generation agent must conform to.
 
@@ -134,10 +134,10 @@ class AgentOutput(AetherisBaseModel):
             return 0.5
 
 
-# ── aetheris Final Output ──────────────────────────────────────────────────
+# ── calienne Final Output ──────────────────────────────────────────────────
 
 
-class aetherisOutput(AetherisBaseModel):
+class calienneOutput(CalienneBaseModel):
     """
     The final synthesized validation output returned by validation arbitrage.
     """
@@ -205,10 +205,10 @@ class aetherisOutput(AetherisBaseModel):
     )
 
 
-# ── AETHERIS Shared Schemas ─────────────────────────────────────────────────────
+# ── CALIENNE Shared Schemas ─────────────────────────────────────────────────────
 
 
-class SessionMetadata(AetherisBaseModel):
+class SessionMetadata(CalienneBaseModel):
     """Conversation session metadata shared with API and telemetry layers."""
 
     model_config = ConfigDict(strict=True)
@@ -222,8 +222,8 @@ class SessionMetadata(AetherisBaseModel):
     state: Literal["active", "waiting", "completed", "failed"]
 
 
-class PipelineResult(AetherisBaseModel):
-    """Structured result produced by a complete AETHERIS pipeline execution."""
+class PipelineResult(CalienneBaseModel):
+    """Structured result produced by a complete CALIENNE pipeline execution."""
 
     model_config = ConfigDict(strict=True)
 
@@ -238,7 +238,7 @@ class PipelineResult(AetherisBaseModel):
     security_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class ProviderHealthStatus(AetherisBaseModel):
+class ProviderHealthStatus(CalienneBaseModel):
     """Current provider health snapshot used for routing and monitoring."""
 
     model_config = ConfigDict(strict=True)
@@ -251,7 +251,7 @@ class ProviderHealthStatus(AetherisBaseModel):
     last_check: datetime
 
 
-class CheckpointData(AetherisBaseModel):
+class CheckpointData(CalienneBaseModel):
     """Minimal state required to resume a pipeline from a checkpoint."""
 
     model_config = ConfigDict(strict=True)
@@ -267,7 +267,7 @@ class CheckpointData(AetherisBaseModel):
 # ── Stage Assessment (RFC-001 §5.1) ─────────────────────────────────────
 
 
-class StageAssessment(AetherisBaseModel):
+class StageAssessment(CalienneBaseModel):
     """Assessment of a single pipeline stage — extended fields default to None."""
 
     confidence: float
@@ -290,7 +290,7 @@ class StageAssessment(AetherisBaseModel):
 # ── Planner Schemas (RFC-003 §3) ─────────────────────────────────────────
 
 
-class TaskProfile(AetherisBaseModel):
+class TaskProfile(CalienneBaseModel):
     """Classification result from IntentAnalyzer — deterministic, token-free."""
 
     task_type: str = "general"
@@ -303,7 +303,7 @@ class TaskProfile(AetherisBaseModel):
     requires_creativity: bool = False
 
 
-class StrategicPlan(AetherisBaseModel):
+class StrategicPlan(CalienneBaseModel):
     """LLM-assisted decomposition of a complex task into sub-problems."""
 
     goal: str = ""
@@ -314,7 +314,7 @@ class StrategicPlan(AetherisBaseModel):
     risk_notes: list[str] = Field(default_factory=list)
 
 
-class PipelineBudget(AetherisBaseModel):
+class PipelineBudget(CalienneBaseModel):
     """Token budget with pressure states — acts as the repair circuit breaker."""
 
     total_tokens: int = 15000
@@ -327,7 +327,7 @@ class PipelineBudget(AetherisBaseModel):
     pressure: str = "normal"  # normal | tight | critical | exhausted
 
 
-class PipelinePlan(AetherisBaseModel):
+class PipelinePlan(CalienneBaseModel):
     """Complete plan produced by ExecutionPlanner — graph + budget + predictions."""
 
     graph: "TaskGraph | None" = None
@@ -335,7 +335,7 @@ class PipelinePlan(AetherisBaseModel):
     strategy: str = "deterministic"
 
 
-class TaskNode(AetherisBaseModel):
+class TaskNode(CalienneBaseModel):
     """A single node in a TaskGraph — maps to one unit of work."""
 
     task_id: str = ""
@@ -352,7 +352,7 @@ class TaskNode(AetherisBaseModel):
     failure_contract: "FailureContract | None" = None
 
 
-class TaskGraph(AetherisBaseModel):
+class TaskGraph(CalienneBaseModel):
     """Validated DAG of TaskNodes — the executable plan shape."""
 
     nodes: list[TaskNode] = Field(default_factory=list)
@@ -368,7 +368,7 @@ class TaskGraph(AetherisBaseModel):
 # ── Prediction (RFC-003 §3.6) ────────────────────────────────────────────
 
 
-class PredictionInterval(AetherisBaseModel):
+class PredictionInterval(CalienneBaseModel):
     """A predicted value with variance bounds."""
 
     value: float = 0.0
@@ -385,7 +385,7 @@ class PredictionInterval(AetherisBaseModel):
         return self.value - self.std_dev
 
 
-class Prediction(AetherisBaseModel):
+class Prediction(CalienneBaseModel):
     """Execution cost / latency / confidence estimates with probability fields."""
 
     expected_cost: PredictionInterval = Field(default_factory=PredictionInterval)
@@ -404,7 +404,7 @@ class Prediction(AetherisBaseModel):
 # ── Clarification (RFC-003 §3.7) ─────────────────────────────────────────
 
 
-class ClarificationRequest(AetherisBaseModel):
+class ClarificationRequest(CalienneBaseModel):
     """Structured request for user input when the system is uncertain."""
 
     status: Literal["needs_clarification"] = "needs_clarification"
@@ -417,7 +417,7 @@ class ClarificationRequest(AetherisBaseModel):
 # ── Version Stamp (RFC-005 §2) ───────────────────────────────────────────
 
 
-class VersionStamp(AetherisBaseModel):
+class VersionStamp(CalienneBaseModel):
     """Immutable version snapshot — set by producer, consumed everywhere."""
 
     architecture_version: str = "0.1.0"

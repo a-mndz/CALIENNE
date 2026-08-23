@@ -1,4 +1,4 @@
-# AETHERIS — Issues & Fixes Roadmap
+# CALIENNE — Issues & Fixes Roadmap
 
 > Generated: 2026-08-19 | Based on architecture v0.1.7 deep research
 
@@ -61,7 +61,7 @@ ResourceManager → ProviderResourceManager
 ResourceManager → DagConcurrencyManager
 
 # 3. Update imports in:
-orchestrator/aetheris_orchestrator.py  (both imports)
+orchestrator/calienne_orchestrator.py  (both imports)
 orchestrator/execution_manager.py      (uses DagConcurrencyManager)
 ```
 
@@ -109,7 +109,7 @@ orchestrator/
 ## 🟡 MEDIUM: Remove Legacy Pipeline
 
 ### Dead Code Locations
-- `pipelines.py` lines 209-493: `aetheris_LEGACY_PIPELINE_ENABLED` branch (~280 lines)
+- `pipelines.py` lines 209-493: `calienne_LEGACY_PIPELINE_ENABLED` branch (~280 lines)
 - `pipelines.py`: `_LEGACY_PIPELINE_ENV`, `_is_legacy_pipeline_opted_in()`, `_legacy_pipeline_blocked_msg()`
 - References to removed `stream_micro_mode` generator
 
@@ -152,10 +152,10 @@ structlog.configure(
 # server.py — add /metrics endpoint
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
 
-BREAKER_PASS_RATE = Gauge('aetheris_breaker_pass_rate', 'Breaker gate pass rate')
-JUDGE_AGREEMENT_RATE = Gauge('aetheris_judge_agreement_rate', 'Judge agreement rate')
-SYNTHESIS_QUALITY = Gauge('aetheris_synthesis_quality_avg', 'Avg validation score')
-PROVIDER_HEALTH = Gauge('aetheris_provider_health', 'Provider health', ['provider', 'status'])
+BREAKER_PASS_RATE = Gauge('calienne_breaker_pass_rate', 'Breaker gate pass rate')
+JUDGE_AGREEMENT_RATE = Gauge('calienne_judge_agreement_rate', 'Judge agreement rate')
+SYNTHESIS_QUALITY = Gauge('calienne_synthesis_quality_avg', 'Avg validation score')
+PROVIDER_HEALTH = Gauge('calienne_provider_health', 'Provider health', ['provider', 'status'])
 ```
 
 ### 3. OpenTelemetry Tracing (Week 2)
@@ -174,16 +174,16 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 ```yaml
 # monitoring/alerts.yml
 groups:
-- name: aetheris
+- name: calienne
   rules:
   - alert: BreakerPassRateLow
-    expr: aetheris_breaker_pass_rate < 0.8
+    expr: calienne_breaker_pass_rate < 0.8
     for: 5m
   - alert: JudgeAgreementLow
-    expr: aetheris_judge_agreement_rate < 0.7
+    expr: calienne_judge_agreement_rate < 0.7
     for: 5m
   - alert: ProviderDead
-    expr: aetheris_provider_health{status="dead"} == 1
+    expr: calienne_provider_health{status="dead"} == 1
     for: 1m
 ```
 
@@ -212,7 +212,7 @@ config/prompt_versions.json
 ### Target: Single Validated Config
 ```python
 # config/schema.py — Pydantic model
-class AetherisConfig(AetherisBaseModel):
+class CalienneConfig(CalienneBaseModel):
     model_capabilities: dict[str, ModelCapability]
     provider_limits: dict[str, ProviderLimit]
     pricing: dict[str, Pricing]
@@ -222,7 +222,7 @@ class AetherisConfig(AetherisBaseModel):
     prompt_versions: dict[str, str]
 
 # config/loader.py — unified loader with validation
-def load_config() -> AetherisConfig:
+def load_config() -> CalienneConfig:
     # 1. Load all JSON files
     # 2. Apply env overrides (warn on override)
     # 3. Validate cross-references (model in capabilities ↔ provider_limits ↔ pricing)
@@ -230,7 +230,7 @@ def load_config() -> AetherisConfig:
 ```
 
 ### Acceptance Criteria
-- [ ] Single `AetherisConfig` object at startup
+- [ ] Single `CalienneConfig` object at startup
 - [ ] Cross-file validation (no orphan models/providers)
 - [ ] Env override warnings logged
 - [ ] Type-safe access everywhere
@@ -300,7 +300,7 @@ tests/
 
 ```mermaid
 gantt
-    title AETHERIS Fix Roadmap
+    title CALIENNE Fix Roadmap
     dateFormat  YYYY-MM-DD
     axisFormat  %m/%d
 
@@ -330,7 +330,7 @@ gantt
 
 | Fix | Files to Modify | New Files |
 |-----|-----------------|-----------|
-| Rename ResourceManager | `api_gateway/rate_limiter.py`, `orchestrator/resource_manager.py`, `orchestrator/aetheris_orchestrator.py`, `orchestrator/execution_manager.py` | — |
+| Rename ResourceManager | `api_gateway/rate_limiter.py`, `orchestrator/resource_manager.py`, `orchestrator/calienne_orchestrator.py`, `orchestrator/execution_manager.py` | — |
 | Structured logging | `core/config.py`, `main.py`, `server.py` | — |
 | Prometheus metrics | `orchestrator/decision_metrics.py`, `server.py` | `orchestrator/metrics.py` |
 | Remove legacy pipeline | `orchestrator/pipelines.py` | — |

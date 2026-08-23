@@ -1,4 +1,4 @@
-"""AETHERIS orchestrator package.
+"""CALIENNE orchestrator package.
 
 Keep package imports lazy so lightweight modules such as
 ``orchestrator.contracts`` can be imported without pulling the full runtime
@@ -44,9 +44,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "EventType": ("orchestrator.streaming", "EventType"),
     "StreamEvent": ("orchestrator.streaming", "StreamEvent"),
     "StreamingManager": ("orchestrator.streaming", "StreamingManager"),
-    "initialize_aetheris_components": ("orchestrator.aetheris_orchestrator", "initialize_aetheris_components"),  # noqa: E501
-    "create_request_passport": ("orchestrator.aetheris_orchestrator", "create_request_passport"),
-    "create_request_state_machine": ("orchestrator.aetheris_orchestrator", "create_request_state_machine"),
+    "initialize_calienne_components": ("orchestrator.calienne_orchestrator", "initialize_calienne_components"),  # noqa: E501
+    "create_request_passport": ("orchestrator.calienne_orchestrator", "create_request_passport"),
+    "create_request_state_machine": ("orchestrator.calienne_orchestrator", "create_request_state_machine"),
     "ExecutionManager": ("orchestrator.execution_manager", "ExecutionManager"),
     "StrategicPlanner": ("orchestrator.strategic_planner", "StrategicPlanner"),
     "ExecutionPlanner": ("orchestrator.execution_planner", "ExecutionPlanner"),

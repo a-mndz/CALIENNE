@@ -71,13 +71,13 @@ On rejection, fall back to a safe deterministic graph template
 
 ## 3. Schemas
 
-All schemas inherit from `AetherisBaseModel` (RFC-001 §3). All
+All schemas inherit from `CalienneBaseModel` (RFC-001 §3). All
 extended fields are `Optional` with documented defaults (ADR-001).
 
 ### 3.1 `TaskProfile`
 
 ```python
-class TaskProfile(AetherisBaseModel):
+class TaskProfile(CalienneBaseModel):
     task_type: str
     complexity: str
     criticality: str
@@ -90,7 +90,7 @@ class TaskProfile(AetherisBaseModel):
 ### 3.2 `StrategicPlan`
 
 ```python
-class StrategicPlan(AetherisBaseModel):
+class StrategicPlan(CalienneBaseModel):
     goal: str
     sub_problems: list[str]
     constraints: list[str]
@@ -102,7 +102,7 @@ class StrategicPlan(AetherisBaseModel):
 ### 3.3 `TaskNode`, `TaskGraph`
 
 ```python
-class TaskNode(AetherisBaseModel):
+class TaskNode(CalienneBaseModel):
     task_id: str
     objective: str
     skills_required: list[str]
@@ -116,7 +116,7 @@ class TaskNode(AetherisBaseModel):
     output_contract: OutputContract | None = None
     failure_contract: FailureContract | None = None
 
-class TaskGraph(AetherisBaseModel):
+class TaskGraph(CalienneBaseModel):
     nodes: list[TaskNode]
     root_task_id: str
     final_task_id: str
@@ -178,7 +178,7 @@ retry_with_backoff | downgrade_model | switch_provider
 Per the "Better Prediction" refinement,
 
 ```python
-class PredictionInterval(AetherisBaseModel):
+class PredictionInterval(CalienneBaseModel):
     value: float
     variance: float
     std_dev: float
@@ -186,7 +186,7 @@ class PredictionInterval(AetherisBaseModel):
     upper_bound: float    # derived: value + std_dev
     lower_bound: float    # derived: value - std_dev
 
-class Prediction(AetherisBaseModel):
+class Prediction(CalienneBaseModel):
     expected_cost: PredictionInterval
     expected_latency_ms: PredictionInterval
     expected_tokens: PredictionInterval
@@ -208,7 +208,7 @@ don't oversubscribe.
 ```python
 from typing import Literal
 
-class ClarificationRequest(AetherisBaseModel):
+class ClarificationRequest(CalienneBaseModel):
     status: Literal["needs_clarification"]
     question: str
     reason: str
@@ -302,7 +302,7 @@ repair and synthesize from the best available verified state.
   `reorder`.
 - **No upgrade authority** in v1. Upgrading model tier is reserved
   for `PredictionLayer` + `ResourceManager`. Future gate:
-  `AETHERIS_ENABLE_META_ESCALATION` (default off; per DEC-003).
+  `CALIENNE_ENABLE_META_ESCALATION` (default off; per DEC-003).
 - Bounded: max N mutations per run; mutation budget consumed from
   the critique / repair budget. Records a `mutation_audit_trail` on
   the trace.
@@ -404,7 +404,7 @@ not an over-engineered guess.
 
 The current `ClaimManager.validate_claim()` is effectively a
 placeholder and claim extraction is disabled by default
-(`aetheris_DISABLE_CLAIM_EXTRACTION=1`). Add a real
+(`calienne_DISABLE_CLAIM_EXTRACTION=1`). Add a real
 `EvidenceChecker` or upgrade `ClaimManager`:
 
 Required flow (lives in the Validation Layer per RFC-001 §2):
@@ -470,7 +470,7 @@ true:
 - [ ] `StrategicPlan`, `TaskProfile`, `TaskNode`, `TaskGraph`,
       `InputContract`, `OutputContract`, `FailureContract`,
       `Prediction`, `PredictionInterval`, `ClarificationRequest`
-      schemas exist and inherit from `AetherisBaseModel`.
+      schemas exist and inherit from `CalienneBaseModel`.
 - [ ] Graph validation (cycles, missing deps, unknown skills, missing
       final node, cap by complexity) is implemented and unit-tested.
 - [ ] Event-driven scheduler is implemented with `asyncio.Condition`,

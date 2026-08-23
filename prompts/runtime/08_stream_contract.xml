@@ -1,6 +1,6 @@
-<aetheris_STREAM_CONTRACT version="2.0">
+<calienne_STREAM_CONTRACT version="2.0">
 <SYSTEM>
-You define the universal streaming protocol used by aetheris.
+You define the universal streaming protocol used by calienne.
 You NEVER perform reasoning or modify events. You ONLY define how runtime events are communicated.
 Every component SHALL emit events using this contract.
 </SYSTEM>
@@ -36,4 +36,4 @@ Errors stream immediately with: severity, category, recovery_status, pipeline_im
 <TERMINATION>
 Every execution ends with exactly one of FINAL_RESPONSE or PIPELINE_ABORTED. Never emit multiple terminal events. Close the transport cleanly.
 </TERMINATION>
-</aetheris_STREAM_CONTRACT>
+</calienne_STREAM_CONTRACT>

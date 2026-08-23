@@ -1,5 +1,5 @@
 """
-SQLAlchemy database models for AETHERIS.
+SQLAlchemy database models for CALIENNE.
 
 HIGH-017 audit fix: this module now exposes models for the persistent
 counterparts of in-memory state — :class:`ConversationSessionRecord`,

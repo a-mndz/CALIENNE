@@ -22,7 +22,7 @@ sequence — the Step 20a exit-gate guarantee.
 
 Everything here is gated by
 :attr:`~orchestrator.feature_flags.FeatureFlags.replay`
-(``AETHERIS_ENABLE_REPLAY``).  The recorder never raises into the request
+(``CALIENNE_ENABLE_REPLAY``).  The recorder never raises into the request
 path (ADR-007): a failing write logs and degrades to no trace.
 """
 
@@ -38,7 +38,7 @@ from typing import Any, Callable, Literal
 
 from pydantic import Field
 
-from core.base import AetherisBaseModel
+from core.base import CalienneBaseModel
 
 LOGGER = logging.getLogger(__name__)
 
@@ -144,7 +144,7 @@ def redact_pii(text: str) -> str:
 # ── Schemas ─────────────────────────────────────────────────────────────────
 
 
-class ReplayEvent(AetherisBaseModel):
+class ReplayEvent(CalienneBaseModel):
     """A single append-only event in an execution trace (RFC-004 §6)."""
 
     event_type: ReplayEventType
@@ -153,7 +153,7 @@ class ReplayEvent(AetherisBaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
-class ExecutionTrace(AetherisBaseModel):
+class ExecutionTrace(CalienneBaseModel):
     """Append-only record of one DAG execution (RFC-004 §6)."""
 
     trace_id: str
@@ -286,7 +286,7 @@ class ReplayStore:
     Traces are written as one JSON file per ``trace_id`` under
     ``telemetry/replays/``.  An index maps ``(graph_version,
     prompt_fingerprint)`` to trace ids.  Retention defaults to 30 days and is
-    configurable per-instance or via ``AETHERIS_REPLAY_RETENTION_DAYS``.  No
+    configurable per-instance or via ``CALIENNE_REPLAY_RETENTION_DAYS``.  No
     method raises into the request path (ADR-007).
     """
 
@@ -302,7 +302,7 @@ class ReplayStore:
         if retention_days is not None:
             self._retention_days = max(0, retention_days)
         else:
-            env_value = os.environ.get("AETHERIS_REPLAY_RETENTION_DAYS")
+            env_value = os.environ.get("CALIENNE_REPLAY_RETENTION_DAYS")
             try:
                 self._retention_days = max(0, int(env_value)) if env_value else _DEFAULT_RETENTION_DAYS
             except (TypeError, ValueError):

@@ -9,7 +9,7 @@ bounds rank into [0,1)).
 Two surfaces:
 
 - ``PostgresTurnSearchProvider`` — implements the dormant RetrievalProvider
-  protocol so it lights up under ``AETHERIS_ENABLE_DAG`` with no changes to
+  protocol so it lights up under ``CALIENNE_ENABLE_DAG`` with no changes to
   RetrievalService/ContextManager.
 - ``hydrate_history`` — the v1 live path: when a query endpoint receives no
   client history, pull the owner's recent turns plus topically relevant past
@@ -31,7 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from orchestrator.retrieval import RetrievalProvider, RetrievalRequest, SourceCandidate
 
-logger = logging.getLogger("aetheris.MemorySearch")
+logger = logging.getLogger("calienne.MemorySearch")
 
 # Raw user input goes through websearch_to_tsquery precisely because it
 # cannot raise (to_tsquery would throw on '&'/'!' inside a query).

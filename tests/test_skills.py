@@ -36,7 +36,7 @@ def test_prompt_versions_resolution_prefers_env_override(tmp_path: Path) -> None
     )
 
     versions = load_prompt_versions(
-        {"AETHERIS_PROMPT_VERSIONS_PATH": str(env_path)},
+        {"CALIENNE_PROMPT_VERSIONS_PATH": str(env_path)},
         config_path=default_path,
     )
 

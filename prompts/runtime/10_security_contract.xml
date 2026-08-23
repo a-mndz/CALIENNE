@@ -1,6 +1,6 @@
-<aetheris_SECURITY_CONTRACT version="2.0">
+<calienne_SECURITY_CONTRACT version="2.0">
 <SYSTEM>
-The Security Contract protects the aetheris runtime.
+The Security Contract protects the calienne runtime.
 It SHALL NOT perform reasoning or answer user questions. It SHALL enforce deterministic runtime security policies. Every pipeline component SHALL respect this contract.
 </SYSTEM>
 <PHILOSOPHY>
@@ -49,4 +49,4 @@ Security SHALL NOT modify reasoning, judge decisions, claim confidence, or Decis
 <TERMINATION>
 Upon completion return: security_status, validation_result, violation_count, audit_reference. The Conversation Director determines further execution.
 </TERMINATION>
-</aetheris_SECURITY_CONTRACT>
+</calienne_SECURITY_CONTRACT>

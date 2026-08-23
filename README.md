@@ -1,4 +1,4 @@
-# aetheris — Adaptive Multi-Model Reasoning Orchestrator
+# Calienne — Adaptive Multi-Model Reasoning Orchestrator
 
 > **[ACTIVE DEVELOPMENT]** A resilient multi-agent reasoning engine that orchestrates LLM agents through a validation-arbitration pipeline, utilizing dynamic runtime prompt layering, and automatically falling back across providers when models fail.
 
@@ -8,11 +8,11 @@
 
 ---
 
-## What is aetheris?
+## What is Calienne?
 
-aetheris is an advanced **multi-agent reasoning orchestrator** designed to produce high-quality, validated responses by running multiple AI agents in parallel and utilizing a synthesis judge to arbitrate the final result.
+Calienne is an advanced **multi-agent reasoning orchestrator** designed to produce high-quality, validated responses by running multiple AI agents in parallel and utilizing a synthesis judge to arbitrate the final result.
 
-Instead of relying on a single raw model call, aetheris executes a robust **four-stage pipeline**:
+Instead of relying on a single raw model call, Calienne executes a robust **four-stage pipeline**:
 
 1. **Breaker Gate** — A lightweight pre-filter checks if the system has sufficient context to answer. If not, it aborts immediately.
 2. **Logician Agent** — Generates a strictly deductive, logically valid answer.
@@ -28,12 +28,12 @@ The entire pipeline is **async-native**, runs with **bounded concurrency**, and 
 ### Web Dashboard & Reasoning Pipeline
 The primary triadic reasoning interface featuring live four-stage execution, agent reasoning expansion, and real-time telemetry:
 
-![aetheris Web Dashboard](docs/images/aetheris_dashboard_ui.png)
+![Calienne Web Dashboard](docs/images/calienne_dashboard_ui.png)
 
 ### Authentication & Login Interface
 Dedicated dark-mode glassmorphism login and registration page (`/login`) with JWT httpOnly cookie security:
 
-![aetheris Login Page](docs/images/aetheris_login_ui.png)
+![Calienne Login Page](docs/images/calienne_login_ui.png)
 
 ---
 
@@ -47,7 +47,7 @@ Dedicated dark-mode glassmorphism login and registration page (`/login`) with JW
 * **Output Processing:** `json-repair` for parsing and correcting malformed JSON LLM outputs
 * **Prompt Layout:** Strictly validated XML formats layered dynamically at runtime
 * **Frontend Web Dashboard:** Modern React 19 + Vite + GSAP 3 animation engine with triadic dark-mode glassmorphism (`frontend/`)
-* **Authentication UI:** Dedicated responsive HTML5/CSS3 cosmic dark-mode login interface (`aetheris_login.html`)
+* **Authentication UI:** Dedicated responsive HTML5/CSS3 cosmic dark-mode login interface (`calienne_login.html`)
 * **LLM Providers:** Native integration with OpenRouter, OpenAI, Google AI Studio, Groq, and custom/local gateways (Ollama / vLLM / LiteLLM). Model routes verified live 2026-08; dead routes (GitHub Models, Llama 3.x, Claude 3.5) are gone from the strategy maps
 
 ---
@@ -82,7 +82,7 @@ Dedicated dark-mode glassmorphism login and registration page (`/login`) with JW
 ```
 
 ### 1. Dynamic Runtime Prompt Layering
-To enforce system instructions and role boundaries, aetheris dynamically layers prompts before sending payloads to the LLM:
+To enforce system instructions and role boundaries, calienne dynamically layers prompts before sending payloads to the LLM:
 
 * **Layer 1: `<ROLE>` Block** — Dynamically injected metadata defining the current role, active pipeline stage, objective, iteration count, and execution mode.
 * **Layer 2: Runtime Prompts (`prompts/runtime/`)** — Global runtime constraints loaded and appended sequentially (`00_agent_runtime.xml`, `01_prompt_loader.xml`, `02_response_contract.xml`, `03_context_manager.xml`, etc.).
@@ -93,10 +93,10 @@ All prompt templates are formatted in clean, single-root XML structures for stru
 ### 2. Multi-Model Fallback & Circuit Breaking
 * **Priority Routing:** If the primary model for a stage fails or times out, the system automatically escalates to a fallback provider chain.
 * **Circuit Breaker:** Tracks failures per provider. If a provider fails 3 consecutive times, it enters cooldown (`DEAD`) and is bypassed for 60 seconds.
-* **Simulation Mode:** Automatically matches environment variables. If no API keys are present, the system runs with deterministic mock responses to enable cost-free development. **In production (`AETHERIS_ENVIRONMENT=production`) this fallback is refused** — a missing provider key raises a `RuntimeError` and logs a `CRITICAL` alarm instead of silently returning fabricated output.
+* **Simulation Mode:** Automatically matches environment variables. If no API keys are present, the system runs with deterministic mock responses to enable cost-free development. **In production (`CALIENNE_ENVIRONMENT=production`) this fallback is refused** — a missing provider key raises a `RuntimeError` and logs a `CRITICAL` alarm instead of silently returning fabricated output.
 
-### 3. AETHERIS Architecture Integration
-aetheris now incorporates the Adaptive Multi-Model Reasoning Orchestrator (AETHERIS) architecture, adding:
+### 3. CALIENNE Architecture Integration
+calienne now incorporates the Adaptive Multi-Model Reasoning Orchestrator (CALIENNE) architecture, adding:
 * **Conversation Management**: Multi-turn dialogue state with automatic token limit truncation.
 * **Provider Registry**: Advanced circuit breaking, exponential backoff, and health monitoring.
 * **Resource Limits**: Configurable rate limits per provider and per user, global concurrency controls.
@@ -126,7 +126,7 @@ aetheris now incorporates the Adaptive Multi-Model Reasoning Orchestrator (AETHE
 
 ## Adaptive Runtime (v1 — in progress)
 
-aetheris is moving from the linear four-stage pipeline to a **planner-driven, DAG-based, async-first orchestration runtime** that is observable, replayable, versioned, and feature-flagged end-to-end. The large adaptive subsystems ship **behind `AETHERIS_ENABLE_*` feature flags that default to off**, so the stable `DecisionEngine` path keeps running until a flag is flipped in a separate, recorded decision. But this migration was not purely additive — several changes to the **default request path** already changed how the system behaves on every request, with no flag flip required.
+calienne is moving from the linear four-stage pipeline to a **planner-driven, DAG-based, async-first orchestration runtime** that is observable, replayable, versioned, and feature-flagged end-to-end. The large adaptive subsystems ship **behind `CALIENNE_ENABLE_*` feature flags that default to off**, so the stable `DecisionEngine` path keeps running until a flag is flipped in a separate, recorded decision. But this migration was not purely additive — several changes to the **default request path** already changed how the system behaves on every request, with no flag flip required.
 
 The design lives under `docs/new/` — a thin master index (`plan.md`), eight RFCs, eight ADRs, a CI-checked decision register, and a per-subsystem maturity matrix. The build is tracked in `docs/new/guide.md` as a 23-step (Step 0–22) checklist. Current `architecture_version` is `0.1.7`; Steps 1–22 are complete (v1 scope done — the remaining RFC-007 §Step 22 self-learning safeguards are a flagged-off v2 concern).
 
@@ -134,10 +134,10 @@ The design lives under `docs/new/` — a thin master index (`plan.md`), eight RF
 
 These are behavioral changes to the pipeline every request already runs:
 
-* **Hallucination firewall is now ON by default.** Claim extraction was previously a disabled no-op (`validate_claim` always returned `UNVERIFIED` at confidence 0.3, so the kill switch `aetheris_DISABLE_CLAIM_EXTRACTION` defaulted to *on*). Step 14 replaced the placeholder with a **deterministic evidence checker** and flipped the default to *off* — so validation now runs. After the Judge produces its answer, `_apply_output_firewall` re-checks the final text against gathered evidence and **rewrites the answer to qualify or strip unsupported claims**, appends a disagreement note (`"Hallucination firewall qualified N unsupported claim(s)."`), and returns a `firewall_result` payload. The env var remains as an emergency kill switch.
-* **Production refuses the simulation fallback.** When `AETHERIS_ENVIRONMENT=production`, a blank provider key no longer silently routes to fabricated ("simulated") answers — `api_gateway/client.py` raises a `RuntimeError` and logs a `CRITICAL` alarm. Development and test still simulate offline for zero-cost runs, so `AETHERIS_ENVIRONMENT` is safety-load-bearing on production deploys.
+* **Hallucination firewall is now ON by default.** Claim extraction was previously a disabled no-op (`validate_claim` always returned `UNVERIFIED` at confidence 0.3, so the kill switch `calienne_DISABLE_CLAIM_EXTRACTION` defaulted to *on*). Step 14 replaced the placeholder with a **deterministic evidence checker** and flipped the default to *off* — so validation now runs. After the Judge produces its answer, `_apply_output_firewall` re-checks the final text against gathered evidence and **rewrites the answer to qualify or strip unsupported claims**, appends a disagreement note (`"Hallucination firewall qualified N unsupported claim(s)."`), and returns a `firewall_result` payload. The env var remains as an emergency kill switch.
+* **Production refuses the simulation fallback.** When `CALIENNE_ENVIRONMENT=production`, a blank provider key no longer silently routes to fabricated ("simulated") answers — `api_gateway/client.py` raises a `RuntimeError` and logs a `CRITICAL` alarm. Development and test still simulate offline for zero-cost runs, so `CALIENNE_ENVIRONMENT` is safety-load-bearing on production deploys.
 * **Streaming and non-streaming requests now share one execution path.** `/api/query/stream` no longer runs a separate `stream_micro_mode` generator (the dead, unwired generator has now been removed entirely). Both `/api/query` and the SSE endpoint route through `run_micro_mode` → `DecisionEngine`, emitting per-agent progress into the same `StreamingManager` and producing one terminal result event. Streaming and blocking calls now share an identical telemetry and passport contract.
-* **Inbound request bodies are strict.** All public request models (`QueryRequest`, `Message`, auth, session, checkpoint, model-management, strategy) now inherit a `_StrictRequestModel` with `extra="forbid"` — unknown fields are rejected (fail-fast) instead of silently ignored. Response models stay permissive. (RFC-001 §4 critical-contract rule; a bridge until `AetherisBaseModel` fully lands.)
+* **Inbound request bodies are strict.** All public request models (`QueryRequest`, `Message`, auth, session, checkpoint, model-management, strategy) now inherit a `_StrictRequestModel` with `extra="forbid"` — unknown fields are rejected (fail-fast) instead of silently ignored. Response models stay permissive. (RFC-001 §4 critical-contract rule; a bridge until `CalienneBaseModel` fully lands.)
 * **Every request carries an immutable ExecutionManifest.** The `ExecutionPassport` gained `set_execution_manifest(...)`; the frozen manifest (SHA-256 graph fingerprint, host snapshot, version stamps) is serialized in `passport.to_dict()` and surfaced to the frontend as the `metrics` field of the response payload.
 * **The orchestrator package now lazy-loads.** `orchestrator/__init__.py` resolves its ~50 exports through `__getattr__`/`import_module`, so lightweight modules (e.g. `orchestrator.contracts`) import without pulling the full runtime graph into module initialization.
 * **Firewall verdicts are measured, not keyword luck.** `validate_claim` v2 scores evidence support as stemmed term coverage and gates verify/contradict at coverage ≥ 0.7 (a verbatim substring of at least 4 chars also counts); the score lands in claim provenance as `support_score`. Measured against the frozen gap corpus this resolved 12 of 14 known blind spots — the 2 semantic residuals are documented in `evals/firewall_known_gaps.md` as the acceptance case for a hosted entailment verifier rather than more lexical rules.
@@ -148,11 +148,11 @@ New response fields on the default path: `firewall_result`, `metrics` (passport/
 
 ### Flag-gated subsystems (built, default OFF, not load-bearing)
 
-Everything below is landed at `Experimental` maturity but dormant until its flag is enabled. Flags are the `AETHERIS_ENABLE_*` namespace (e.g. `AETHERIS_ENABLE_DAG`).
+Everything below is landed at `Experimental` maturity but dormant until its flag is enabled. Flags are the `CALIENNE_ENABLE_*` namespace (e.g. `CALIENNE_ENABLE_DAG`).
 
 | Subsystem | Flag | Status |
 |-----------|------|--------|
-| Base model + v1 schemas (`AetherisBaseModel`, `extra="ignore"`) | — | ✅ Landed |
+| Base model + v1 schemas (`CalienneBaseModel`, `extra="ignore"`) | — | ✅ Landed |
 | Feature flags + versioning primitives | (all) | ✅ Landed |
 | Classifier (`IntentAnalyzer`) + deterministic planner fallback | `PLANNER` | ✅ Landed |
 | Graph planner + event-driven scheduler + ExecutionManager | `DAG`, `PLANNER` | ✅ Landed |
@@ -229,7 +229,7 @@ That baseline is also the evidence the parked DAG verdict (behind all-off flags)
 ### 1. Clone the repository
 ```bash
 git clone <repository-url>
-cd aetheris
+cd calienne
 ```
 
 ### 2. Create a virtual environment
@@ -253,9 +253,9 @@ pip install -r requirements-dev.txt
 ```
 
 ### 4. Configure secrets and environment variables
-`.env.example` is the complete, annotated reference — all 23 Settings variables, every `AETHERIS_ENABLE_*` feature flag (13 gates, default off), and the operational overrides (replay retention, retrieval weights, capability paths), each with its default. Copying it enables nothing; everything optional is commented out.
+`.env.example` is the complete, annotated reference — all Settings variables, feature flags, and operational overrides. Copying it enables nothing; everything optional is commented out.
 
-Provider API keys are loaded from the OS-native secret store through `secrets_bootstrap.py`, then exported into the `AETHERIS_*` environment variables expected by `core/config.py`. Keep live keys out of `.env` and out of version control.
+Provider API keys are loaded from the OS-native secret store through `secrets_bootstrap.py`, then exported into the `CALIENNE_*` environment variables expected by `core/config.py`. Keep live keys out of `.env` and out of version control.
 
 One-time setup per developer machine:
 ```bash
@@ -263,27 +263,27 @@ pip install keyring
 ```
 
 ```powershell
-"sk-or-v1-..." | keyring set Aetheris OPENROUTER_API_KEY
-"gsk_..."      | keyring set Aetheris GROQ_API_KEY
-"nvapi-..."    | keyring set Aetheris NVIDIA_NIM_API_KEY
-"ghp_..."      | keyring set Aetheris GITHUB_TOKEN
-"..."          | keyring set Aetheris MISTRAL_API_KEY
-"..."          | keyring set Aetheris GOOGLE_API_KEY
-"sk-..."       | keyring set Aetheris OPENAI_API_KEY
-"..."          | keyring set Aetheris KIE_API_KEY
-"..."          | keyring set Aetheris UNLI_DEV_API_KEY
+"sk-or-v1-..." | keyring set Calienne OPENROUTER_API_KEY
+"gsk_..."      | keyring set Calienne GROQ_API_KEY
+"nvapi-..."    | keyring set Calienne NVIDIA_NIM_API_KEY
+"ghp_..."      | keyring set Calienne GITHUB_TOKEN
+"..."          | keyring set Calienne MISTRAL_API_KEY
+"..."          | keyring set Calienne GOOGLE_API_KEY
+"sk-..."       | keyring set Calienne OPENAI_API_KEY
+"..."          | keyring set Calienne KIE_API_KEY
+"..."          | keyring set Calienne UNLI_DEV_API_KEY
 ```
 
-The keyring service name is `Aetheris`. The account names are the bare config field names, without the `AETHERIS_` prefix.
+The keyring service name is `Calienne` (with automatic fallback to `Calienne` for backward compatibility). The account names are the bare config field names.
 
 Use `.env` only for non-secret local runtime settings, for example:
 ```bash
-AETHERIS_LOG_LEVEL=INFO
-DATABASE_URL=postgresql+asyncpg://postgres@localhost:5432/postgres
-AETHERIS_JWT_SECRET_KEY=replace-with-a-local-development-secret-at-least-32-chars
+CALIENNE_LOG_LEVEL=INFO
+DATABASE_URL=postgresql+asyncpg://postgres@localhost:5432/calienne
+CALIENNE_JWT_SECRET_KEY=replace-with-a-local-development-secret-at-least-32-chars
 ```
 
-If no provider keys are present in the OS secret store or environment, the system defaults to Simulation Mode — **except in production (`AETHERIS_ENVIRONMENT=production`), where a missing key is refused (hard `RuntimeError` + `CRITICAL` alarm) rather than faked.**
+If no provider keys are present in the OS secret store or environment, the system defaults to Simulation Mode — **except in production (`CALIENNE_ENVIRONMENT=production`), where a missing key is refused (hard `RuntimeError` + `CRITICAL` alarm) rather than faked.**
 
 ---
 
@@ -305,7 +305,7 @@ The dashboard is served from `frontend/dist/` — build it first (`cd frontend &
 
 ### Deployment notes
 * Run `alembic upgrade head` before serving traffic — the chain runs 001→005 (004 adds `updated_at` for recency ordering; 005 adds the memory-search `tsvector` column + GIN/composite indexes). Startup verifies the schema revision and refuses to boot on drift, so a skipped migration fails loudly, not silently.
-* Production (`AETHERIS_ENVIRONMENT=production`) hard-requires: a real provider key (simulation fallback refused), `AETHERIS_METRICS_TOKEN` (the `/metrics` endpoint refuses to serve without it), `DATABASE_SSL=true`, and an explicit CORS origin allowlist (wildcards are rejected at startup).
+* Production (`CALIENNE_ENVIRONMENT=production`) hard-requires: a real provider key (simulation fallback refused), `CALIENNE_METRICS_TOKEN` (the `/metrics` endpoint refuses to serve without it), `DATABASE_SSL=true`, and an explicit CORS origin allowlist (wildcards are rejected at startup).
 * Both `/api/config/vault` endpoints are admin-only; the frontend degrades gracefully for non-admins.
 
 ---
@@ -313,10 +313,10 @@ The dashboard is served from `frontend/dist/` — build it first (`cd frontend &
 ## Project Structure
 
 ```
-aetheris/
+calienne/
 ├── main.py                    # CLI entry point (REPL + --web flag)
 ├── server.py                  # FastAPI web server & auth/page routing
-├── aetheris_login.html        # Dedicated dark-mode login & sign-up UI (/login)
+├── calienne_login.html        # Dedicated dark-mode login & sign-up UI (/login)
 ├── requirements.txt           # Backend dependency ranges (starlette floor ≥0.47.2)
 ├── requirements.lock          # Hashed pins — what CI installs (G4-verified)
 ├── requirements-dev.txt       # pytest / ruff (contributors + CI)
@@ -351,7 +351,7 @@ aetheris/
 │   ├── streaming.py           # Real-time SSE event streaming
 │   ├── memory.py              # Epistemic failure-tracking bus (owner-scoped)
 │   │                          # --- Adaptive v1 runtime (flag-gated, default off) ---
-│   ├── feature_flags.py       # Typed AETHERIS_ENABLE_* accessor (env > file > off)
+│   ├── feature_flags.py       # Typed CALIENNE_ENABLE_* accessor (env > file > off)
 │   ├── strategic_planner.py   # LLM-assisted decomposition → StrategicPlan
 │   ├── execution_planner.py   # Rule-based DAG builder + template fallback
 │   ├── scheduler.py           # Event-driven async scheduler (asyncio.Condition)
@@ -405,8 +405,8 @@ aetheris/
 │
 └── docs/
     ├── images/                # Visual UI screenshots & previews
-    │   ├── aetheris_dashboard_ui.png
-    │   └── aetheris_login_ui.png
+    │   ├── calienne_dashboard_ui.png
+    │   └── calienne_login_ui.png
     ├── new/                   # Adaptive-runtime spec (source of truth)
     │   ├── plan.md            #   Master roadmap & invariant index
     │   ├── guide.md           #   Step-by-step build tracker (0–22)

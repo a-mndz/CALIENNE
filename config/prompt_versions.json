@@ -2,7 +2,7 @@
   "_meta": {
     "owner": "RFC-005 (per-skill)",
     "reviewers": "Architecture + Skills owners",
-    "spec": "RFC-005 §5 — resolution order: env AETHERIS_PROMPT_VERSIONS_PATH -> this file -> orchestrator/skills.py built-in defaults (with a warning).",
+    "spec": "RFC-005 §5 — resolution order: env CALIENNE_PROMPT_VERSIONS_PATH -> this file -> orchestrator/skills.py built-in defaults (with a warning).",
     "notes": "skills.py defines behavior/composition; this file defines which template revision is active. One entry per initial skill (RFC-003 §13). Bumping a version here is an A/B and replay signal, not a code change."
   },
   "skills": {

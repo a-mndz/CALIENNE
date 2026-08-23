@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 Structural integrity layer for LLM JSON output.
 
 This module sits between raw LLM responses and the typed Pydantic schemas
@@ -104,7 +104,7 @@ def parse_and_repair(
        ``repair_json`` and load the repaired result.
     3. Validate the resulting dict against *target_schema_class*.
     4. On any failure, return a safe error dictionary instead of
-       raising — the aetheris pipeline must never crash due to
+       raising — the calienne pipeline must never crash due to
        malformed model output.
 
     Parameters

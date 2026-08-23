@@ -40,8 +40,8 @@ def test_manifest_snapshots_every_feature_flag_explicitly() -> None:
     assert manifest.git_commit == git_commit
     assert manifest.feature_flags == flags.as_env_map()
     assert set(manifest.feature_flags) == set(FeatureFlags().as_env_map())
-    assert manifest.feature_flags["AETHERIS_ENABLE_DAG"] is True
-    assert manifest.feature_flags["AETHERIS_ENABLE_RAG"] is False
+    assert manifest.feature_flags["CALIENNE_ENABLE_DAG"] is True
+    assert manifest.feature_flags["CALIENNE_ENABLE_RAG"] is False
     assert manifest.prompt_versions == {"coder": "7"}
 
 

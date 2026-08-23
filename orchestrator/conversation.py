@@ -1,5 +1,5 @@
 """
-aetheris — Conversation Director
+calienne — Conversation Director
 Manages multi-turn dialogue state, history, and context window management.
 
 Specifications from Requirement 3:

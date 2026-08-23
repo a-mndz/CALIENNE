@@ -3,21 +3,21 @@
     "owner": "RFC-006 + RFC-008",
     "reviewers": "Architecture",
     "spec": "RFC-006 §3/§4 — all 13 v1 flags, default OFF. Precedence: env var > this file > hardcoded default (off).",
-    "notes": "Keys are the full AETHERIS_ENABLE_<SUBSYSTEM> names so this file matches the ExecutionManifest snapshot 1:1. Flipping a flag to true here is a separate, decision_register.md-recorded change. META_ESCALATION and SELF_LEARNING are v2-reserved: setting them true logs a warning and has no runtime effect in v1."
+    "notes": "Keys are the full CALIENNE_ENABLE_<SUBSYSTEM> names so this file matches the ExecutionManifest snapshot 1:1. Flipping a flag to true here is a separate, decision_register.md-recorded change. META_ESCALATION and SELF_LEARNING are v2-reserved: setting them true logs a warning and has no runtime effect in v1."
   },
   "flags": {
-    "AETHERIS_ENABLE_PLANNER":         false,
-    "AETHERIS_ENABLE_DAG":             false,
-    "AETHERIS_ENABLE_CONSENSUS":       false,
-    "AETHERIS_ENABLE_RAG":             false,
-    "AETHERIS_ENABLE_REPAIR":          false,
-    "AETHERIS_ENABLE_PREDICTION":      false,
-    "AETHERIS_ENABLE_CONTEXT":         false,
-    "AETHERIS_ENABLE_SKILLS":          false,
-    "AETHERIS_ENABLE_EXPERIENCE_DB":   false,
-    "AETHERIS_ENABLE_KNOWLEDGE_LAYER": false,
-    "AETHERIS_ENABLE_REPLAY":          false,
-    "AETHERIS_ENABLE_META_ESCALATION": false,
-    "AETHERIS_ENABLE_SELF_LEARNING":   false
+    "CALIENNE_ENABLE_PLANNER":         false,
+    "CALIENNE_ENABLE_DAG":             false,
+    "CALIENNE_ENABLE_CONSENSUS":       false,
+    "CALIENNE_ENABLE_RAG":             false,
+    "CALIENNE_ENABLE_REPAIR":          false,
+    "CALIENNE_ENABLE_PREDICTION":      false,
+    "CALIENNE_ENABLE_CONTEXT":         false,
+    "CALIENNE_ENABLE_SKILLS":          false,
+    "CALIENNE_ENABLE_EXPERIENCE_DB":   false,
+    "CALIENNE_ENABLE_KNOWLEDGE_LAYER": false,
+    "CALIENNE_ENABLE_REPLAY":          false,
+    "CALIENNE_ENABLE_META_ESCALATION": false,
+    "CALIENNE_ENABLE_SELF_LEARNING":   false
   }
 }

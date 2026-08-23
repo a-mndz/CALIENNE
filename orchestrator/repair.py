@@ -1,7 +1,7 @@
 """Reflection / repair loop (RFC-003 §9).
 
 Flow: Generate → Judge/Critique → Reflect → Repair → Rejudge → Done.
-Gate: AETHERIS_ENABLE_REPAIR.
+Gate: CALIENNE_ENABLE_REPAIR.
 
 The Token Budget Manager is the circuit breaker: if a repair cycle would
 exceed the critique/repair budget, bypass repair and synthesize from the

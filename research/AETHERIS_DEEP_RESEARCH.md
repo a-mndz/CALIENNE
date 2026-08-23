@@ -1,8 +1,8 @@
-# AETHERIS Deep Research Report
+# CALIENNE Deep Research Report
 
 ## Executive Summary
 
-AETHERIS (Adaptive Multi-Model Reasoning Orchestrator) is a sophisticated multi-agent reasoning system that implements a **validation-arbitration pipeline** (Logician + Creative + Synthesis Judge) with provider resilience, hallucination firewall, execution manifests, and adaptive DAG-based orchestration. This report provides a comprehensive technical analysis of its architecture, strengths, weaknesses, and relevant research landscape.
+CALIENNE (Adaptive Multi-Model Reasoning Orchestrator) is a sophisticated multi-agent reasoning system that implements a **validation-arbitration pipeline** (Logician + Creative + Synthesis Judge) with provider resilience, hallucination firewall, execution manifests, and adaptive DAG-based orchestration. This report provides a comprehensive technical analysis of its architecture, strengths, weaknesses, and relevant research landscape.
 
 ---
 
@@ -45,7 +45,7 @@ AETHERIS (Adaptive Multi-Model Reasoning Orchestrator) is a sophisticated multi-
 
 ### 1.2 Adaptive Runtime v1 (Flag-Gated, Default OFF)
 
-The system is migrating to a **planner-driven, DAG-based, async-first orchestration runtime** behind `AETHERIS_ENABLE_*` feature flags (architecture version `0.1.7`, 22/23 steps complete).
+The system is migrating to a **planner-driven, DAG-based, async-first orchestration runtime** behind `CALIENNE_ENABLE_*` feature flags (architecture version `0.1.7`, 22/23 steps complete).
 
 **Key Subsystems (landed, flagged off):**
 | Subsystem | Flag | Description |
@@ -151,7 +151,7 @@ The `DecisionEngine` class concentrates too many responsibilities:
 - `api_gateway/rate_limiter.py` → `ResourceManager` (provider-level: semaphores, circuit breakers, retry)
 - `orchestrator/resource_manager.py` → `ResourceManager` (DAG-level: global/route/model concurrency ceilings)
 
-**Problem:** Two classes with identical name but different responsibilities. In `aetheris_orchestrator.py`:
+**Problem:** Two classes with identical name but different responsibilities. In `calienne_orchestrator.py`:
 ```python
 from api_gateway.rate_limiter import ResourceManager  # provider-level
 from orchestrator.resource_manager import ResourceManager as DagResourceManager  # DAG-level
@@ -179,7 +179,7 @@ else:
 **Problem:** Duplicate logic paths, inconsistent behavior, unclear ownership.
 
 ### 3.4 Legacy Code Debt (MEDIUM RISK)
-- **Legacy inline pipeline** preserved behind `aetheris_LEGACY_PIPELINE_ENABLED` env var (~400 lines in `pipelines.py`)
+- **Legacy inline pipeline** preserved behind `calienne_LEGACY_PIPELINE_ENABLED` env var (~400 lines in `pipelines.py`)
 - CRIT-001 enforces DecisionEngine as sole path, but legacy code remains for "staged rollouts"
 - Dead code: `stream_micro_mode` generator removed but references persist
 - Technical debt accumulates as adaptive v1 grows alongside legacy path
@@ -206,7 +206,7 @@ else:
 
 ### 3.8 Testing & Simulation Concerns
 - **Simulation mode** fabricates deterministic mock responses
-- In production (`AETHERIS_ENVIRONMENT=production`), missing keys raise `RuntimeError` + `CRITICAL` alarm
+- In production (`CALIENNE_ENVIRONMENT=production`), missing keys raise `RuntimeError` + `CRITICAL` alarm
 - **Risk:** Simulation path not exercised in CI against real providers
 - No contract tests verifying simulation parity with real provider behavior
 
@@ -216,7 +216,7 @@ else:
 
 ### 4.1 Multi-Agent Orchestration Patterns
 
-| Pattern | Description | AETHERIS Alignment |
+| Pattern | Description | CALIENNE Alignment |
 |---------|-------------|-------------------|
 | **Pipeline** | Sequential stages (Research → Draft → Critique → Revise) | Legacy micro-mode is linear pipeline |
 | **Fan-out/Fan-in** | Parallel agents + aggregation (voting, weighted merge, LLM synthesis) | Logician + Creative parallel → Judge synthesis |
@@ -239,7 +239,7 @@ else:
 - **Multi-Agent Debate for LLM Judges** (NeurIPS 2025): Beta-Binomial mixture for adaptive stability detection
 - **Courtroom-Style PROClaim** (2026): Structured adversarial deliberation (Plaintiff/Defense/Judge roles)
 
-**AETHERIS Approach:** Single Synthesis Judge (not multi-judge debate) with validation scoring. Weighted consensus (`CONSENSUS` flag) adds multi-judge allocation for high/critical tasks.
+**CALIENNE Approach:** Single Synthesis Judge (not multi-judge debate) with validation scoring. Weighted consensus (`CONSENSUS` flag) adds multi-judge allocation for high/critical tasks.
 
 **Gap:** No iterative debate/refinement in Judge — single-pass arbitration. Could benefit from multi-round debate with stability detection.
 
@@ -251,7 +251,7 @@ else:
 - **Lightweight Hallucination Firewall** (2024): TF-IDF evidence + deterministic self-check
 - **Pelican** (2025): Claim decomposition + program-of-thought verification (8-32% hallucination reduction)
 
-**AETHERIS Approach:** Deterministic evidence checker (Step 14) with claim extraction → evidence building → validation → firewall rewrite. Claims tracked in ReasoningGraph with provenance.
+**CALIENNE Approach:** Deterministic evidence checker (Step 14) with claim extraction → evidence building → validation → firewall rewrite. Claims tracked in ReasoningGraph with provenance.
 
 **Strengths:** Default ON, integrated with passport, returns structured `firewall_result`.
 
@@ -265,7 +265,7 @@ else:
 - **Hedging**: Near p95 latency, speculative parallel requests
 - **Exponential backoff + jitter** standard
 
-**AETHERIS:** Implements all three layers in `api_gateway/rate_limiter.py`:
+**CALIENNE:** Implements all three layers in `api_gateway/rate_limiter.py`:
 - `AsyncAPIGateway.execute_with_fallback` with retry/backoff
 - `ProviderPool` with circuit breaker (3 failures → DEAD, 60s cooldown)
 - Provider priority chains per role
@@ -279,7 +279,7 @@ else:
 - **Docker manifest v2**: SHA-256 versioned manifests
 - **Graph Praxis** (2025): JSON-defined agent graphs with declarative execution
 
-**AETHERIS:** `ExecutionManifest` with:
+**CALIENNE:** `ExecutionManifest` with:
 - SHA-256 graph fingerprint (via `TopologyNormalizer`)
 - Monotonic `graph_version` (via `VersionRegistry`)
 - Host primitives (process start snapshot)
@@ -293,7 +293,7 @@ else:
 
 ## 5. Comparative Analysis
 
-| Dimension | AETHERIS | LangGraph | AutoGen v0.4 | CrewAI | Microsoft Conductor |
+| Dimension | CALIENNE | LangGraph | AutoGen v0.4 | CrewAI | Microsoft Conductor |
 |-----------|----------|-----------|--------------|--------|---------------------|
 | **Orchestration Style** | Pipeline → DAG (v1) | DAG/Graph native | Event-driven actor | Sequential/Hierarchical | Deterministic workflow |
 | **Validation** | Built-in Judge + Firewall | User-defined | User-defined | User-defined | Human-in-loop built-in |
@@ -317,7 +317,7 @@ else:
 3. **Unify Claim/Validation paths** — Single `ValidationPipeline` owning extraction → validation → firewall
 4. **Add structured JSON logging** — Replace `basicConfig` with `structlog` or `python-json-logger`
 5. **Prometheus metrics endpoint** — Export breaker_pass_rate, judge_agreement_rate, provider health
-6. **Remove legacy pipeline code** — Delete `aetheris_LEGACY_PIPELINE_ENABLED` branch after v1 stabilization
+6. **Remove legacy pipeline code** — Delete `calienne_LEGACY_PIPELINE_ENABLED` branch after v1 stabilization
 7. **Add OpenTelemetry tracing** — Distributed traces across agents, gateway, database
 
 ### 6.2 Short-Term (1-2 Sprints)
@@ -354,7 +354,7 @@ else:
 | `server.py` | FastAPI server + auth + API | 1384 | Medium (monolithic) |
 | `orchestrator/pipelines.py` | Micro-mode + DecisionEngine path | 1077 | High (dual paths) |
 | `orchestrator/decisions.py` | DecisionEngine (god object) | 621 | **High** |
-| `orchestrator/aetheris_orchestrator.py` | Component factory | 193 | Low |
+| `orchestrator/calienne_orchestrator.py` | Component factory | 193 | Low |
 | `orchestrator/evaluation.py` | Judge synthesis | 114 | Low |
 | `orchestrator/claims.py` | ClaimManager + firewall | ~400 | Medium |
 | `orchestrator/validation_layer.py` | ValidationLayer (overlaps claims) | ~300 | Medium |
@@ -372,7 +372,7 @@ else:
 
 ## 8. Conclusion
 
-AETHERIS is an **ambitious, well-architected system** with genuine innovations:
+CALIENNE is an **ambitious, well-architected system** with genuine innovations:
 - Validation arbitrage (Logician + Creative + Judge) — rare in production systems
 - Hallucination firewall default-ON with deterministic evidence checking
 - ExecutionManifest for reproducibility and audit
@@ -408,7 +408,7 @@ AETHERIS is an **ambitious, well-architected system** with genuine innovations:
 - NiteAgent (2026) — "Building Reliable Agent Error Handling"
 - LangGraph / AutoGen v0.4 / CrewAI — Production orchestration frameworks
 
-### AETHERIS Internal Docs
+### CALIENNE Internal Docs
 - `docs/new/plan.md` — Master roadmap & invariant index
 - `docs/new/guide.md` — 23-step build tracker (Steps 1-22 complete)
 - `docs/new/rfcs/RFC-001..008` — System Architecture, Execution Pipeline, Planner/Scheduler, Memory/RAG/Context, Versioning/Manifest, Feature Flags, Implementation Roadmap, Governance
@@ -419,4 +419,4 @@ AETHERIS is an **ambitious, well-architected system** with genuine innovations:
 ---
 
 *Report generated: 2026-08-19*  
-*Based on AETHERIS architecture version 0.1.7 (commit inspection + documentation review)*
+*Based on CALIENNE architecture version 0.1.7 (commit inspection + documentation review)*

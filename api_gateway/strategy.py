@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 Provider strategy: mode-aware model selection with per-role fallback chains.
 
 This module maps each system *role* (generation, breaker, judge) to a
@@ -81,7 +81,7 @@ class StrategyMode(str, Enum):
 # Models are specified as OpenRouter-style identifiers so the downstream
 # ``provider_pool`` can route them to the correct gateway.
 
-# Verified alive 2026-08-21 (research/AETHERIS_RESEARCH_2026-08-21.md, Tier 0.3):
+# Verified alive 2026-08-21 (research/CALIENNE_RESEARCH_2026-08-21.md, Tier 0.3):
 # - github/* routes retired 30 Jul 2026 — removed.
 # - Groq's production list contains no Llama models; llama-3.3-70b-versatile and
 #   llama-3.1-8b-instant 404. Replaced with Groq-hosted openai/gpt-oss-*,
@@ -220,6 +220,58 @@ class ProviderStrategy:
             logger.info("Added model '%s' to role '%s' in %s mode.", model, role, self._mode.value)
             return True
         return False
+
+    def set_primary_model(self, role: str, model: str) -> bool:
+        """Designate *model* as the primary (index 0) model for *role* fallback chain."""
+        role = ROUTE_ROLE_ALIASES.get(role, role)
+        chain = self._model_map.setdefault(role, [])
+        if model in chain:
+            chain.remove(model)
+        chain.insert(0, model)
+        self._disabled_models.discard(model)
+        logger.info("Set '%s' as primary model for role '%s'.", model, role)
+        return True
+
+    def set_model_chain(self, role: str, chain: list[str]) -> bool:
+        """Replace the ordered model fallback chain for a given role."""
+        actual_r = ROUTE_ROLE_ALIASES.get(role, role)
+        self._model_map[actual_r] = [m.strip() for m in chain if m.strip()]
+        logger.info("Updated model chain for role '%s': %s", role, self._model_map[actual_r])
+        return True
+
+    def remove_model(self, model: str, role: str | None = None) -> bool:
+        """Remove a model from a specific role chain, or all role chains if role is None."""
+        removed = False
+        roles_to_check = [role] if role else list(self._model_map.keys())
+        for r in roles_to_check:
+            actual_r = ROUTE_ROLE_ALIASES.get(r, r)
+            chain = self._model_map.get(actual_r, [])
+            if model in chain:
+                chain.remove(model)
+                removed = True
+        self._disabled_models.discard(model)
+        return removed
+
+    def set_model_roles(self, model: str, roles: list[str]) -> bool:
+        """Ensure *model* is in chains for the given roles and removed from others."""
+        target_roles = {ROUTE_ROLE_ALIASES.get(r, r) for r in roles}
+        for role_key in list(self._model_map.keys()):
+            chain = self._model_map[role_key]
+            if role_key in target_roles:
+                if model not in chain:
+                    chain.append(model)
+            else:
+                if model in chain:
+                    chain.remove(model)
+        return True
+
+    def get_model_roles(self, model: str) -> list[str]:
+        """Return list of roles currently containing *model*."""
+        roles = []
+        for role_key, chain in self._model_map.items():
+            if model in chain:
+                roles.append(role_key)
+        return roles
 
     def set_model_enabled(self, model: str, enabled: bool) -> bool:
         """Enable or disable one exact model identifier across role chains."""

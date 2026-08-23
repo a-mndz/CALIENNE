@@ -612,7 +612,7 @@ class ExecutionManager:
     ) -> None:
         """Seed the Step 16 memory hierarchy with the current request.
 
-        Only fires when ``AETHERIS_ENABLE_CONTEXT`` is on and a hierarchy
+        Only fires when ``CALIENNE_ENABLE_CONTEXT`` is on and a hierarchy
         is wired. Failures are logged and swallowed (ADR-007).
         """
 

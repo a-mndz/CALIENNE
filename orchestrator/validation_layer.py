@@ -10,7 +10,7 @@ from core.schemas import (
     ClarificationRequest,
     StageAssessment,
     TaskProfile,
-    aetherisOutput,
+    calienneOutput,
 )
 from orchestrator.claims import ClaimManager
 from orchestrator.knowledge_layer import KnowledgeBundle
@@ -33,7 +33,7 @@ class ValidationLayer:
         strategy: Any,
         pool: Any,
         passport: Any,
-    ) -> aetherisOutput:
+    ) -> calienneOutput:
         return await decision_engine.execute_judge_synthesis(
             query=knowledge.query,
             logician_output=logician_output,
@@ -139,7 +139,7 @@ class ValidationLayer:
         strategic_plan: Any | None,
         results: dict[str, Any],
         final_node_id: str | None = None,
-    ) -> tuple[aetherisOutput, dict[str, Any]]:
+    ) -> tuple[calienneOutput, dict[str, Any]]:
         final_node_id = final_node_id or (next(reversed(results.keys())) if results else "")
         final_result = results.get(final_node_id, {}) if final_node_id else {}
         final_text = str(final_result.get("final_response") or final_result.get("objective") or "")
@@ -180,7 +180,7 @@ class ValidationLayer:
             overall_confidence = "Medium"
         else:
             overall_confidence = "Low"
-        output = aetherisOutput(
+        output = calienneOutput(
             final_answer=firewall.sanitized_text or final_text,
             overall_confidence=overall_confidence,
             overall_bias_risk="Medium" if unsupported else "Low",

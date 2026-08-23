@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 Validation arbitration & synthesis judge.
 
 Invokes a dedicated judge model to score logical consistency between
@@ -16,9 +16,9 @@ from agents.parser import parse_and_repair
 from agents.prompt_utils import assemble_synthesizer_prompt
 from api_gateway.rate_limiter import AsyncAPIGateway, ProviderPool
 from api_gateway.strategy import ProviderStrategy
-from core.schemas import aetherisOutput
+from core.schemas import calienneOutput
 
-logger = logging.getLogger("aetheris.Orchestrator.Evaluation")
+logger = logging.getLogger("calienne.Orchestrator.Evaluation")
 
 
 def _delimit_safe(value: str) -> str:
@@ -47,7 +47,7 @@ async def arbitrate_and_synthesize(
     pool: Optional[ProviderPool] = None,
     lessons: str = "",
     history: list[dict[str, str]] | None = None,
-) -> aetherisOutput | dict:
+) -> calienneOutput | dict:
     """
     Invokes the synthesizer judge to score logical consistency
     and formulate the authoritative consensus response.
@@ -106,7 +106,7 @@ INSTRUCTIONS:
 3. Provide validation_score from 0.0 to 10.0 indicating overall logical consistency.
 4. State structural disagreements clearly in 'disagreement_notes'.
 
-Output strictly in raw JSON following the aetherisOutput schema layout:
+Output strictly in raw JSON following the calienneOutput schema layout:
 {{
   "final_answer": "<your_synthesized_response>",
   "overall_confidence": "High/Medium/Low",
@@ -133,4 +133,4 @@ Output strictly in raw JSON following the aetherisOutput schema layout:
         max_tokens=8192,
     )
 
-    return parse_and_repair(raw_judge_output, aetherisOutput)
+    return parse_and_repair(raw_judge_output, calienneOutput)

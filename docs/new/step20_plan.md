@@ -1,7 +1,7 @@
 # Step 20 — Execution Replay + Experience DB (RFC-007 §Step 19)
 
 Implements RFC-004 §6 (replay) and §7 (Experience DB, ADR-008). Both land
-behind their feature flags (`AETHERIS_ENABLE_REPLAY`, `AETHERIS_ENABLE_EXPERIENCE_DB`),
+behind their feature flags (`CALIENNE_ENABLE_REPLAY`, `CALIENNE_ENABLE_EXPERIENCE_DB`),
 default **off**, per Step 20's exit gate in `docs/new/guide.md`.
 
 Flags already exist in `feature_flags.py` + `config/feature_flags.json`.
@@ -12,7 +12,7 @@ Watchlist already lists `execution_replay.py` + `experience_db.py`.
 ### New: `orchestrator/execution_replay.py`
 - `prompt_fingerprint(user_query) -> str` — deterministic SHA-256 (12–16 hex
   chars) so traces index by `(graph_version, prompt_fingerprint)` (RFC-004 §6.2).
-- Schemas (all `AetherisBaseModel`, invariant 1):
+- Schemas (all `CalienneBaseModel`, invariant 1):
   - `ReplayEvent{event_type, node_id?, timestamp_offset_ms, payload}` — event
     types exactly the 11 in RFC-004 §6 (`node_queued`, `node_started`,
     `node_completed`, `node_failed`, `dependency_released`, `repair_started`,
@@ -32,7 +32,7 @@ Watchlist already lists `execution_replay.py` + `experience_db.py`.
 - `ReplayStore` — filesystem-backed, append-only JSON under `telemetry/replays/`
   indexed by `(graph_version, prompt_fingerprint)`; `record()`, `load(trace_id)`,
   `list_traces()`, `prune(before)`; **default 30-day retention** (RFC-004 §6.3),
-  configurable via ctor + `AETHERIS_REPLAY_RETENTION_DAYS`.
+  configurable via ctor + `CALIENNE_REPLAY_RETENTION_DAYS`.
 - **PII redaction before storage** (guide 20a): a `_redact()` pass over
   user-supplied text fields (query/history) before write — deterministic,
   no raising into the request path (ADR-007).
@@ -52,10 +52,10 @@ Watchlist already lists `execution_replay.py` + `experience_db.py`.
   breaks the request (ADR-007), mirroring `_seed_memory_hierarchy`.
 
 ### Endpoint: `server.py`
-- `GET /api/debug/replay/{trace_id}` gated by `AETHERIS_ENABLE_REPLAY`
+- `GET /api/debug/replay/{trace_id}` gated by `CALIENNE_ENABLE_REPLAY`
   (RFC-004 §6.4). Returns the trace (503 when flag off / store unavailable,
   404 when trace absent), following the existing `/api/checkpoints/...` shape
-  (`_aetheris.get(...)`, `get_current_user` dep, `HTTPException`).
+  (`_calienne.get(...)`, `get_current_user` dep, `HTTPException`).
 
 ## 20b — Experience DB (PostgreSQL, two tables, ADR-008)
 
@@ -83,14 +83,14 @@ Watchlist already lists `execution_replay.py` + `experience_db.py`.
 
 ### `orchestrator/experience_db.py` — repository + record dataclasses
 - Pydantic-friendly transfer objects `OperationalExperience` /
-  `LearningExperience` (`AetherisBaseModel`), decoupled from ORM rows.
+  `LearningExperience` (`CalienneBaseModel`), decoupled from ORM rows.
 - `ExperienceRepository` — the **only** path to SQL (invariant 8, RFC-004 §7.3):
   `record_operational`, `record_learning`, `query_operational(...)`,
   `query_learning(...)`, `prune(before)`. Takes a `db_session_factory`
   (callable → `AsyncSession`), exactly like `CheckpointManager` (CRIT-003).
   Async-first (ADR-002); a missing factory raises `RuntimeError` on internal
   helper, public methods degrade/log per the checkpoint precedent.
-- Gate: writes only fire when `AETHERIS_ENABLE_EXPERIENCE_DB` is on (checked by
+- Gate: writes only fire when `CALIENNE_ENABLE_EXPERIENCE_DB` is on (checked by
   the caller / a thin `enabled` guard). No raw SQL anywhere else.
 - Connection pool ownership: repository receives its factory from the caller;
   `ResourceManager` remains the documented pool owner (ADR-008) — no per-repo

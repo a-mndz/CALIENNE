@@ -40,7 +40,7 @@ def _read_ci_metadata(*, env: dict[str, str] | None = None, ci_commit_file: Path
 def resolve_git_commit(*, env: dict[str, str] | None = None, ci_commit_file: Path | None = None) -> str:
     environment = os.environ if env is None else env
     return (
-        environment.get("AETHERIS_GIT_COMMIT")
+        environment.get("CALIENNE_GIT_COMMIT")
         or environment.get("GIT_COMMIT")
         or _read_ci_metadata(env=environment, ci_commit_file=ci_commit_file)
         or "unknown"

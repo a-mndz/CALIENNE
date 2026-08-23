@@ -1,6 +1,6 @@
-<aetheris_JSON_SCHEMA version="6.0">
+<calienne_JSON_SCHEMA version="6.0">
 <SYSTEM>
-This document defines the canonical communication protocol of aetheris.
+This document defines the canonical communication protocol of calienne.
 Every agent, judge, pipeline stage, streaming event, API response, adaptive loop, and internal message MUST conform to these schemas.
 No component may invent fields. No component may remove required fields.
 </SYSTEM>
@@ -60,6 +60,6 @@ Every payload contains schema_version using SemVer: major (breaking change), min
 Components with incompatible versions SHALL refuse communication.
 </SCHEMA_VERSIONING>
 <IDL_DEFINITION>
-Every aetheris message should be generated from a single Interface Definition Language (IDL) so JSON Schema, Python models, TypeScript interfaces, Rust structs, Go structs, OpenAPI, and documentation stay in sync. Maintain a single source of truth.
+Every calienne message should be generated from a single Interface Definition Language (IDL) so JSON Schema, Python models, TypeScript interfaces, Rust structs, Go structs, OpenAPI, and documentation stay in sync. Maintain a single source of truth.
 </IDL_DEFINITION>
-</aetheris_JSON_SCHEMA>
+</calienne_JSON_SCHEMA>

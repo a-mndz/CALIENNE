@@ -1,11 +1,11 @@
 import logging
 from typing import Dict
 
-logger = logging.getLogger("aetheris.Telemetry")
+logger = logging.getLogger("calienne.Telemetry")
 
 # Pricing rates per 1,000,000 tokens (USD). Refreshed 2026-08-22 against
 # provider price pages (google: ai.google.dev, groq gpt-oss: console.groq.com,
-# anthropic claude-5: platform.claude.com — see research/AETHERIS_RESEARCH_
+# anthropic claude-5: platform.claude.com — see research/CALIENNE_RESEARCH_
 # 2026-08-21.md). Substring match on the served model id, most-specific key
 # first ("gpt-4o-mini" must precede "gpt-4o"). "default" applies to unknown
 # models — costs for those are approximations, not measurements.
@@ -115,7 +115,7 @@ class TelemetryObserver:
     def print_session_report(self):
         """Outputs summary metrics for system auditing."""
         logger.info("=" * 50)
-        logger.info("aetheris TELEMETRY SESSION REPORT")
+        logger.info("calienne TELEMETRY SESSION REPORT")
         logger.info("=" * 50)
         logger.info("Total Model Calls:   %d", self.transaction_count)
         logger.info("Total Input Tokens:  %d", self.total_input_tokens)

@@ -20,7 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 OUTPUT = REPO_ROOT / "docs" / "api.md"
 
 HEADER = """\
-# aetheris API Reference
+# calienne API Reference
 
 <!-- GENERATED FILE — do not edit by hand.
      Regenerate with: python tools/generate_api_reference.py -->

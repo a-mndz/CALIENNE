@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 from functools import lru_cache
 from typing import Any, Optional, Tuple
 
-logger = logging.getLogger("aetheris.Agents.PromptManager")
+logger = logging.getLogger("calienne.Agents.PromptManager")
 
 
 def clean_xml_prompt(content: str) -> str:
@@ -319,7 +319,7 @@ def assemble_agent_prompt(
     prompts_dir: Optional[str] = None,
 ) -> str:
     """
-    Assembles the hierarchical aetheris prompt layout with dynamic role injection:
+    Assembles the hierarchical calienne prompt layout with dynamic role injection:
 
     1. <ROLE> block
     2. Runtime contracts (00-11) sorted by numeric prefix

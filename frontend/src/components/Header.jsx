@@ -46,11 +46,16 @@ const Header = memo(function Header({
     { mode: "hidden", label: "Hide Panels", icon: Square },
   ];
 
+  const displayModels = (() => {
+    const configuredOnly = models.filter((m) => m.custom || m.configured);
+    return configuredOnly.length > 0 ? configuredOnly : models;
+  })();
+
   return (
     <header className="header">
       <div className="header-left">
         <button className="icon-btn mobile-only" onClick={onOpenSidebarMobile} aria-label="Open conversations panel"><Menu size={18} /></button>
-        <div className="brand" title="Aetheris - Reasoning, arbitrated.">
+        <div className="brand" title="Calienne - Reasoning, arbitrated.">
           <span className="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
               <path d="M12 3L4 19H8.5L12 11L15.5 19H20L12 3Z" stroke="var(--text)" strokeWidth="1.6" strokeLinejoin="round" />
@@ -58,15 +63,20 @@ const Header = memo(function Header({
               <path d="M6.5 14H17.5" stroke="#00F0FF" strokeWidth="1.2" strokeDasharray="2 2" opacity="0.8" />
             </svg>
           </span>
-          <span className="brand-name">Aetheris</span>
+          <span className="brand-name">Calienne</span>
           <span className="brand-ver">REV 2.0</span>
         </div>
         {onExitLanding && <button className="text-btn desktop-only return-btn" onClick={onExitLanding}><ChevronLeft size={14} /> Overview</button>}
       </div>
 
       <div className="header-models">
-        {models.map((model) => (
-          <button key={model.id} className={`chip${model.active ? " chip-active" : ""}${pulsingChipId === model.full_id ? " chip-pulse" : ""}`} onClick={() => handleToggleModel(model.full_id)} disabled={!isAdmin} title={isAdmin ? (model.active ? "Click to deactivate" : "Click to activate") : "Admin access required"}>
+        {displayModels.map((model) => (
+          <button
+            key={model.full_id || model.id}
+            className={`chip${model.active ? " chip-active" : ""}${pulsingChipId === (model.full_id || model.id) ? " chip-pulse" : ""}`}
+            onClick={() => handleToggleModel(model.full_id || model.id)}
+            title={model.active ? "Click to deactivate model" : "Click to activate model"}
+          >
             <span className={`chip-dot${model.active ? " on" : ""}`} />
             {model.name}
           </button>
@@ -84,8 +94,8 @@ const Header = memo(function Header({
             </div>
           )}
         </Popover>}
-        {isAdmin && <button className="chip chip-ghost" onClick={onOpenStudio} title="Open Model & API Gateway Studio">
-          ⚡ Model &amp; API Studio
+        {isAdmin && <button className="chip chip-ghost chip-studio-btn" onClick={onOpenStudio} title="Open Model & Provider Studio">
+          ⚡ Model &amp; Provider Studio
         </button>}
       </div>
 
@@ -102,6 +112,7 @@ const Header = memo(function Header({
               <div className="session-row"><span>Uptime</span><SessionClock /></div>
               <div className="session-row"><span>Build</span><span className="mono">REV 2.0</span></div>
               <div className="dd-sep" />
+              {isAdmin && <button className="dd-item" onClick={() => { close(); onOpenStudio?.(); }}><Activity size={13} /> Model &amp; Provider Studio</button>}
               <button className="dd-item" onClick={() => { close(); onOpenSettings(); }}><Settings size={13} /> Open Settings</button>
             </div>
           )}

@@ -1,4 +1,4 @@
-<aetheris_STREAMING_ENGINE version="5.0">
+<calienne_STREAMING_ENGINE version="5.0">
 <PHILOSOPHY>
 Streaming is NOT cosmetic. Streaming is part of the reasoning pipeline.
 The user shall continuously observe pipeline progress. Never wait until completion to display activity.
@@ -46,4 +46,4 @@ Every stage in the pipeline exposes its current state with one of these indicato
 🟢 Running, 🟡 Waiting, 🔵 Streaming, 🔴 Failed, ⚫ Skipped, ⚪ Idle.
 States update in real time.
 </LIVE_PIPELINE_INSPECTOR>
-</aetheris_STREAMING_ENGINE>
+</calienne_STREAMING_ENGINE>

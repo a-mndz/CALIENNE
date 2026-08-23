@@ -1,5 +1,5 @@
 """
-aetheris — Checkpoint Manager
+calienne — Checkpoint Manager
 Save and restore pipeline state for recovery from failures.
 
 Specifications from Requirement 13:

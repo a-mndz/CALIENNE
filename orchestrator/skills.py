@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import Field
 
-from core.base import AetherisBaseModel
+from core.base import CalienneBaseModel
 from core.schemas import StrategicPlan, TaskGraph, TaskNode, TaskProfile
 from orchestrator.contracts import OutputContract
 
@@ -20,14 +20,14 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_PROMPT_VERSIONS_PATH = _REPO_ROOT / "config" / "prompt_versions.json"
 
 
-class PromptVersion(AetherisBaseModel):
+class PromptVersion(CalienneBaseModel):
     """Resolved version/template pair for a single skill."""
 
     version: str = "1"
     template: str = ""
 
 
-class SkillDefinition(AetherisBaseModel):
+class SkillDefinition(CalienneBaseModel):
     """Declarative definition of a composable skill."""
 
     name: str
@@ -41,7 +41,7 @@ class SkillDefinition(AetherisBaseModel):
     prompt_version: PromptVersion = Field(default_factory=PromptVersion)
 
 
-class SkillComposition(AetherisBaseModel):
+class SkillComposition(CalienneBaseModel):
     """Resolved bundle for a single node."""
 
     node_id: str
@@ -198,7 +198,7 @@ def load_prompt_versions(
     """Load per-skill prompt versions using env -> config -> built-in precedence."""
 
     environment = os.environ if env is None else env
-    env_override = environment.get("AETHERIS_PROMPT_VERSIONS_PATH")
+    env_override = environment.get("CALIENNE_PROMPT_VERSIONS_PATH")
     resolved_path = (
         Path(str(env_override))
         if env_override

@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 Absolute Network Boundary (The Shield) - Rate Limiter & Health tracking.
 
 This module enforces rate-limiting (concurrency limits), dynamic pre-request

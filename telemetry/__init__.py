@@ -1,3 +1,3 @@
-# aetheris — telemetry package
+# calienne — telemetry package
 
 from telemetry.observer import TelemetryObserver, observer

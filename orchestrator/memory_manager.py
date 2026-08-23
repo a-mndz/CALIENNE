@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 Memory Manager: context window management with compression strategies.
 
 Handles conversation history tracking, token counting, and context window

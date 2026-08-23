@@ -2,16 +2,16 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-13
-- **Deciders:** AETHERIS architecture working group
+- **Deciders:** CALIENNE architecture working group
 - **Related RFCs:** RFC-001
 
 ## Context
 
-AETHERIS is migrating from a linear pipeline to a planner-driven, DAG-based
+CALIENNE is migrating from a linear pipeline to a planner-driven, DAG-based
 runtime. During the migration, upstream orchestration components may emit
 rich adaptive fields (e.g. `calibration`, `evidence_strength`,
 `contradiction_score`) on `StageAssessment`, `AgentOutput`, and
-`aetherisOutput` that legacy downstream nodes have not been refactored to
+`calienneOutput` that legacy downstream nodes have not been refactored to
 parse. A structural `ValidationError` at the boundary of an un-migrated
 node would block the entire request and break every existing regression
 test that uses the legacy payload shape.
@@ -25,19 +25,19 @@ The two needs are in tension. A single global policy cannot serve both.
 ## Decision
 
 All schemas in `core/schemas.py` (and any new schema file) inherit from a
-shared `AetherisBaseModel`:
+shared `CalienneBaseModel`:
 
 ```python
 from pydantic import BaseModel, ConfigDict
 
-class AetherisBaseModel(BaseModel):
+class CalienneBaseModel(BaseModel):
     model_config = ConfigDict(extra="ignore")
 ```
 
 Critical contracts opt into `extra="forbid"` explicitly:
 
 ```python
-class ProviderConfig(AetherisBaseModel):
+class ProviderConfig(CalienneBaseModel):
     model_config = ConfigDict(extra="forbid")
     ...
 ```
@@ -83,7 +83,7 @@ Harder:
   default.
 - **Global `extra="forbid"`.** Rejected: immediately breaks every existing
   regression test that parses legacy payloads, and any unmigrated
-  consumer of `StageAssessment`/`AgentOutput`/`aetherisOutput` would
+  consumer of `StageAssessment`/`AgentOutput`/`calienneOutput` would
   start failing in production.
 - **Custom `__setattr__` validation layer outside Pydantic.** Rejected:
   duplicates the validation framework, harder to test, easier to bypass.

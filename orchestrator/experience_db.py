@@ -17,7 +17,7 @@ callable returning an ``AsyncSession`` — exactly like
 connection pool behind that factory is owned by the ``ResourceManager``
 (ADR-008), not by the repository.
 
-Writes are gated by ``AETHERIS_ENABLE_EXPERIENCE_DB`` (RFC-006).  The
+Writes are gated by ``CALIENNE_ENABLE_EXPERIENCE_DB`` (RFC-006).  The
 repository itself is async-first (ADR-002); a missing factory raises
 ``RuntimeError`` from the internal helper so callers can decide whether to
 degrade.  ``pgvector`` is installed but unused in v1 (DEC-007).
@@ -31,7 +31,7 @@ from typing import Any, Callable
 
 from pydantic import Field
 
-from core.base import AetherisBaseModel
+from core.base import CalienneBaseModel
 
 LOGGER = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def _utc_now() -> datetime:
 # ── Transfer objects (decoupled from the ORM rows) ──────────────────────────
 
 
-class OperationalExperience(AetherisBaseModel):
+class OperationalExperience(CalienneBaseModel):
     """A single ``experience_operational`` record (RFC-004 §7.1)."""
 
     prompt_fingerprint: str
@@ -62,7 +62,7 @@ class OperationalExperience(AetherisBaseModel):
     created_at: datetime = Field(default_factory=_utc_now)
 
 
-class LearningExperience(AetherisBaseModel):
+class LearningExperience(CalienneBaseModel):
     """A single ``experience_learning`` record (RFC-004 §7.2)."""
 
     prompt_fingerprint: str

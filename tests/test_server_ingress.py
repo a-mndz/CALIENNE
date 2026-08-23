@@ -106,7 +106,7 @@ async def test_streaming_pipeline_timeout_emits_terminal_error(monkeypatch) -> N
     monkeypatch.setattr(server, "_streaming_mgr", StreamingManager())
     monkeypatch.setattr(
         server,
-        "_aetheris",
+        "_calienne",
         {"execution_manager": SimpleNamespace(execute=blocked_pipeline)},
     )
 
@@ -137,7 +137,7 @@ def test_server_query_routes_use_execution_manager() -> None:
     from pathlib import Path
 
     source = Path("server.py").read_text(encoding="utf-8")
-    assert source.count('_aetheris["execution_manager"].execute(') == 2
+    assert source.count('_calienne["execution_manager"].execute(') == 2
 
 
 @pytest.mark.asyncio

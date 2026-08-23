@@ -1,6 +1,6 @@
 """Agent contracts — per-node I/O contracts and failure policies (RFC-003 §3.4).
 
-Every contract inherits from ``AetherisBaseModel`` per ADR-001.
+Every contract inherits from ``CalienneBaseModel`` per ADR-001.
 """
 
 from __future__ import annotations
@@ -9,10 +9,10 @@ from typing import Any
 
 from pydantic import Field
 
-from core.base import AetherisBaseModel
+from core.base import CalienneBaseModel
 
 
-class InputContract(AetherisBaseModel):
+class InputContract(CalienneBaseModel):
     """Required inputs and validation rules for a node."""
 
     required_fields: list[str] = Field(default_factory=list)
@@ -20,7 +20,7 @@ class InputContract(AetherisBaseModel):
     validation_rules: dict[str, Any] = Field(default_factory=dict)
 
 
-class OutputContract(AetherisBaseModel):
+class OutputContract(CalienneBaseModel):
     """Produced outputs and their types for a node."""
 
     produced_fields: list[str] = Field(default_factory=list)
@@ -28,14 +28,14 @@ class OutputContract(AetherisBaseModel):
     schema_ref: str | None = None
 
 
-class FailureContract(AetherisBaseModel):
+class FailureContract(CalienneBaseModel):
     """Failure modes and the response shape for each."""
 
     failure_modes: list[str] = Field(default_factory=list)
     response_shape: str = "repair_request"
 
 
-class FailurePolicy(AetherisBaseModel):
+class FailurePolicy(CalienneBaseModel):
     """Maps FailureClass -> Action (RFC-003 §3.5)."""
 
     failure_class: str = "recoverable"  # recoverable | non_recoverable
@@ -43,7 +43,7 @@ class FailurePolicy(AetherisBaseModel):
     max_retries: int = 2
 
 
-class ContractViolation(AetherisBaseModel):
+class ContractViolation(CalienneBaseModel):
     """A single input/output contract breach for one node (RFC-003 §3.4)."""
 
     task_id: str

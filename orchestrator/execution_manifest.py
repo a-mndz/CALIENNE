@@ -10,13 +10,13 @@ from typing import Mapping
 
 from pydantic import ConfigDict, Field
 
-from core.base import AetherisBaseModel
+from core.base import CalienneBaseModel
 from orchestrator.feature_flags import FeatureFlags
 
 MANIFEST_SCHEMA_VERSION = "1.0"
 
 
-class HostPrimitives(AetherisBaseModel):
+class HostPrimitives(CalienneBaseModel):
     """Host details needed to diagnose replay differences."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -77,7 +77,7 @@ def capture_host_primitives() -> HostPrimitives:
 host_primitives = capture_host_primitives()
 
 
-class ExecutionManifest(AetherisBaseModel):
+class ExecutionManifest(CalienneBaseModel):
     """Frozen critical contract tying one request to its runtime versions."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")

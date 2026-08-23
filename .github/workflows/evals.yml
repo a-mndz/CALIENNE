@@ -2,7 +2,7 @@ name: Evals (stochastic)
 
 # G6/G7 — live-model gates. NEVER a required check: fork PRs receive no
 # secrets, and temperature 0 is not determinism (batch-invariance is the
-# missing property; AETHERIS controls neither OpenRouter's nor Groq's batch
+# missing property; CALIENNE controls neither OpenRouter's nor Groq's batch
 # size). Runs nightly and on opt-in labels only; `continue-on-error` keeps
 # it from ever turning a PR red. See evals/README.md.
 
@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 90
     continue-on-error: true
     env:
-      AETHERIS_JWT_SECRET_KEY: ci-only-not-a-real-secret-32chars-minimum
+      CALIENNE_JWT_SECRET_KEY: ci-only-not-a-real-secret-32chars-minimum
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -42,9 +42,9 @@ jobs:
         run: python -m evals.validate
       - name: Capture candidate arm
         env:
-          AETHERIS_OPENROUTER_API_KEY: ${{ secrets.AETHERIS_OPENROUTER_API_KEY }}
-          AETHERIS_GROQ_API_KEY: ${{ secrets.AETHERIS_GROQ_API_KEY }}
-          AETHERIS_GOOGLE_API_KEY: ${{ secrets.AETHERIS_GOOGLE_API_KEY }}
+          CALIENNE_OPENROUTER_API_KEY: ${{ secrets.CALIENNE_OPENROUTER_API_KEY }}
+          CALIENNE_GROQ_API_KEY: ${{ secrets.CALIENNE_GROQ_API_KEY }}
+          CALIENNE_GOOGLE_API_KEY: ${{ secrets.CALIENNE_GOOGLE_API_KEY }}
           LIMIT: ${{ github.event.inputs.limit }}
           RERUNS: ${{ github.event.inputs.reruns }}
         run: |

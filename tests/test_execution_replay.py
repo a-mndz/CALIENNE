@@ -30,7 +30,7 @@ from orchestrator.execution_replay import (
 # store tests use a fresh mkdtemp dir each run and clean it up.
 @pytest.fixture
 def replay_dir():
-    path = Path(tempfile.mkdtemp(prefix="aetheris_replay_"))
+    path = Path(tempfile.mkdtemp(prefix="calienne_replay_"))
     try:
         yield path
     finally:
@@ -155,7 +155,7 @@ def test_store_prune_removes_expired_only(replay_dir):
 
 
 def test_store_retention_days_env_override(replay_dir, monkeypatch):
-    monkeypatch.setenv("AETHERIS_REPLAY_RETENTION_DAYS", "5")
+    monkeypatch.setenv("CALIENNE_REPLAY_RETENTION_DAYS", "5")
     store = ReplayStore(base_dir=replay_dir)
     assert store.retention_days == 5
 

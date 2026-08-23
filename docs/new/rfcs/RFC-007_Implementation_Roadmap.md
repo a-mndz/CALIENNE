@@ -37,7 +37,7 @@ measurable.
 
 ### Step 2. Schemas and assessments (RFC-001)
 
-- Add `AetherisBaseModel` in `core/base.py`.
+- Add `CalienneBaseModel` in `core/base.py`.
 - Make every existing schema in `core/schemas.py` inherit from it.
 - Add `TaskProfile`, `StageAssessment` (with all extended fields
   `Optional` + documented defaults), `PipelineBudget`,
@@ -169,7 +169,7 @@ measurable.
 ### Step 20. Knowledge / Reasoning / Validation layer separation (RFC-001 §2)
 
 - Refactor the existing `DecisionEngine` RAG path into three layers.
-- Staged behind `AETHERIS_ENABLE_KNOWLEDGE_LAYER`.
+- Staged behind `CALIENNE_ENABLE_KNOWLEDGE_LAYER`.
 
 ### Step 21. Agent contracts (Input + Output + Failure) (RFC-003 §3.4)
 
@@ -181,7 +181,7 @@ measurable.
 - Add experience replay records.
 - Require offline evaluation, shadow testing, A/B testing, then
   production rollout.
-- `AETHERIS_ENABLE_SELF_LEARNING` gates adaptive routing in v2.
+- `CALIENNE_ENABLE_SELF_LEARNING` gates adaptive routing in v2.
 
 ## 3. PR Grouping Model
 

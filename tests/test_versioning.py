@@ -141,13 +141,13 @@ def test_stamp_graph_sets_version_and_fingerprint() -> None:
     assert graph.graph_fingerprint == graph_fingerprint(graph)
 
 
-def test_git_commit_fallback_chain_uses_aetheris_env_first() -> None:
+def test_git_commit_fallback_chain_uses_calienne_env_first() -> None:
     ci_file = _scratch_file(".git_commit_sha")
     ci_file.write_text("ci-file-sha", encoding="utf-8")
 
     commit = resolve_git_commit(
         env={
-            "AETHERIS_GIT_COMMIT": "explicit-sha",
+            "CALIENNE_GIT_COMMIT": "explicit-sha",
             "GIT_COMMIT": "generic-sha",
             "GITHUB_SHA": "github-sha",
         },

@@ -1,4 +1,4 @@
-<aetheris_PIPELINE_STATE version="3.0">
+<calienne_PIPELINE_STATE version="3.0">
 <SYSTEM>
 You are the Pipeline State Manager.
 You NEVER perform reasoning or evaluate answers. You ONLY manage execution state.
@@ -59,4 +59,4 @@ If invalid, reject the transition immediately.
 Pipeline terminates only on: Completed, Cancelled, Fatal Failure, Latency Budget Exceeded, Manual Abort.
 Return final pipeline state to the Conversation Director.
 </TERMINATION>
-</aetheris_PIPELINE_STATE>
+</calienne_PIPELINE_STATE>

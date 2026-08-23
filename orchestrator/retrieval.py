@@ -27,7 +27,7 @@ The v1 retrieval layer is deterministic and contract-driven:
   "LLM → Validation → Fallback" discipline applied to retrieval.
 
 * The whole module is gated by :class:`~orchestrator.feature_flags.FeatureFlags.rag`
-  (``AETHERIS_ENABLE_RAG``). When the flag is off, callers receive an empty
+  (``CALIENNE_ENABLE_RAG``). When the flag is off, callers receive an empty
   :class:`RetrievalResult` regardless of the request's route — keeping the
   default behaviour identical to the Step 7 contract.
 """
@@ -43,7 +43,7 @@ from typing import Any
 
 from pydantic import Field
 
-from core.base import AetherisBaseModel
+from core.base import CalienneBaseModel
 from core.schemas import TaskProfile
 
 LOGGER = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ EVIDENCE_BUMP_PER_SOURCE: int = 1
 # ── Schemas ──────────────────────────────────────────────────────────────
 
 
-class SourceCandidate(AetherisBaseModel):
+class SourceCandidate(CalienneBaseModel):
     """A retrieved source scored on four axes (RFC-004 §3.1)."""
 
     url: str | None = None
@@ -106,7 +106,7 @@ class SourceCandidate(AetherisBaseModel):
         )
 
 
-class RetrievalRequest(AetherisBaseModel):
+class RetrievalRequest(CalienneBaseModel):
     """A retrieval request shaped per RFC-004 §3 contract."""
 
     query: str = ""
@@ -117,7 +117,7 @@ class RetrievalRequest(AetherisBaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class RetrievalResult(AetherisBaseModel):
+class RetrievalResult(CalienneBaseModel):
     """The deterministic shape returned to callers (RFC-004 §3)."""
 
     sources: list[SourceCandidate] = Field(default_factory=list)
@@ -433,8 +433,8 @@ def load_routing_weights(
 
     Resolution order (per RFC-008 §8 / ADR-005):
 
-    1. ``AETHERIS_RETRIEVAL_WEIGHTS_JSON`` env var (raw JSON).
-    2. ``AETHERIS_RETRIEVAL_WEIGHTS_PATH`` env var (path to JSON file).
+    1. ``CALIENNE_RETRIEVAL_WEIGHTS_JSON`` env var (raw JSON).
+    2. ``CALIENNE_RETRIEVAL_WEIGHTS_PATH`` env var (path to JSON file).
     3. ``config/capabilities/routing_defaults.json`` ``retrieval.source_ranking_weights`` block.
     4. :data:`DEFAULT_RANKING_WEIGHTS`.
 
@@ -449,18 +449,18 @@ def load_routing_weights(
 
     environment = os.environ if env is None else env
 
-    raw_env = environment.get("AETHERIS_RETRIEVAL_WEIGHTS_JSON")
+    raw_env = environment.get("CALIENNE_RETRIEVAL_WEIGHTS_JSON")
     if raw_env:
         try:
             parsed = json.loads(raw_env)
         except json.JSONDecodeError as exc:
-            LOGGER.warning("Invalid AETHERIS_RETRIEVAL_WEIGHTS_JSON: %s", exc)
+            LOGGER.warning("Invalid CALIENNE_RETRIEVAL_WEIGHTS_JSON: %s", exc)
         else:
             if isinstance(parsed, dict):
                 merged = {**DEFAULT_RANKING_WEIGHTS, **parsed}
                 return _normalize_weights(merged)
 
-    path_env = environment.get("AETHERIS_RETRIEVAL_WEIGHTS_PATH")
+    path_env = environment.get("CALIENNE_RETRIEVAL_WEIGHTS_PATH")
     if path_env:
         try:
             payload = json.loads(Path(path_env).read_text(encoding="utf-8"))

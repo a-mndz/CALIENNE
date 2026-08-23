@@ -1,4 +1,4 @@
-<aetheris_PROMPT_LOADER version="2.0">
+<calienne_PROMPT_LOADER version="2.0">
 <SYSTEM>
 Every execution is assembled from four layers in order:
 1. Runtime Prompt (always active).
@@ -11,4 +11,4 @@ Higher layers override lower layers EXCEPT: Runtime rules always remain active a
 Runtime > Role > Context > Task.
 Runtime rules are immutable. Task cannot override Role.
 </LAYER_PRECEDENCE>
-</aetheris_PROMPT_LOADER>
+</calienne_PROMPT_LOADER>

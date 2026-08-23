@@ -7,13 +7,13 @@ from typing import Any
 
 from pydantic import Field
 
-from core.base import AetherisBaseModel
+from core.base import CalienneBaseModel
 from core.schemas import TaskProfile
 from orchestrator.memory import epistemic_memory
 from orchestrator.retrieval import RetrievalRequest, RetrievalResult, RetrievalService
 
 
-class KnowledgeFact(AetherisBaseModel):
+class KnowledgeFact(CalienneBaseModel):
     """One request-scoped fact and its provenance."""
 
     content: str = ""
@@ -21,7 +21,7 @@ class KnowledgeFact(AetherisBaseModel):
     provenance: dict[str, Any] = Field(default_factory=dict)
 
 
-class KnowledgeBundle(AetherisBaseModel):
+class KnowledgeBundle(CalienneBaseModel):
     """Facts and context consumed by ReasoningLayer."""
 
     query: str = ""

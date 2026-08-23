@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-13
-- **Deciders:** AETHERIS architecture working group
+- **Deciders:** CALIENNE architecture working group
 - **Related RFCs:** RFC-004
 
 ## Context
@@ -29,7 +29,7 @@ every contributor picks differently.
 
 ## Decision
 
-AETHERIS's persistence stack for v1 is **PostgreSQL + SQLAlchemy 2
+CALIENNE's persistence stack for v1 is **PostgreSQL + SQLAlchemy 2
 (async) + `asyncpg` + Alembic**. `pgvector` is reserved for v2.
 
 - **PostgreSQL** — the database. Multi-writer; supports the two-table

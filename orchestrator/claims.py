@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 Claim Manager: extracts and validates factual claims from agent outputs
 to detect hallucinations and unsupported assertions.
 

@@ -4,7 +4,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 // with a clean structural aesthetic leaning toward high-precision custom cards, restrained motion, and zero marketing slop.
 // Dials: DESIGN_VARIANCE=6 (controlled asymmetry), MOTION_INTENSITY=4 (subtle reveal transitions), VISUAL_DENSITY=5 (balanced information density).
 
-const AetherisDashboard = lazy(() => import('./AetherisDashboard'))
+const CalienneDashboard = lazy(() => import('./CalienneDashboard'))
 
 const CHAT_HASH = '#workspace'
 
@@ -46,7 +46,7 @@ const architectureCards = [
   {
     name: 'Decision memory',
     title: 'The final recommendation preserves edge cases, not just the winning sentence.',
-    body: 'Aetheris stores the argument spine, fallback paths, and unresolved risk so a team can restart from context instead of folklore.',
+    body: 'Calienne stores the argument spine, fallback paths, and unresolved risk so a team can restart from context instead of folklore.',
     icon: 'vault',
     tone: 'wide',
   },
@@ -299,7 +299,7 @@ export default function App() {
   if (surface === 'dashboard') {
     return (
       <Suspense fallback={<div className="dashboard-loading">Loading workspace...</div>}>
-        <AetherisDashboard onExitLanding={openLanding} />
+        <CalienneDashboard onExitLanding={openLanding} />
       </Suspense>
     )
   }
@@ -319,10 +319,10 @@ export default function App() {
       <header className="site-header">
         <div className="nav-shell">
           <div className="nav-core">
-            <a className="brand-lockup" href="#content" aria-label="Aetheris home">
-              <span className="brand-mark">A</span>
+            <a className="brand-lockup" href="#content" aria-label="Calienne home">
+              <span className="brand-mark">C</span>
               <span className="brand-copy">
-                <strong>Aetheris</strong>
+                <strong>Calienne</strong>
                 <span>decision room</span>
               </span>
             </a>
@@ -400,7 +400,7 @@ export default function App() {
               <span className="hero-soft-break"> evidence, and synthesis at once.</span>
             </h1>
             <p className="hero-body">
-              Aetheris gives product, research, and infrastructure teams a shared surface for hard questions.
+              Calienne gives product, research, and infrastructure teams a shared surface for hard questions.
               The interface stays quiet while the reasoning gets sharper, more explicit, and easier to reuse.
             </p>
             <div className="hero-actions">
@@ -484,7 +484,7 @@ export default function App() {
             <span className="eyebrow">How a decision gets structured</span>
             <h2>Turn a hard call into claims, pressure tests, objections, and a preserved synthesis.</h2>
             <p>
-              Aetheris gives every part of the argument a place to live, so the final answer can be audited instead of retold.
+              Calienne gives every part of the argument a place to live, so the final answer can be audited instead of retold.
             </p>
           </div>
 
@@ -569,7 +569,7 @@ export default function App() {
                   <span className="micro-label">Export sample</span>
                   <span>architecture review // saved</span>
                 </div>
-                <div className="proof-table" aria-label="Example Aetheris decision trace">
+                <div className="proof-table" aria-label="Example Calienne decision trace">
                   <div><span>Decision</span><p>Delay multi-region writes until identity schema is stable.</p></div>
                   <div><span>Supporting evidence</span><p>Current replication path increases rollback cost on billing and audit tables.</p></div>
                   <div><span>Dissent preserved</span><p>Creative argued for a reversible shadow-write pilot to avoid freezing learning.</p></div>
@@ -601,8 +601,8 @@ export default function App() {
               </div>
               <div className="cta-cluster">
                 <CTA href={CHAT_HASH} onClick={openDashboard}>Launch the demo</CTA>
-                <a className="text-link" href="mailto:signal@aetheris.ai">
-                  signal@aetheris.ai
+                <a className="text-link" href="mailto:signal@calienne.ai">
+                  signal@calienne.ai
                 </a>
               </div>
             </div>
@@ -611,7 +611,7 @@ export default function App() {
       </main>
 
       <footer className="site-footer">
-        <span>Aetheris decision room</span>
+        <span>Calienne decision room</span>
         <div>
           <a href="#content">Back to top</a>
           <a href="#contact">Contact</a>

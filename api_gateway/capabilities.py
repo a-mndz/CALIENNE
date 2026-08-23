@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 Capability configuration loader (RFC-002 §5, ADR-005).
 
 Capability configuration lives under ``config/capabilities/`` and is **never**
@@ -13,7 +13,7 @@ JSON files:
     prediction_calibration.json — cold-start priors for the Prediction layer
 
 Loading contract (RFC-002 §5):
-    * Override the directory with ``AETHERIS_CAPABILITIES_PATH=/abs/path/to/dir``.
+    * Override the directory with ``CALIENNE_CAPABILITIES_PATH=/abs/path/to/dir``.
     * On load failure (missing file, malformed JSON, bad value) → log a warning,
       fall back to a neutral default (``0.5`` for weights, documented defaults
       elsewhere), and record a ``capability_load_failed`` marker.
@@ -31,14 +31,14 @@ from typing import Any
 
 from pydantic import ConfigDict, Field, ValidationError
 
-from core.base import AetherisBaseModel
+from core.base import CalienneBaseModel
 
 logger = logging.getLogger(__name__)
 
 # ── Locations ────────────────────────────────────────────────────────────
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_CAPABILITIES_DIR = _REPO_ROOT / "config" / "capabilities"
-_ENV_OVERRIDE = "AETHERIS_CAPABILITIES_PATH"
+_ENV_OVERRIDE = "CALIENNE_CAPABILITIES_PATH"
 
 # ── Neutral fallbacks (RFC-002 §5) ───────────────────────────────────────
 NEUTRAL_WEIGHT = 0.5
@@ -60,7 +60,7 @@ _CAPABILITY_FILES: dict[str, str] = {
 }
 
 
-class ProviderConfig(AetherisBaseModel):
+class ProviderConfig(CalienneBaseModel):
     """Strict external provider-limit contract (RFC-001 §4)."""
 
     model_config = ConfigDict(extra="forbid")
@@ -234,7 +234,7 @@ def get_capability_registry(*, refresh: bool = False) -> CapabilityRegistry:
     """Return a process-wide :class:`CapabilityRegistry`.
 
     Pass ``refresh=True`` to rebuild (e.g. after changing
-    ``AETHERIS_CAPABILITIES_PATH`` in a test)."""
+    ``CALIENNE_CAPABILITIES_PATH`` in a test)."""
     global _DEFAULT_REGISTRY
     if _DEFAULT_REGISTRY is None or refresh:
         _DEFAULT_REGISTRY = CapabilityRegistry()

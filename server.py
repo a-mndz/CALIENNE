@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 Web Server: FastAPI backend serving the web UI and pipeline API.
 
 Launch with:  python main.py --web
@@ -16,7 +16,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Optional, Union
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,6 +41,7 @@ from api_gateway.rate_limiter import (
 from core.config import configure_logging, get_settings
 from core.database import get_db, verify_schema_current
 from core.models import ConversationMessageRecord, ConversationSessionRecord, User
+from core.provider_registry import get_provider_registry
 from core.security import (
     SecurityValidationError,
     create_access_token,
@@ -50,7 +51,10 @@ from core.security import (
     verify_password,
 )
 from orchestrator import metrics
-from orchestrator.aetheris_orchestrator import create_request_passport, initialize_aetheris_components
+from orchestrator.calienne_orchestrator import (
+    create_request_passport,
+    initialize_calienne_components,
+)
 from orchestrator.background_tasks import cancel_background_tasks, create_background_tasks
 from orchestrator.conversation import ConversationState
 from orchestrator.memory_search import hydrate_history
@@ -58,7 +62,7 @@ from orchestrator.pipelines import _build_frontend_payload
 from orchestrator.streaming import EventType, StreamingManager
 from telemetry.observer import observer
 
-logger = logging.getLogger("aetheris.web")
+logger = logging.getLogger("calienne.web")
 
 _PIPELINE_TIMEOUT_SEC = 900
 _MAX_REQUEST_BODY_BYTES = 100_000
@@ -68,7 +72,7 @@ _gateway: AsyncAPIGateway | None = None
 _strategy: ProviderStrategy | None = None
 _pool: ProviderPool | None = None
 _streaming_mgr: StreamingManager = StreamingManager()
-_aetheris: dict[str, Any] = {}
+_calienne: dict[str, Any] = {}
 _background_tasks: list[asyncio.Task] = []
 
 # HIGH-014 — fixed-window in-process limiter for /auth/* routes.
@@ -136,7 +140,7 @@ def _resolve_cors_origins() -> list[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _gateway, _strategy, _pool, _streaming_mgr, _aetheris
+    global _gateway, _strategy, _pool, _streaming_mgr, _calienne
 
     settings = get_settings()
     configure_logging(settings)
@@ -155,27 +159,43 @@ async def lifespan(app: FastAPI):
 
     _strategy = ProviderStrategy(mode="HYBRID")
     _pool = _bootstrap_pool(_strategy)
+    get_provider_registry().bootstrap(_strategy, _pool)
     _gateway = AsyncAPIGateway()
-    _aetheris = initialize_aetheris_components()
+    _calienne = initialize_calienne_components()
 
     # Publish singletons to the api/ route modules (late-bound, no cycles).
     from api.state import state as _api_state
 
-    _api_state.aetheris = _aetheris
+    _api_state.calienne = _calienne
     _api_state.gateway = _gateway
     _api_state.strategy = _strategy
     _api_state.pool = _pool
     _api_state.streaming_manager = _streaming_mgr
 
     # Create background tasks for cleanup operations
-    # Add streaming_manager to aetheris components if not already present
-    aetheris_with_streaming = dict(_aetheris)
-    if "streaming_manager" not in aetheris_with_streaming:
-        aetheris_with_streaming["streaming_manager"] = _streaming_mgr
-    _background_tasks = create_background_tasks(aetheris_with_streaming)
+    # Add streaming_manager to components if not already present
+    calienne_with_streaming = dict(_calienne)
+    if "streaming_manager" not in calienne_with_streaming:
+        calienne_with_streaming["streaming_manager"] = _streaming_mgr
+    _background_tasks = create_background_tasks(calienne_with_streaming)
+
+    # Ensure initial database users have admin access
+    try:
+        from core.database import async_session_factory
+        async with async_session_factory() as session:
+            stmt = select(User)
+            res = await session.execute(stmt)
+            all_users = res.scalars().all()
+            if all_users and not any(u.role == "admin" for u in all_users):
+                for u in all_users:
+                    u.role = "admin"
+                await session.commit()
+                logger.info("Automatically promoted user(s) to admin role.")
+    except Exception as exc:
+        logger.debug("User role sync note: %s", exc)
 
     logger.info(
-        "aetheris Web Server ready — mode=%s, providers=%d, background_tasks=%d",
+        "Calienne Web Server ready — mode=%s, providers=%d, background_tasks=%d",
         _strategy.mode.value,
         len(_pool.get_all_statuses()) if _pool else 0,
         len(_background_tasks),
@@ -191,10 +211,10 @@ async def lifespan(app: FastAPI):
     if _gateway:
         await _gateway.close()
     observer.print_session_report()
-    logger.info("aetheris Web Server shut down.")
+    logger.info("Calienne Web Server shut down.")
 
 
-app = FastAPI(title="aetheris", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Calienne", version="1.0.0", lifespan=lifespan)
 
 
 @app.middleware("http")
@@ -363,18 +383,18 @@ async def handle_query(
         session_id = str(uuid.uuid4())
         passport = create_request_passport(user_id=current_user.email)
         result = await asyncio.wait_for(
-            _aetheris["execution_manager"].execute(
+            _calienne["execution_manager"].execute(
                 user_query=req.query.strip(),
                 gateway=_gateway,
                 strategy=_strategy,
                 pool=_pool,
                 history=history_list,
                 passport=passport,
-                decision_engine=_aetheris.get("decision_engine"),
-                reasoning_graph=_aetheris.get("reasoning_graph"),
-                claim_manager=_aetheris.get("claim_manager"),
-                streaming_manager=_aetheris.get("streaming_manager"),
-                conversation_director=_aetheris.get("conversation_director"),
+                decision_engine=_calienne.get("decision_engine"),
+                reasoning_graph=_calienne.get("reasoning_graph"),
+                claim_manager=_calienne.get("claim_manager"),
+                streaming_manager=_calienne.get("streaming_manager"),
+                conversation_director=_calienne.get("conversation_director"),
                 session_id=session_id,
                 user_id=current_user.email,
             ),
@@ -466,18 +486,18 @@ async def handle_query_stream(
         """
         try:
             result = await asyncio.wait_for(
-                _aetheris["execution_manager"].execute(
+                _calienne["execution_manager"].execute(
                     user_query=req.query.strip(),
                     gateway=_gateway,
                     strategy=_strategy,
                     pool=_pool,
                     history=history_list,
                     passport=passport,
-                    decision_engine=_aetheris.get("decision_engine"),
-                    reasoning_graph=_aetheris.get("reasoning_graph"),
-                    claim_manager=_aetheris.get("claim_manager"),
+                    decision_engine=_calienne.get("decision_engine"),
+                    reasoning_graph=_calienne.get("reasoning_graph"),
+                    claim_manager=_calienne.get("claim_manager"),
                     streaming_manager=_streaming_mgr,
-                    conversation_director=_aetheris.get("conversation_director"),
+                    conversation_director=_calienne.get("conversation_director"),
                     session_id=session_id,
                     user_id=current_user.email,
                 ),
@@ -573,35 +593,120 @@ async def handle_query_stream(
 
 
 def _clean_model_name(model_str: str) -> str:
-    """Format an OpenRouter/Gateway model identifier into a crisp display name."""
+    """Format a model identifier into an accurate, canonical display name."""
+    # 1. Custom model explicit label from registry
+    reg = get_provider_registry()
     parts = model_str.split("/")
+    pid = parts[0]
+    prov = reg.get_provider(pid)
+    if prov:
+        for m in prov.models:
+            if m.full_id == model_str and m.name:
+                return m.name
+
     base = parts[-1]
-    replacements = {
-        "claude-3.5-sonnet": "claude-3.5-sonnet",
-        "llama-3.3-70b-versatile": "llama-3.3-70b",
-        "meta-llama-3.1-70b-instruct": "llama-3.1-70b",
-        "llama-3.1-8b-instant": "llama-3.1-8b",
-        "gemini-2.5-flash": "gemini-2.5-flash",
-        "gemini-2.5-pro": "gemini-2.5-pro",
-        "gpt-4o-mini": "gpt-4o-mini",
-        "gpt-4o": "gpt-4o",
-        "deepseek-chat": "deepseek-chat",
+    name_map = {
+        # Anthropic
+        "claude-3.5-sonnet": "Claude 3.5 Sonnet",
+        "claude-3-5-sonnet-20241022": "Claude 3.5 Sonnet",
+        "claude-3-5-haiku-20241022": "Claude 3.5 Haiku",
+        "claude-3-opus-20240229": "Claude 3 Opus",
+        "claude-sonnet-5": "Claude Sonnet 5",
+        "claude-opus-5": "Claude Opus 5",
+        # OpenAI
+        "gpt-4o": "GPT-4o",
+        "gpt-4o-mini": "GPT-4o Mini",
+        "gpt-4-turbo": "GPT-4 Turbo",
+        "o1-preview": "o1 Preview",
+        "o1-mini": "o1 Mini",
+        "o3-mini": "o3 Mini",
+        "gpt-oss-120b": "GPT-OSS 120B",
+        "gpt-oss-20b": "GPT-OSS 20B",
+        # Google
+        "gemini-2.0-flash": "Gemini 2.0 Flash",
+        "gemini-2.0-pro-exp": "Gemini 2.0 Pro",
+        "gemini-1.5-pro": "Gemini 1.5 Pro",
+        "gemini-1.5-flash": "Gemini 1.5 Flash",
+        "gemini-3.7-flash": "Gemini 3.7 Flash",
+        "gemini-3.5-flash-lite": "Gemini 3.5 Flash Lite",
+        "gemini-pro-latest": "Gemini Pro",
+        # DeepSeek
+        "deepseek-chat": "DeepSeek V3",
+        "deepseek-reasoner": "DeepSeek R1",
+        "deepseek-r1": "DeepSeek R1",
+        "deepseek-v3": "DeepSeek V3",
+        # Meta Llama
+        "llama-3.3-70b-versatile": "Llama 3.3 70B",
+        "llama-3.3-70b": "Llama 3.3 70B",
+        "llama-3.1-8b-instant": "Llama 3.1 8B",
+        "llama-3.1-70b-instruct": "Llama 3.1 70B",
+        "llama-3.1-405b-instruct": "Llama 3.1 405B",
+        # Mistral / Qwen
+        "mistral-large-latest": "Mistral Large",
+        "codestral-latest": "Codestral",
+        "qwen-2.5-72b-instruct": "Qwen 2.5 72B",
+        "qwen-2.5-coder-32b-instruct": "Qwen 2.5 Coder 32B",
     }
-    return replacements.get(base, base)
+    if base in name_map:
+        return name_map[base]
+    if model_str in name_map:
+        return name_map[model_str]
+    return base
+
+
+def _is_model_configured(model_str: str) -> bool:
+    """Check if model's provider is a custom provider or has an active API key."""
+    provider_key = extract_provider_key(model_str)
+    provider_root = provider_key.split("/")[0].lower()
+
+    # 1. Custom Provider? (Always configured once registered)
+    reg = get_provider_registry()
+    if provider_root in reg.get_custom_providers():
+        return True
+
+    # 2. Built-in provider account check
+    key_account_map = {
+        "openrouter": "OPENROUTER_API_KEY",
+        "openai": "OPENAI_API_KEY",
+        "google": "GOOGLE_API_KEY",
+        "groq": "GROQ_API_KEY",
+        "nvidia": "NVIDIA_NIM_API_KEY",
+        "mistral": "MISTRAL_API_KEY",
+    }
+    account = key_account_map.get(provider_root)
+    if account:
+        val = (
+            os.environ.get(f"CALIENNE_{account}", "")
+            or os.environ.get(account, "")
+        )
+        if val and len(val.strip()) > 4:
+            return True
+        key = reg.get_api_key(provider_root)
+        if key and len(key.strip()) > 4:
+            return True
+    return False
 
 
 def _get_dynamic_models() -> list[dict[str, Any]]:
-    """Return dynamic model list with health status and latency from active strategy."""
+    """Return dynamic model list with health status, latency, roles, and primary flags from active strategy."""
     if not _strategy:
         return []
+
+    judge_chain = _strategy.get_model_chain("judge")
+    gen_chain = _strategy.get_model_chain("generation")
+    breaker_chain = _strategy.get_model_chain("breaker")
+    primary_judge = judge_chain[0] if judge_chain else None
+    primary_gen = gen_chain[0] if gen_chain else None
+    primary_breaker = breaker_chain[0] if breaker_chain else None
+
+    custom_pids = set(get_provider_registry().get_custom_providers().keys())
 
     models_dict: dict[str, dict[str, Any]] = {}
     for role in _strategy.supported_roles:
         for model_str in _strategy.get_configured_model_chain(role):
             if model_str not in models_dict:
                 provider_key = extract_provider_key(model_str)
-                # No fabricated latency: "—" until the pool has real
-                # measurements (mean_latency_ms is now fed by report_success).
+                provider_root = provider_key.split("/")[0]
                 latency_str = "—"
                 is_active = _strategy.is_model_enabled(model_str)
                 if _pool:
@@ -617,6 +722,8 @@ def _get_dynamic_models() -> list[dict[str, Any]]:
                         )
 
                 clean_name = _clean_model_name(model_str)
+                is_custom = provider_root in custom_pids
+                is_conf = _is_model_configured(model_str)
                 models_dict[model_str] = {
                     "id": clean_name.replace(".", "").replace("-", ""),
                     "name": clean_name,
@@ -625,11 +732,22 @@ def _get_dynamic_models() -> list[dict[str, Any]]:
                     "latency": latency_str,
                     "active": is_active,
                     "roles": [role],
+                    "is_primary_judge": (model_str == primary_judge),
+                    "is_primary_generation": (model_str == primary_gen),
+                    "is_primary_breaker": (model_str == primary_breaker),
+                    "custom": is_custom,
+                    "configured": is_conf,
+                    "has_key": is_conf,
                 }
             else:
                 if role not in models_dict[model_str]["roles"]:
                     models_dict[model_str]["roles"].append(role)
-    return list(models_dict.values())
+
+    # Prioritize custom models and configured models first
+    return sorted(
+        models_dict.values(),
+        key=lambda m: (not m.get("custom", False), not m.get("configured", False), m["name"]),
+    )
 
 
 @app.get("/api/status")
@@ -728,8 +846,11 @@ def _get_vault_status() -> list[dict[str, Any]]:
     ]
     results = []
     for p in providers_meta:
-        env_var = f"AETHERIS_{p['account']}" if not p['account'].startswith("AETHERIS_") else p['account']
-        val = os.environ.get(env_var, "") or os.environ.get(p["account"], "")
+        val = (
+            os.environ.get(f"CALIENNE_{p['account']}", "")
+            or os.environ.get(f"CALIENNE_{p['account']}", "")
+            or os.environ.get(p["account"], "")
+        )
         has_key = bool(val and len(val.strip()) > 4)
         masked = f"••••••••••••{val.strip()[-4:]}" if has_key else "Not Configured"
         results.append({
@@ -750,6 +871,52 @@ class VaultSaveRequest(_StrictRequestModel):
 class CustomModelRequest(_StrictRequestModel):
     model_id: str
     role: str = "generation"
+
+
+class ProviderDiscoverRequest(_StrictRequestModel):
+    base_url: str
+    api_key: Optional[str] = None
+
+
+class ProviderImportModelItem(_StrictRequestModel):
+    id: str
+    name: Optional[str] = None
+    roles: list[str] = PField(default_factory=lambda: ["generation"])
+    enabled: bool = True
+    context_length: Optional[int] = None
+    description: Optional[str] = None
+
+
+class ProviderSaveRequest(_StrictRequestModel):
+    id: Optional[str] = None
+    name: str
+    base_url: str
+    api_key: Optional[str] = None
+    models: list[ProviderImportModelItem] = PField(default_factory=list)
+
+
+class ModelRolesUpdateRequest(_StrictRequestModel):
+    model_id: str
+    roles: list[str]
+
+
+class ModelPrimaryUpdateRequest(_StrictRequestModel):
+    role: str
+    model_id: str
+
+
+class ModelDeleteRequest(_StrictRequestModel):
+    id: str
+
+
+VaultSaveRequest.model_rebuild()
+CustomModelRequest.model_rebuild()
+ProviderDiscoverRequest.model_rebuild()
+ProviderImportModelItem.model_rebuild()
+ProviderSaveRequest.model_rebuild()
+ModelRolesUpdateRequest.model_rebuild()
+ModelPrimaryUpdateRequest.model_rebuild()
+ModelDeleteRequest.model_rebuild()
 
 
 @app.get("/api/config/vault")
@@ -775,15 +942,18 @@ async def save_vault_secret(
         "GROQ_API_KEY", "NVIDIA_NIM_API_KEY", "MISTRAL_API_KEY",
         "CUSTOM_GATEWAY_KEY", "GITHUB_TOKEN",
     }
-    if account not in allowed_accounts:
+    is_custom_provider_key = account.startswith("PROVIDER_KEY_")
+    if account not in allowed_accounts and not is_custom_provider_key:
         raise HTTPException(status_code=400, detail="Invalid account identifier.")
     if secret:
-        os.environ[f"AETHERIS_{account}"] = secret
+        os.environ[f"CALIENNE_{account}"] = secret
+        os.environ[f"CALIENNE_{account}"] = secret
         os.environ[account] = secret
         storage = "memory"
         try:
             import keyring
-            keyring.set_password("Aetheris", account, secret)
+            keyring.set_password("Calienne", account, secret)
+            keyring.set_password("Calienne", account, secret)
             storage = "keyring"
         except Exception as exc:
             logger.debug("OS Keyring unavailable or non-writable: %s", exc)
@@ -792,6 +962,141 @@ async def save_vault_secret(
         "storage": storage if secret else "unchanged",
         "providers": _get_vault_status(),
     }
+
+
+@app.post("/api/providers/discover")
+async def discover_provider_models(
+    req: ProviderDiscoverRequest,
+    current_user: User = Depends(require_role("admin")),
+) -> dict:
+    """Probe model provider endpoint to automatically fetch available models."""
+    if not req.base_url.strip():
+        raise HTTPException(status_code=400, detail="Provider base URL is required.")
+    try:
+        models = await get_provider_registry().discover_models(req.base_url, req.api_key)
+        return {"status": "success", "models": models}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/providers")
+async def list_providers_endpoint(
+    current_user: User = Depends(require_role("admin")),
+) -> dict:
+    """List all custom providers with secure masked status and model counts."""
+    return {
+        "providers": get_provider_registry().list_providers_view(),
+        "preferences": get_provider_registry().get_role_preferences(),
+    }
+
+
+@app.post("/api/providers")
+async def save_provider_endpoint(
+    req: ProviderSaveRequest,
+    current_user: User = Depends(require_role("admin")),
+) -> dict:
+    """Register or update a custom provider, saving key securely in OS Keyring."""
+    if not _strategy or not _pool:
+        raise HTTPException(status_code=503, detail="Orchestrator not initialized.")
+    if not req.name.strip():
+        raise HTTPException(status_code=400, detail="Provider name cannot be empty.")
+    if not req.base_url.strip():
+        raise HTTPException(status_code=400, detail="Provider base URL cannot be empty.")
+
+    try:
+        models_data = [m.model_dump() for m in req.models]
+        spec = get_provider_registry().register_or_update_provider(
+            name=req.name,
+            base_url=req.base_url,
+            api_key=req.api_key,
+            models=models_data,
+            provider_id=req.id,
+            strategy=_strategy,
+            pool=_pool,
+        )
+        return {
+            "status": "success",
+            "provider": spec.model_dump(),
+            "models": _get_dynamic_models(),
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete("/api/providers/{provider_id}")
+async def delete_provider_endpoint(
+    provider_id: str,
+    current_user: User = Depends(require_role("admin")),
+) -> dict:
+    """Delete a custom provider and purge its secrets from OS Keyring."""
+    if not _strategy or not _pool:
+        raise HTTPException(status_code=503, detail="Orchestrator not initialized.")
+    success = get_provider_registry().delete_provider(provider_id, _strategy, _pool)
+    if not success:
+        raise HTTPException(status_code=404, detail="Provider not found.")
+    return {"status": "success", "models": _get_dynamic_models()}
+
+
+@app.post("/api/models/roles")
+async def update_model_roles_endpoint(
+    req: ModelRolesUpdateRequest,
+    current_user: User = Depends(require_role("admin")),
+) -> dict:
+    """Update role assignments (e.g. Judge, Generation, Breaker) for any model."""
+    if not _strategy or not _pool:
+        raise HTTPException(status_code=503, detail="Orchestrator not initialized.")
+    get_provider_registry().update_model_roles(req.model_id, req.roles, _strategy, _pool)
+    return {"status": "success", "models": _get_dynamic_models()}
+
+
+@app.post("/api/models/primary")
+async def set_primary_model_endpoint(
+    req: ModelPrimaryUpdateRequest,
+    current_user: User = Depends(require_role("admin")),
+) -> dict:
+    """Designate a model as the Primary model for a role (e.g. Primary Judge)."""
+    if not _strategy or not _pool:
+        raise HTTPException(status_code=503, detail="Orchestrator not initialized.")
+    get_provider_registry().set_primary_role_model(req.role, req.model_id, _strategy)
+    return {"status": "success", "models": _get_dynamic_models()}
+
+
+class ModelChainUpdateRequest(_StrictRequestModel):
+    role: str
+    chain: list[str]
+
+
+ModelChainUpdateRequest.model_rebuild()
+
+
+@app.post("/api/models/chain")
+async def update_model_chain_endpoint(
+    req: ModelChainUpdateRequest,
+    current_user: User = Depends(require_role("admin")),
+) -> dict:
+    """Update the priority order / fallback chain of models for a role."""
+    if not _strategy or not _pool:
+        raise HTTPException(status_code=503, detail="Orchestrator not initialized.")
+    _strategy.set_model_chain(req.role, req.chain)
+    return {"status": "success", "models": _get_dynamic_models()}
+
+
+@app.post("/api/models/delete")
+async def delete_model_endpoint(
+    req: ModelDeleteRequest,
+    current_user: User = Depends(require_role("admin")),
+) -> dict:
+    """Remove a model from the active orchestrator strategy."""
+    if not _strategy or not _pool:
+        raise HTTPException(status_code=503, detail="Orchestrator not initialized.")
+    _strategy.remove_model(req.id)
+    parts = req.id.split("/")
+    pid = parts[0]
+    prov = get_provider_registry().get_provider(pid)
+    if prov:
+        prov.models = [m for m in prov.models if m.full_id != req.id]
+        get_provider_registry()._save_to_disk()
+    return {"status": "success", "models": _get_dynamic_models()}
 
 
 @app.post("/api/models/custom")
@@ -841,11 +1146,11 @@ async def get_replay_trace(
 ) -> dict[str, Any]:
     """Return a recorded execution trace for offline replay/debugging.
 
-    Gated by ``AETHERIS_ENABLE_REPLAY`` — when the flag is off the
+    Gated by ``CALIENNE_ENABLE_REPLAY`` — when the flag is off the
     ``replay_store`` component is ``None`` and this reports 503 rather
     than fabricating an empty trace (ADR-007).
     """
-    replay_store = _aetheris.get("replay_store")
+    replay_store = _calienne.get("replay_store")
     if not replay_store:
         raise HTTPException(status_code=503, detail="Execution replay is disabled")
 
@@ -861,7 +1166,7 @@ async def prometheus_metrics(request: Request) -> Response:
     """Prometheus text exposition of decision and provider-health metrics.
 
     Auth: a scraper cannot present the httpOnly JWT cookie the admin endpoints
-    rely on, so this path uses its own bearer token (``AETHERIS_METRICS_TOKEN``).
+    rely on, so this path uses its own bearer token (``CALIENNE_METRICS_TOKEN``).
     In production the token is mandatory — an unset token means the endpoint
     refuses to serve rather than silently exposing internals. Outside production
     an unset token leaves it open so local scraping needs no setup.
@@ -871,10 +1176,10 @@ async def prometheus_metrics(request: Request) -> Response:
 
     if not expected:
         if settings.ENVIRONMENT == "production":
-            logger.error("AETHERIS_METRICS_TOKEN unset — refusing to serve /metrics.")
+            logger.error("CALIENNE_METRICS_TOKEN unset — refusing to serve /metrics.")
             raise HTTPException(
                 status_code=503,
-                detail="Metrics endpoint unconfigured: set AETHERIS_METRICS_TOKEN.",
+                detail="Metrics endpoint unconfigured: set CALIENNE_METRICS_TOKEN.",
             )
     else:
         header = request.headers.get("authorization", "")
@@ -887,7 +1192,7 @@ async def prometheus_metrics(request: Request) -> Response:
             raise HTTPException(status_code=401, detail="Invalid metrics token.")
 
     metrics.refresh(
-        decision_engine=_aetheris.get("decision_engine"),
+        decision_engine=_calienne.get("decision_engine"),
         pool=_pool,
     )
     return Response(content=metrics.render(), media_type=metrics.CONTENT_TYPE)

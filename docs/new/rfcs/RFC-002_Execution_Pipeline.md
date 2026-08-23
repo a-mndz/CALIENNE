@@ -7,7 +7,7 @@
 
 ## 1. Purpose
 
-This RFC defines the **execution front-end** of the AETHERIS runtime:
+This RFC defines the **execution front-end** of the CALIENNE runtime:
 the deterministic `IntentAnalyzer`, the `ExecutionManager` that owns
 the event loop, and the `ResourceManager` ceiling rules. It does not
 define the planner or the scheduler (RFC-003), memory or RAG
@@ -78,7 +78,7 @@ and the entry point for every request.
 The existing `DecisionEngine` in `orchestrator/decisions.py` is kept
 as a lower-level compatibility executor initially. The new
 `ExecutionManager` wraps it instead of replacing everything in one
-step. When `AETHERIS_ENABLE_DAG` is off, the request falls back to
+step. When `CALIENNE_ENABLE_DAG` is off, the request falls back to
 the existing `run_micro_mode` path.
 
 ## 4. ResourceManager
@@ -133,7 +133,7 @@ config/
 ```
 
 Loader: `api_gateway/capabilities.py`. Override path:
-`AETHERIS_CAPABILITIES_PATH=/abs/path/to/dir`. On load failure: log a
+`CALIENNE_CAPABILITIES_PATH=/abs/path/to/dir`. On load failure: log a
 warning, fall back to a neutral default of `0.5`, emit a
 `capability_load_failed` metric. **Never** raise into the request
 path.
@@ -272,7 +272,7 @@ true:
       `routing_defaults.json` and have unit tests.
 - [ ] Telemetry emits `execution.*` and `planner.*` namespaces
       (spec in RFC-005 §4).
-- [ ] Integration tests prove `AETHERIS_ENABLE_DAG=false` falls
+- [ ] Integration tests prove `CALIENNE_ENABLE_DAG=false` falls
       back to `run_micro_mode` unchanged.
 - [ ] `docs/decision_register.md` rows for DEC-001, DEC-011 are
       `Implemented? Yes`; `docs/maturity.md` row for this RFC

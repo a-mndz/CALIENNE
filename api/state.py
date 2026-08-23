@@ -16,7 +16,7 @@ class AppState:
         self.strategy: Any = None
         self.pool: Any = None
         self.streaming_manager: Any = None
-        self.aetheris: dict[str, Any] = {}
+        self.calienne: dict[str, Any] = {}
         self.background_tasks: Any = None
 
 

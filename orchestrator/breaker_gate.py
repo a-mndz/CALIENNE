@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class BreakerGate:
     """Knowledge-absence detection within a configurable time budget.
 
-    Timing: AETHERIS_BREAKER_TIMEOUT_MS (default 100ms — enough for
+    Timing: CALIENNE_BREAKER_TIMEOUT_MS (default 100ms — enough for
     simulation mode; live LLM round-trips need ~5-8s). On timeout or error
     the gate FAILS OPEN: a slow or erroring breaker is an infrastructure
     artifact, not knowledge absence, so the pipeline continues and pays the

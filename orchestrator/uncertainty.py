@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from core.base import AetherisBaseModel
+from core.base import CalienneBaseModel
 from core.schemas import Prediction, StageAssessment, TaskProfile
 from orchestrator.validation_layer import ClarificationRequest, ValidationLayer
 
@@ -35,7 +35,7 @@ _CODE_CONTEXT_REFERENCE_PATTERNS: tuple[str, ...] = (
 )
 
 
-class UncertaintyDecision(AetherisBaseModel):
+class UncertaintyDecision(CalienneBaseModel):
     """Outcome and rationale from the uncertainty engine."""
 
     outcome: UncertaintyOutcome = "continue_execution"

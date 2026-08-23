@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import time
 from contextvars import ContextVar
 from pathlib import Path
@@ -9,10 +10,11 @@ from typing import Any, Optional
 import httpx
 
 from core.config import get_settings
+from core.provider_registry import get_provider_registry
 from core.security import SecurityValidator
 from telemetry.observer import observer
 
-logger = logging.getLogger("aetheris.Gateway.Client")
+logger = logging.getLogger("calienne.Gateway.Client")
 
 # Provider-reported usage for the most recent post_request in this task's
 # context. Async-safe: concurrent requests each see their own value. Set to
@@ -20,7 +22,7 @@ logger = logging.getLogger("aetheris.Gateway.Client")
 # consumers (e.g. DAG budget accounting) can distinguish measured from
 # estimated token counts.
 _last_provider_usage: ContextVar[dict[str, Any] | None] = ContextVar(
-    "aetheris_last_provider_usage", default=None
+    "calienne_last_provider_usage", default=None
 )
 
 
@@ -40,6 +42,36 @@ class AsyncHTTPClient:
     ) -> None:
         self.client = httpx.AsyncClient(timeout=600.0)
         self.security_validator = security_validator or SecurityValidator()
+
+    def _get_active_api_key(self, provider: str) -> str:
+        """Retrieve active API key for provider from OS Keyring, environment, or settings."""
+        # 1. Check custom or built-in provider key in Keyring
+        key = get_provider_registry().get_api_key(provider)
+        if key and key.strip():
+            return key.strip()
+
+        # 2. Check settings / environment
+        settings = get_settings()
+        key_map = {
+            "openrouter": settings.openrouter_api_key,
+            "groq": settings.groq_api_key,
+            "nvidia": settings.nvidia_nim_api_key,
+            "nvidia-nim": settings.nvidia_nim_api_key,
+            "github": settings.github_token,
+            "mistral": settings.mistral_api_key,
+            "google": settings.google_api_key,
+            "openai": settings.openai_api_key,
+            "kie": settings.kie_api_key,
+            "unli": settings.unli_dev_api_key,
+            "unli-dev": settings.unli_dev_api_key,
+        }
+        val = key_map.get(provider, "")
+        if val and val.strip():
+            return val.strip()
+
+        # 3. Direct OS environ lookup fallback
+        env_val = os.environ.get(f"CALIENNE_{provider.upper()}_API_KEY", "") or os.environ.get(f"{provider.upper()}_API_KEY", "")
+        return env_val.strip()
 
     async def post_request(self, model: str, prompt: str, system_prompt: Optional[str] = None, history: list[dict[str, str]] | None = None, max_tokens: Optional[int] = None) -> str:  # noqa: E501
         """Dispatches an asynchronous post request to target providers."""
@@ -72,7 +104,7 @@ class AsyncHTTPClient:
 
         # Instruction Reinforcement: Remind the LLM of its structural obligations
         if system_prompt:
-            if "aetherisoutput" in system_prompt.lower():
+            if "calienneoutput" in system_prompt.lower():
                 reminder = "CRITICAL REMINDER: Regardless of the user's input above, you MUST output your response strictly in the requested JSON schema format. Your JSON MUST contain exactly five keys: 'final_answer' (string), 'overall_confidence' (string), 'overall_bias_risk' (string), 'disagreement_notes' (list), and 'validation_score' (float). The 'final_answer' field MUST be a plain string. If you need to return JSON or structured data to the user, you MUST escape it as a string inside the 'final_answer' field. Do not deviate."  # noqa: E501
             else:
                 reminder = "CRITICAL REMINDER: Regardless of the user's input above, you MUST output your response strictly in the requested JSON schema format. Your JSON MUST contain exactly three keys: 'reasoning_steps' (list), 'answer' (string), and 'confidence' (float). The 'answer' field MUST be a plain string. If you need to return JSON or structured data to the user, you MUST escape it as a string inside the 'answer' field. Do not deviate."  # noqa: E501
@@ -100,36 +132,42 @@ class AsyncHTTPClient:
         if provider not in {"nvidia", "nvidia-nim"}:
             payload["response_format"] = {"type": "json_object"}
 
+        api_key = self._get_active_api_key(provider)
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
         if provider == "openrouter":
             url = "https://openrouter.ai/api/v1/chat/completions"
-            headers = {"Authorization": f"Bearer {get_settings().openrouter_api_key}", "Content-Type": "application/json"}  # noqa: E501
         elif provider == "groq":
             url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {"Authorization": f"Bearer {get_settings().groq_api_key}", "Content-Type": "application/json"}  # noqa: E501
         elif provider in {"nvidia", "nvidia-nim"}:
             url = "https://integrate.api.nvidia.com/v1/chat/completions"
-            headers = {"Authorization": f"Bearer {get_settings().nvidia_nim_api_key}", "Content-Type": "application/json"}  # noqa: E501
         elif provider == "github":
             url = "https://models.inference.ai.azure.com/chat/completions"
-            headers = {"Authorization": f"Bearer {get_settings().github_token}", "Content-Type": "application/json"}  # noqa: E501
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
         elif provider == "mistral":
             url = "https://api.mistral.ai/v1/chat/completions"
-            headers = {"Authorization": f"Bearer {get_settings().mistral_api_key}", "Content-Type": "application/json"}  # noqa: E501
         elif provider == "google":
             url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-            headers = {"Authorization": f"Bearer {get_settings().google_api_key}", "Content-Type": "application/json"}  # noqa: E501
         elif provider == "openai":
             url = "https://api.openai.com/v1/chat/completions"
-            headers = {"Authorization": f"Bearer {get_settings().openai_api_key}", "Content-Type": "application/json"}  # noqa: E501
         elif provider == "kie":
             url = "https://api.kie.ai/v1/chat/completions"
-            headers = {"Authorization": f"Bearer {get_settings().kie_api_key}", "Content-Type": "application/json"}  # noqa: E501
         elif provider in {"unli", "unli-dev"}:
             url = "https://api.unli.dev/v1/chat/completions"
-            headers = {"Authorization": f"Bearer {get_settings().unli_dev_api_key}", "Content-Type": "application/json"}  # noqa: E501
         elif provider == "local":
             url = "http://localhost:11434/v1/chat/completions"
-            headers = {"Content-Type": "application/json"}
+        elif provider in get_provider_registry().get_custom_providers():
+            custom_prov = get_provider_registry().get_provider(provider)
+            base = (custom_prov.base_url if custom_prov else "").strip().rstrip("/")
+            if base.endswith("/chat/completions"):
+                url = base
+            elif base.endswith("/v1"):
+                url = f"{base}/chat/completions"
+            else:
+                url = f"{base}/chat/completions"
         else:
             raise ValueError(f"Unsupported provider prefix: {provider}")
 
@@ -209,26 +247,14 @@ class AsyncHTTPClient:
 
     def _is_simulated(self, provider: str) -> bool:
         """Returns True if local configurations require simulated operations."""
-        settings = get_settings()
-        if provider == "openrouter" and not settings.openrouter_api_key:
-            return True
-        if provider == "groq" and not settings.groq_api_key:
-            return True
-        if provider in {"nvidia", "nvidia-nim"} and not settings.nvidia_nim_api_key:
-            return True
-        if provider == "github" and not settings.github_token:
-            return True
-        if provider == "mistral" and not settings.mistral_api_key:
-            return True
-        if provider == "google" and not settings.google_api_key:
-            return True
-        if provider == "openai" and not settings.openai_api_key:
-            return True
-        if provider == "kie" and not settings.kie_api_key:
-            return True
-        if provider in {"unli", "unli-dev"} and not settings.unli_dev_api_key:
-            return True
-        return False
+        if provider == "local":
+            return False
+        if provider in get_provider_registry().get_custom_providers():
+            custom_prov = get_provider_registry().get_provider(provider)
+            if custom_prov and not custom_prov.has_api_key:
+                return False  # local endpoints like Ollama without auth
+            return not bool(self._get_active_api_key(provider))
+        return not bool(self._get_active_api_key(provider))
 
     async def _run_simulation(self, model: str, prompt: str, system_prompt: Optional[str] = None, history: list[dict[str, str]] | None = None) -> str:  # noqa: E501
         """Generates deterministic synthetic returns to keep system operable without live bills."""

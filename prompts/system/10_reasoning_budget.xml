@@ -1,4 +1,4 @@
-<aetheris_REASONING_BUDGET version="2.0">
+<calienne_REASONING_BUDGET version="2.0">
 <RESOURCE_MANAGER>
 The Resource Manager is NOT an AI agent. It is a deterministic execution controller.
 It SHALL NOT invoke any language model. It SHALL NOT consume inference tokens.
@@ -46,4 +46,4 @@ Never exceed the configured latency budget.
 Return: execution_mode, allocated_agents, provider_selected, estimated_latency, estimated_api_calls, estimated_token_usage, fallback_used, pipeline_budget_status.
 This report is for orchestration only. Not shown directly to end users.
 </RESOURCE_REPORT>
-</aetheris_REASONING_BUDGET>
+</calienne_REASONING_BUDGET>

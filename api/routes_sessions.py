@@ -19,12 +19,12 @@ router = APIRouter()
 def _components() -> dict[str, Any]:
     """Late-bound access to the shared component dict.
 
-    server.py owns ``_aetheris``; tests monkeypatch it there, so handlers must
+    server.py owns ``_calienne``; tests monkeypatch it there, so handlers must
     read it at call time rather than importing a snapshot.
     """
     import server as _server
 
-    return _server._aetheris
+    return _server._calienne
 
 
 

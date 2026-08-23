@@ -24,7 +24,7 @@ feature flags (RFC-006), the roadmap (RFC-007), or governance
 version is set by its **producer**, not its consumer.
 
 ```python
-class VersionStamp(AetherisBaseModel):
+class VersionStamp(CalienneBaseModel):
     architecture_version: str          # "0.1.0"
     planner_version: str | None
     scheduler_version: str | None
@@ -55,7 +55,7 @@ Never raises, no subprocess at request time. Priority chain:
 
 ```python
 git_commit = (
-    os.getenv("AETHERIS_GIT_COMMIT")
+    os.getenv("CALIENNE_GIT_COMMIT")
     or os.getenv("GIT_COMMIT")
     or _read_ci_metadata()      # reads .git_commit_sha
     or "unknown"
@@ -98,7 +98,7 @@ request, attached to `TaskGraph`, `ExecutionTrace`, `Experience`, and
 ### 3.1 Schema
 
 ```python
-class ExecutionManifest(AetherisBaseModel):
+class ExecutionManifest(CalienneBaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")   # critical contract (RFC-001 §4)
     manifest_schema_version: str        # "1.0"; decoupled from architecture_version (DEC-009)
     architecture_version: str           # "0.1.0"
@@ -118,7 +118,7 @@ Replay often fails due to environment differences, not code
 differences. Capture once at process start; never at request time.
 
 ```python
-class HostPrimitives(AetherisBaseModel):
+class HostPrimitives(CalienneBaseModel):
     os: str
     os_version: str | None
     python_version: str | None
@@ -193,7 +193,7 @@ Specified in this RFC §4. Emission specified in each component RFC.
 }
 ```
 
-Resolution order (per OQ5 and OQ-H): env override (`AETHERIS_PROMPT_VERSIONS_PATH`)
+Resolution order (per OQ5 and OQ-H): env override (`CALIENNE_PROMPT_VERSIONS_PATH`)
 → default `config/prompt_versions.json` → `skills.py` built-in defaults
 (with a warning).
 
@@ -244,7 +244,7 @@ true:
       `VersionRegistry`; in-memory in v1.
 - [ ] `config/prompt_versions.json` exists with per-skill entries;
       `orchestrator/skills.py` loads via
-      `AETHERIS_PROMPT_VERSIONS_PATH` → default → built-in fallback.
+      `CALIENNE_PROMPT_VERSIONS_PATH` → default → built-in fallback.
 - [ ] Metric namespace spec is documented (this RFC §4.1).
 - [ ] Every component RFC's emission rules are referenced from this
       spec (cross-links).

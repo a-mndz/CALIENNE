@@ -1,4 +1,4 @@
-# AETHERIS Refactor Findings & Implementation Plan
+# CALIENNE Refactor Findings & Implementation Plan
 
 > **Branch:** `refactor/architecture-fixes` (created 2026-08-19)
 > **Base:** `main` at commit `cef2ed3` ("updates")
@@ -18,7 +18,7 @@
 | 4 | `orchestrator/metrics.py` + authenticated `GET /metrics` | `tests/test_observability.py` (9 tests) |
 
 Files touched: `api_gateway/rate_limiter.py`, `orchestrator/resource_manager.py`,
-`orchestrator/aetheris_orchestrator.py`, `orchestrator/pipelines.py`, `orchestrator/metrics.py` *(new)*,
+`orchestrator/calienne_orchestrator.py`, `orchestrator/pipelines.py`, `orchestrator/metrics.py` *(new)*,
 `core/config.py`, `main.py`, `server.py`, `requirements.txt`,
 `tests/test_providers_repair.py`, `tests/test_pipeline.py`, `tests/test_pipeline_repair.py`,
 `tests/test_observability.py` *(new)*.
@@ -27,11 +27,11 @@ Files touched: `api_gateway/rate_limiter.py`, `orchestrator/resource_manager.py`
 
 1. **Rename scope: option A only.** `ProviderResourceManager` alone removes the collision — no two
    classes share a name. `orchestrator.resource_manager.ResourceManager` was left alone; its module
-   path disambiguates it and the `DagResourceManager` alias at `aetheris_orchestrator.py:126`
+   path disambiguates it and the `DagResourceManager` alias at `calienne_orchestrator.py:126`
    documents intent. Saved 4 files of churn. Option B remains available if that class grows public API.
 
 2. **`/metrics` gets its own bearer token, not `require_role("admin")`.** Prometheus cannot present
-   the httpOnly JWT cookie the admin endpoints use. New setting `AETHERIS_METRICS_TOKEN`:
+   the httpOnly JWT cookie the admin endpoints use. New setting `CALIENNE_METRICS_TOKEN`:
    mandatory in production (**503 when unset** — fails closed rather than exposing internals),
    optional elsewhere so local scraping needs no setup. Compared with `secrets.compare_digest`.
 
@@ -43,7 +43,7 @@ Files touched: `api_gateway/rate_limiter.py`, `orchestrator/resource_manager.py`
 
 4. **Metrics are pull-based.** Gauges refresh from the live `DecisionEngine`/`ProviderPool` at scrape
    time, so the hot request path performs no metric writes. A private `CollectorRegistry` avoids
-   "Duplicated timeseries" on re-import and keeps the scrape to AETHERIS series only.
+   "Duplicated timeseries" on re-import and keeps the scrape to CALIENNE series only.
 
 5. **Inactive provider statuses are emitted as `0`, not omitted.** A vanishing series is
    indistinguishable from a dead scrape target, which would make `status="dead"` alerts unfireable.
@@ -70,14 +70,14 @@ ImportError: cannot import name 'ResourceManager' from 'api_gateway.rate_limiter
 
 Broken importers, all now updated: `orchestrator/resource_manager.py:37` (**missing from every
 earlier doc's touch map** — and the file that actually threw),
-`orchestrator/aetheris_orchestrator.py:52,98,100`, `tests/test_providers_repair.py:17,39,43,54,66`.
+`orchestrator/calienne_orchestrator.py:52,98,100`, `tests/test_providers_repair.py:17,39,43,54,66`.
 `api_gateway/__init__.py` does not re-export it — no change was needed there.
 
 ---
 
 ## Corrections To The Earlier Docs
 
-`ISSUES_AND_FIXES.md` and `AETHERIS_DEEP_RESEARCH.md` were written from documentation +
+`ISSUES_AND_FIXES.md` and `CALIENNE_DEEP_RESEARCH.md` were written from documentation +
 inspection. Six claims were stale or wrong; the rest verified accurate.
 
 1. **Naming inconsistency across docs.** Deep research §3.2 says `DagResourceManager (or
@@ -97,13 +97,13 @@ inspection. Six claims were stale or wrong; the rest verified accurate.
    - `tests/test_pipeline_repair.py:39-43` — asserted `_is_legacy_pipeline_opted_in()` behaviour
 
    All three rewritten to assert the *new* contract: `decision_engine` is required, the removed
-   symbols are gone, and setting `aetheris_LEGACY_PIPELINE_ENABLED=true` no longer resurrects the path.
+   symbols are gone, and setting `calienne_LEGACY_PIPELINE_ENABLED=true` no longer resurrects the path.
 
 5. **Observability deps were present in `.venv` but undeclared.** So Steps 3-4 were smaller than the
    docs assumed — but CI would have installed a different environment than local. Now pinned.
 
 6. **Stale worktree pollutes all searches.**
-   `.claude/worktrees/aetheris-pipeline-hardening-2026-08-10/` is a full duplicate checkout. Every
+   `.claude/worktrees/calienne-pipeline-hardening-2026-08-10/` is a full duplicate checkout. Every
    `grep -r` returns doubled hits. Use `--exclude-dir=.claude --exclude-dir=.venv --exclude-dir=.ua`
    or delete the worktree.
 
@@ -121,11 +121,11 @@ claim/validation via `_process_claims_for_outputs` / `_apply_output_firewall` vs
 ```
 api_gateway/rate_limiter.py:543           class ProviderResourceManager
 orchestrator/resource_manager.py:37       ProviderResourceManager as RateLimiter
-orchestrator/aetheris_orchestrator.py     :52 docstring, :98 import, :100-101 construct + log
+orchestrator/calienne_orchestrator.py     :52 docstring, :98 import, :100-101 construct + log
 tests/test_providers_repair.py            import + 4 usages
 ```
 
-- [x] `python -c "import orchestrator.aetheris_orchestrator, server, main"` succeeds
+- [x] `python -c "import orchestrator.calienne_orchestrator, server, main"` succeeds
 - [x] Remaining `ResourceManager` matches are all DAG-level or the 2 local mocks — zero collision
 - [x] Full suite green
 
@@ -155,9 +155,9 @@ structlog-native calls — **no call sites changed**. Idempotent, since both `ma
 `server.py`'s lifespan call it.
 
 `orchestrator/metrics.py` exports (names mirror `DecisionMetrics`):
-`aetheris_breaker_pass_rate`, `aetheris_judge_agreement_rate`, `aetheris_synthesis_quality_avg`,
-`aetheris_total_decisions`, `aetheris_provider_health{provider,status}`,
-`aetheris_provider_consecutive_failures{provider}`, `aetheris_provider_available{provider}`.
+`calienne_breaker_pass_rate`, `calienne_judge_agreement_rate`, `calienne_synthesis_quality_avg`,
+`calienne_total_decisions`, `calienne_provider_health{provider,status}`,
+`calienne_provider_consecutive_failures{provider}`, `calienne_provider_available{provider}`.
 `refresh()` swallows and logs component errors — a scrape must never take down the process it
 scrapes — and tolerates `None` components so a scrape during startup returns what it can.
 `python -m orchestrator.metrics` runs the self-check.
@@ -171,7 +171,7 @@ unification (1d) → OTel tracing (3d) → alerting rules. Those sections of `IS
 are still valid as written.
 
 The alerting rules in `ISSUES_AND_FIXES.md` §Observability-4 will work against the metric names
-above as-is — `aetheris_provider_health{status="dead"} == 1` fires correctly because inactive
+above as-is — `calienne_provider_health{status="dead"} == 1` fires correctly because inactive
 statuses are emitted as `0` rather than omitted.
 
 ---
@@ -179,9 +179,9 @@ statuses are emitted as `0` rather than omitted.
 ## Verification Commands
 
 ```bash
-cd /c/Users/amand/Downloads/AETHERIS
+cd /c/Users/amand/Downloads/CALIENNE
 
-python -c "import orchestrator.aetheris_orchestrator, server, main"
+python -c "import orchestrator.calienne_orchestrator, server, main"
 python -m orchestrator.metrics          # metrics self-check
 python -m ruff check .
 python -m pytest -q tests/              # full run — use -x only when iterating on one failure
@@ -201,7 +201,7 @@ $GREP "class ResourceManager" .
 2. **Do not rename** the local mock classes at `tests/test_runtime_repair.py:149,185`.
 3. **Always exclude** `.claude/worktrees/`, `.venv/`, `.ua/` from greps — the worktree is a full
    duplicate checkout and doubles every result.
-4. `AETHERIS_METRICS_TOKEN` must be set before any production deploy, or `/metrics` returns 503.
+4. `CALIENNE_METRICS_TOKEN` must be set before any production deploy, or `/metrics` returns 503.
 5. OpenTelemetry is installed locally but undeclared on purpose — declare it with the tracing step,
    and note the installed exporter is the **http** OTLP variant, not grpc.
 

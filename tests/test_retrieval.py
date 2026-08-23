@@ -328,7 +328,7 @@ def test_load_routing_weights_honors_env_json_override() -> None:
     payload = json.dumps({"relevance": 0.5, "credibility": 0.2, "freshness": 0.2, "consensus": 0.1})
     weights = load_routing_weights(
         config_path=_scratch_file("missing.json"),
-        env={"AETHERIS_RETRIEVAL_WEIGHTS_JSON": payload},
+        env={"CALIENNE_RETRIEVAL_WEIGHTS_JSON": payload},
     )
     expected = {"relevance": 0.5, "credibility": 0.2, "freshness": 0.2, "consensus": 0.1}
     assert weights == pytest.approx(expected)
@@ -338,7 +338,7 @@ def test_load_routing_weights_normalizes_misbalanced_weights() -> None:
     payload = json.dumps({"relevance": 0.8, "credibility": 0.8, "freshness": 0.4, "consensus": 0.0})
     weights = load_routing_weights(
         config_path=_scratch_file("missing.json"),
-        env={"AETHERIS_RETRIEVAL_WEIGHTS_JSON": payload},
+        env={"CALIENNE_RETRIEVAL_WEIGHTS_JSON": payload},
     )
     assert abs(sum(weights.values()) - 1.0) < 1e-6
 
@@ -346,7 +346,7 @@ def test_load_routing_weights_normalizes_misbalanced_weights() -> None:
 def test_load_routing_weights_invalid_env_falls_back_to_defaults() -> None:
     weights = load_routing_weights(
         config_path=_scratch_file("missing.json"),
-        env={"AETHERIS_RETRIEVAL_WEIGHTS_JSON": "{not-json"},
+        env={"CALIENNE_RETRIEVAL_WEIGHTS_JSON": "{not-json"},
     )
     assert weights == DEFAULT_RANKING_WEIGHTS
 
@@ -359,7 +359,7 @@ def test_load_routing_weights_reads_path_override() -> None:
     )
     weights = load_routing_weights(
         config_path=_scratch_file("missing.json"),
-        env={"AETHERIS_RETRIEVAL_WEIGHTS_PATH": str(override)},
+        env={"CALIENNE_RETRIEVAL_WEIGHTS_PATH": str(override)},
     )
     assert weights["relevance"] == pytest.approx(0.7)
 

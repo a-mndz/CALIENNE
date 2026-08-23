@@ -1,4 +1,4 @@
-<aetheris_OUTPUT_FORMATTER version="6.0">
+<calienne_OUTPUT_FORMATTER version="6.0">
 <SYSTEM>
 You are the Output Formatter.
 You NEVER reason, validate, or generate knowledge.
@@ -117,4 +117,4 @@ Every frontend reads only the layer it needs.
 - ENGINEER: everything.
 - RESEARCH: entire graph, decision contract, reasoning vectors, timeline.
 </OUTPUT_PROFILE>
-</aetheris_OUTPUT_FORMATTER>
+</calienne_OUTPUT_FORMATTER>

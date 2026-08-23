@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+Calienne — Adaptive Multi-Model Reasoning Orchestrator
 Configuration module using pydantic-settings for environment variable loading
 with optional API credentials, hardware constraints, and logging validation.
 """
@@ -15,33 +15,24 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 logger = logging.getLogger(__name__)
 
 
-class aetherisConfig(BaseSettings):
+class CalienneConfig(BaseSettings):
     """
-    Central configuration for the aetheris multi-agent orchestration system.
+    Central configuration for the Calienne multi-agent orchestration system.
 
     All values are loaded from environment variables (or a `.env` file).
-    Prefix: aetheris_  (e.g. aetheris_OPENROUTER_API_KEY)
+    Prefix: CALIENNE_ or legacy CALIENNE_
     """
 
     model_config = SettingsConfigDict(
-        env_prefix="AETHERIS_",
+        env_prefix="CALIENNE_",
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
-        # The ``aetheris_`` lowercase prefix remains documented for legacy
-        # callers; uppercase ``AETHERIS_*`` is canonical because the
-        # settings class uses ``case_sensitive=True``.
         env_ignore_empty=False,
     )
 
     # ── API Keys (optional; blank values activate Simulation Mode) ───────
-
-    # CRIT-007 audit fix: each provider key is rejected when it contains
-    # a hardcoded leak marker prefix that triggered the audit (e.g. live
-    # ``sk-…`` OpenRouter keys, NVIDIA ``nvapi-…`` tokens, etc.).  Even when
-    # operators delete the demo .env values, any keys that still cycle
-    # through the environment are refused — defence in depth.
 
     LEAKED_KEY_PREFIXES: ClassVar[tuple[str, ...]] = (
         "sk-or-v1-",
@@ -55,23 +46,11 @@ class aetherisConfig(BaseSettings):
 
     @classmethod
     def _sanitize_provider_key(cls, field_name: str, value: str) -> str:
-        """Reject any non-empty key carrying a known live prefix (CRIT-007).
-
-        Operators who intentionally want to use live keys sourced from
-        the OS secret store (see ``secrets_bootstrap.py``) can opt in
-        by exporting ``AETHERIS_ALLOW_LIVE_KEYS=1`` in the process
-        environment before invoking the application.  This keeps the
-        audit guard active for *unintended* loads (a key ending up in
-        ``.env``, a typo'd CI secret, etc.) while letting developers
-        run with their real keys when they knowingly choose to.
-
-        The opt-in is logged so it leaves a paper trail in startup
-        output — never a silent override.
-        """
+        """Reject any non-empty key carrying a known live prefix unless allowed."""
         if value and any(value.startswith(prefix) for prefix in cls.LEAKED_KEY_PREFIXES):
-            if os.environ.get("AETHERIS_ALLOW_LIVE_KEYS") == "1":
+            if os.environ.get("CALIENNE_ALLOW_LIVE_KEYS") == "1" and os.environ.get("CALIENNE_ALLOW_LIVE_KEYS") == "1":
                 logger.warning(
-                    "CRIT-007 override active (AETHERIS_ALLOW_LIVE_KEYS=1); "
+                    "Override active (CALIENNE_ALLOW_LIVE_KEYS=1); "
                     "loading live %s. Audit trail: %s.",
                     field_name,
                     "intentional developer opt-in",
@@ -82,38 +61,47 @@ class aetherisConfig(BaseSettings):
 
     OPENROUTER_API_KEY: str = Field(
         default="",
+        validation_alias=AliasChoices("CALIENNE_OPENROUTER_API_KEY", "CALIENNE_OPENROUTER_API_KEY", "OPENROUTER_API_KEY"),
         description="API key for the OpenRouter inference gateway. Leave empty for Simulation Mode.",
     )
     NVIDIA_NIM_API_KEY: str = Field(
         default="",
+        validation_alias=AliasChoices("CALIENNE_NVIDIA_NIM_API_KEY", "CALIENNE_NVIDIA_NIM_API_KEY", "NVIDIA_NIM_API_KEY"),
         description="API key for NVIDIA NIM micro-services. Leave empty for Simulation Mode.",
     )
     GROQ_API_KEY: str = Field(
         default="",
+        validation_alias=AliasChoices("CALIENNE_GROQ_API_KEY", "CALIENNE_GROQ_API_KEY", "GROQ_API_KEY"),
         description="API key for Groq.",
     )
     GITHUB_TOKEN: str = Field(
         default="",
+        validation_alias=AliasChoices("CALIENNE_GITHUB_TOKEN", "CALIENNE_GITHUB_TOKEN", "GITHUB_TOKEN"),
         description="GitHub models token.",
     )
     MISTRAL_API_KEY: str = Field(
         default="",
+        validation_alias=AliasChoices("CALIENNE_MISTRAL_API_KEY", "CALIENNE_MISTRAL_API_KEY", "MISTRAL_API_KEY"),
         description="API key for Mistral.",
     )
     GOOGLE_API_KEY: str = Field(
         default="",
+        validation_alias=AliasChoices("CALIENNE_GOOGLE_API_KEY", "CALIENNE_GOOGLE_API_KEY", "GOOGLE_API_KEY"),
         description="API key for Google AI Studio.",
     )
     OPENAI_API_KEY: str = Field(
         default="",
+        validation_alias=AliasChoices("CALIENNE_OPENAI_API_KEY", "CALIENNE_OPENAI_API_KEY", "OPENAI_API_KEY"),
         description="API key for OpenAI.",
     )
     KIE_API_KEY: str = Field(
         default="",
+        validation_alias=AliasChoices("CALIENNE_KIE_API_KEY", "CALIENNE_KIE_API_KEY", "KIE_API_KEY"),
         description="API key for Kie.ai.",
     )
     UNLI_DEV_API_KEY: str = Field(
         default="",
+        validation_alias=AliasChoices("CALIENNE_UNLI_DEV_API_KEY", "CALIENNE_UNLI_DEV_API_KEY", "UNLI_DEV_API_KEY"),
         description="API key for UNLI.dev. Leave empty for Simulation Mode.",
     )
 
@@ -134,7 +122,7 @@ class aetherisConfig(BaseSettings):
         return cls._sanitize_provider_key("provider_key", value)
 
     DATABASE_URL: str = Field(
-        default="postgresql+asyncpg://user:password@localhost:5432/aetheris",
+        default="postgresql+asyncpg://user:password@localhost:5432/calienne",
         validation_alias="DATABASE_URL",
         description="PostgreSQL connection string using asyncpg",
     )
@@ -163,15 +151,15 @@ class aetherisConfig(BaseSettings):
 
     # MED-019 / MED-021 helpers for Authentication middleware.
     AUTH_COOKIE_NAME: str = Field(
-        default="aetheris_auth",
-        validation_alias="AETHERIS_AUTH_COOKIE_NAME",
+        default="calienne_auth",
+        validation_alias=AliasChoices("CALIENNE_AUTH_COOKIE_NAME", "CALIENNE_AUTH_COOKIE_NAME"),
         description="Name of the httpOnly session cookie used for JWT delivery.",
     )
 
     # HIGH-014: per-IP rate limit on /auth/login and /auth/register.
     AUTH_RATE_LIMIT_PER_MINUTE: int = Field(
         default=5,
-        validation_alias="AETHERIS_AUTH_RATE_LIMIT_PER_MINUTE",
+        validation_alias=AliasChoices("CALIENNE_AUTH_RATE_LIMIT_PER_MINUTE", "CALIENNE_AUTH_RATE_LIMIT_PER_MINUTE"),
         description="Maximum number of /auth/* requests a single IP may issue per minute.",
     )
 
@@ -179,7 +167,7 @@ class aetherisConfig(BaseSettings):
         default=100,
         ge=100,
         le=60_000,
-        validation_alias="AETHERIS_BREAKER_TIMEOUT_MS",
+        validation_alias=AliasChoices("CALIENNE_BREAKER_TIMEOUT_MS", "CALIENNE_BREAKER_TIMEOUT_MS"),
         description=(
             "Breaker gate budget in milliseconds. 100 (the default) fits "
             "simulation mode; a live LLM round-trip needs ~5000-8000. On "
@@ -189,11 +177,11 @@ class aetherisConfig(BaseSettings):
 
     JWT_SECRET_KEY: str = Field(
         default="",
-        validation_alias="AETHERIS_JWT_SECRET_KEY",
+        validation_alias=AliasChoices("CALIENNE_JWT_SECRET_KEY", "CALIENNE_JWT_SECRET_KEY"),
         description=(
-            "REQUIRED: secret key used for signing JWT tokens.  Set via "
-            "AETHERIS_JWT_SECRET_KEY environment variable.  Application "
-            "startup rejects the empty default (CRIT-005)."
+            "REQUIRED: secret key used for signing JWT tokens. Set via "
+            "CALIENNE_JWT_SECRET_KEY environment variable. Application "
+            "startup rejects the empty default."
         ),
     )
 
@@ -210,11 +198,11 @@ class aetherisConfig(BaseSettings):
     @field_validator("JWT_SECRET_KEY", mode="after")
     @classmethod
     def _reject_default_or_weak_secret(cls, value: str) -> str:
-        """Refuse to start with the canonical demo fallback or a weak key (CRIT-005)."""
+        """Refuse to start with the canonical demo fallback or a weak key."""
         if value in cls._FORBIDDEN_JWT_DEFAULTS:
             raise ValueError(
                 "JWT_SECRET_KEY must be set to a non-default value via "
-                "the aetheris_JWT_SECRET_KEY environment variable. "
+                "the CALIENNE_JWT_SECRET_KEY environment variable. "
                 "An empty/known-demo value is refused because JWTs would "
                 "be forgeable."
             )
@@ -227,11 +215,10 @@ class aetherisConfig(BaseSettings):
 
     JWT_ALGORITHM: str = Field(
         default="HS256",
-        # Tier 0.6: the alias was lowercase "aetheris_*", which silently
-        # ignored the documented uppercase AETHERIS_* form. Both accepted,
-        # uppercase first.
         validation_alias=AliasChoices(
-            "AETHERIS_JWT_ALGORITHM", "aetheris_JWT_ALGORITHM"
+            "CALIENNE_JWT_ALGORITHM",
+            "CALIENNE_JWT_ALGORITHM",
+            "calienne_JWT_ALGORITHM",
         ),
         description="Algorithm used for signing JWT tokens",
     )
@@ -239,8 +226,9 @@ class aetherisConfig(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
         default=60,
         validation_alias=AliasChoices(
-            "AETHERIS_JWT_ACCESS_TOKEN_EXPIRE_MINUTES",
-            "aetheris_JWT_ACCESS_TOKEN_EXPIRE_MINUTES",
+            "CALIENNE_JWT_ACCESS_TOKEN_EXPIRE_MINUTES",
+            "CALIENNE_JWT_ACCESS_TOKEN_EXPIRE_MINUTES",
+            "calienne_JWT_ACCESS_TOKEN_EXPIRE_MINUTES",
         ),
         description="Duration in minutes that access tokens are valid for",
     )
@@ -250,6 +238,7 @@ class aetherisConfig(BaseSettings):
 
     LOCAL_MODEL_VRAM_LIMIT_MB: int = Field(
         default=6144,  # 6 GB = 6 × 1024 MB
+        validation_alias=AliasChoices("CALIENNE_LOCAL_MODEL_VRAM_LIMIT_MB", "CALIENNE_LOCAL_MODEL_VRAM_LIMIT_MB"),
         description=(
             "Hard ceiling (in MB) on VRAM that local fallback models may "
             "allocate. Defaults to 6 144 MB (6 GB) to prevent OOM crashes "
@@ -280,10 +269,12 @@ class aetherisConfig(BaseSettings):
 
     LOG_LEVEL: str = Field(
         default="INFO",
+        validation_alias=AliasChoices("CALIENNE_LOG_LEVEL", "CALIENNE_LOG_LEVEL"),
         description="Python logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).",
     )
     LOG_FORMAT: str = Field(
         default="%(asctime)s | %(name)-25s | %(levelname)-8s | %(message)s",
+        validation_alias=AliasChoices("CALIENNE_LOG_FORMAT", "CALIENNE_LOG_FORMAT"),
         description=(
             "Format string for Python's logging.Formatter. Only consulted by the "
             "legacy plain-text fallback in configure_logging() when structlog is "
@@ -292,17 +283,17 @@ class aetherisConfig(BaseSettings):
     )
     ENVIRONMENT: Literal["development", "test", "production"] = Field(
         default="development",
-        validation_alias="AETHERIS_ENVIRONMENT",
+        validation_alias=AliasChoices("CALIENNE_ENVIRONMENT", "CALIENNE_ENVIRONMENT"),
         description="Runtime environment used for security-sensitive defaults.",
     )
     LOG_MODEL_IO: bool = Field(
         default=False,
-        validation_alias="AETHERIS_LOG_MODEL_IO",
+        validation_alias=AliasChoices("CALIENNE_LOG_MODEL_IO", "CALIENNE_LOG_MODEL_IO"),
         description="Write full model prompts and responses to logs/model_io.log.",
     )
     METRICS_TOKEN: str = Field(
         default="",
-        validation_alias="AETHERIS_METRICS_TOKEN",
+        validation_alias=AliasChoices("CALIENNE_METRICS_TOKEN", "CALIENNE_METRICS_TOKEN"),
         description=(
             "Bearer token required to scrape /metrics. Prometheus cannot present "
             "the JWT cookie the admin endpoints use, so the scrape path gets its "
@@ -364,16 +355,21 @@ class aetherisConfig(BaseSettings):
         return self.DATABASE_URL
 
 
+# ── Backwards Compatibility Alias ────────────────────────────────────────
+
+calienneConfig = CalienneConfig
+
+
 # ── Singleton accessor ───────────────────────────────────────────────────
 
-_settings: aetherisConfig | None = None
+_settings: CalienneConfig | None = None
 
 
-def get_settings() -> aetherisConfig:
-    """Return a cached, validated aetherisConfig instance (singleton)."""
+def get_settings() -> CalienneConfig:
+    """Return a cached, validated CalienneConfig instance (singleton)."""
     global _settings  # noqa: PLW0603
     if _settings is None:
-        _settings = aetherisConfig()  # type: ignore[call-arg]
+        _settings = CalienneConfig()  # type: ignore[call-arg]
     return _settings
 
 
@@ -383,7 +379,7 @@ _logging_configured = False
 
 
 def configure_logging(
-    settings: aetherisConfig | None = None,
+    settings: CalienneConfig | None = None,
     *,
     force: bool = False,
 ) -> None:

@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 ResourceManager — the sole owner of concurrency, ceilings, and rate-limit
 state (RFC-002 §4, ADR-004, DEC-011).
 

@@ -33,7 +33,7 @@ async def test_checkpoint_routes_isolate_users(monkeypatch) -> None:
         partial_results={},
         user_email="bob@example.com",
     )
-    monkeypatch.setattr(server, "_aetheris", {"checkpoint_manager": manager})
+    monkeypatch.setattr(server, "_calienne", {"checkpoint_manager": manager})
     alice = SimpleNamespace(email="alice@example.com")
 
     listed = await server.list_checkpoints("shared-request", alice)
@@ -99,7 +99,7 @@ def test_auth_cookie_secure_outside_development(monkeypatch) -> None:
     import server
 
     settings = SimpleNamespace(
-        AUTH_COOKIE_NAME="aetheris_auth",
+        AUTH_COOKIE_NAME="calienne_auth",
         JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60,
         ENVIRONMENT="production",
     )
@@ -116,7 +116,7 @@ async def test_csrf_requires_origin_for_cookie_authenticated_write(monkeypatch) 
     import server
 
     settings = SimpleNamespace(
-        AUTH_COOKIE_NAME="aetheris_auth",
+        AUTH_COOKIE_NAME="calienne_auth",
         CORS_ORIGINS="http://localhost:8000",
     )
     monkeypatch.setattr(server, "get_settings", lambda: settings)
@@ -125,7 +125,7 @@ async def test_csrf_requires_origin_for_cookie_authenticated_write(monkeypatch) 
             "type": "http",
             "method": "POST",
             "path": "/api/query",
-            "headers": [(b"cookie", b"aetheris_auth=token")],
+            "headers": [(b"cookie", b"calienne_auth=token")],
         }
     )
 

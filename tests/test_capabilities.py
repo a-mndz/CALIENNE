@@ -1,7 +1,7 @@
 """Exit-gate tests for the capability loader (Step 18, RFC-002 §5, ADR-005).
 
 Covers the fail-safe contract: missing file, malformed JSON, out-of-range
-weight, unknown task_type, ``AETHERIS_CAPABILITIES_PATH`` override, and the
+weight, unknown task_type, ``CALIENNE_CAPABILITIES_PATH`` override, and the
 ``_meta`` metadata-key strip. Construction must never raise.
 """
 
@@ -105,7 +105,7 @@ def test_env_override_path_is_used(monkeypatch) -> None:
         json.dumps({"providers": {"acme": {"parallel_limit": 99}}}),
         encoding="utf-8",
     )
-    monkeypatch.setenv("AETHERIS_CAPABILITIES_PATH", str(d))
+    monkeypatch.setenv("CALIENNE_CAPABILITIES_PATH", str(d))
     # No explicit dir → must consult the env var.
     reg = CapabilityRegistry()
     assert reg.provider_parallel_limit("acme") == 99
@@ -114,7 +114,7 @@ def test_env_override_path_is_used(monkeypatch) -> None:
     assert reg2.provider_parallel_limit("acme") == 99
     # Restore the module singleton to the real repo config so later tests /
     # default-constructed strategies don't see this scratch dir.
-    monkeypatch.delenv("AETHERIS_CAPABILITIES_PATH")
+    monkeypatch.delenv("CALIENNE_CAPABILITIES_PATH")
     get_capability_registry(refresh=True)
 
 

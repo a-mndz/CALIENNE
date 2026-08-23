@@ -140,9 +140,9 @@ class _FallbackDecisionEngine:
         return out, out
 
     async def execute_judge_synthesis(self, *, query, logician_output, creative_output, gateway, strategy, pool, passport, lessons="", history=None):  # noqa: E501
-        from core.schemas import aetherisOutput
+        from core.schemas import calienneOutput
 
-        return aetherisOutput(
+        return calienneOutput(
             final_answer="fallback verdict",
             overall_confidence="High",
             overall_bias_risk="Low",
@@ -204,9 +204,9 @@ async def test_execution_manager_passes_injected_knowledge_flag_to_fallback(
 
 
 def test_component_factory_wires_execution_manager() -> None:
-    from orchestrator.aetheris_orchestrator import initialize_aetheris_components
+    from orchestrator.calienne_orchestrator import initialize_calienne_components
 
-    components = initialize_aetheris_components()
+    components = initialize_calienne_components()
 
     assert isinstance(components["execution_manager"], ExecutionManager)
 
@@ -519,7 +519,7 @@ async def test_execution_manager_rag_on_runs_research_retrieval(
             return [
                 SourceCandidate(
                     url="https://docs.example.test/handbook",
-                    title="Aetheris Handbook",
+                    title="Calienne Handbook",
                     excerpt="Smart RAG ranks sources by relevance, credibility, freshness, and consensus.",
                     credibility_score=0.9,
                     freshness_score=0.7,

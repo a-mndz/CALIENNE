@@ -19,23 +19,28 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_CONFIG_PATH = _REPO_ROOT / "config" / "feature_flags.json"
 
 _FLAG_FIELDS: tuple[tuple[str, str], ...] = (
-    ("AETHERIS_ENABLE_PLANNER", "planner"),
-    ("AETHERIS_ENABLE_DAG", "dag"),
-    ("AETHERIS_ENABLE_CONSENSUS", "consensus"),
-    ("AETHERIS_ENABLE_RAG", "rag"),
-    ("AETHERIS_ENABLE_REPAIR", "repair"),
-    ("AETHERIS_ENABLE_PREDICTION", "prediction"),
-    ("AETHERIS_ENABLE_CONTEXT", "context"),
-    ("AETHERIS_ENABLE_SKILLS", "skills"),
-    ("AETHERIS_ENABLE_EXPERIENCE_DB", "experience_db"),
-    ("AETHERIS_ENABLE_KNOWLEDGE_LAYER", "knowledge_layer"),
-    ("AETHERIS_ENABLE_REPLAY", "replay"),
-    ("AETHERIS_ENABLE_META_ESCALATION", "meta_escalation"),
-    ("AETHERIS_ENABLE_SELF_LEARNING", "self_learning"),
+    ("CALIENNE_ENABLE_PLANNER", "planner"),
+    ("CALIENNE_ENABLE_DAG", "dag"),
+    ("CALIENNE_ENABLE_CONSENSUS", "consensus"),
+    ("CALIENNE_ENABLE_RAG", "rag"),
+    ("CALIENNE_ENABLE_REPAIR", "repair"),
+    ("CALIENNE_ENABLE_PREDICTION", "prediction"),
+    ("CALIENNE_ENABLE_CONTEXT", "context"),
+    ("CALIENNE_ENABLE_SKILLS", "skills"),
+    ("CALIENNE_ENABLE_EXPERIENCE_DB", "experience_db"),
+    ("CALIENNE_ENABLE_KNOWLEDGE_LAYER", "knowledge_layer"),
+    ("CALIENNE_ENABLE_REPLAY", "replay"),
+    ("CALIENNE_ENABLE_META_ESCALATION", "meta_escalation"),
+    ("CALIENNE_ENABLE_SELF_LEARNING", "self_learning"),
 )
 
 _RESERVED_V2_FLAGS: frozenset[str] = frozenset(
-    {"AETHERIS_ENABLE_META_ESCALATION", "AETHERIS_ENABLE_SELF_LEARNING"}
+    {
+        "CALIENNE_ENABLE_META_ESCALATION",
+        "CALIENNE_ENABLE_SELF_LEARNING",
+        "CALIENNE_ENABLE_META_ESCALATION",
+        "CALIENNE_ENABLE_SELF_LEARNING",
+    }
 )
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
@@ -59,10 +64,12 @@ class FeatureFlags:
     self_learning: bool = False
 
     def as_env_map(self) -> dict[str, bool]:
-        return {
-            env_name: getattr(self, field_name)
-            for env_name, field_name in _FLAG_FIELDS
-        }
+        res: dict[str, bool] = {}
+        for env_name, field_name in _FLAG_FIELDS:
+            val = getattr(self, field_name)
+            res[env_name] = val
+            res[env_name.replace("CALIENNE_ENABLE_", "CALIENNE_ENABLE_")] = val
+        return res
 
 
 def _coerce_bool(value: object, *, default: bool = False) -> bool:
@@ -116,10 +123,13 @@ def load_flags(
 
     resolved: dict[str, bool] = {}
     for env_name, field_name in _FLAG_FIELDS:
-        default = file_flags.get(env_name, False)
-        value = _coerce_bool(environment.get(env_name), default=default)
-        if env_name in _RESERVED_V2_FLAGS and value:
-            LOGGER.warning("%s is reserved for v2 and remains disabled in v1", env_name)
+        legacy_name = env_name.replace("CALIENNE_ENABLE_", "CALIENNE_ENABLE_")
+        default = file_flags.get(env_name, file_flags.get(legacy_name, False))
+        matched_name = env_name if env_name in environment else legacy_name
+        env_val = environment.get(env_name) if env_name in environment else environment.get(legacy_name)
+        value = _coerce_bool(env_val, default=default)
+        if (env_name in _RESERVED_V2_FLAGS or legacy_name in _RESERVED_V2_FLAGS) and value:
+            LOGGER.warning("%s is reserved for v2 and remains disabled in v1", matched_name)
             value = False
         resolved[field_name] = value
 
@@ -127,3 +137,4 @@ def load_flags(
 
 
 FLAGS = load_flags()
+

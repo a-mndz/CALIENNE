@@ -2,12 +2,12 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-13
-- **Deciders:** AETHERIS architecture working group
+- **Deciders:** CALIENNE architecture working group
 - **Related RFCs:** RFC-002, RFC-003
 
 ## Context
 
-AETHERIS's orchestrator manages multiple parallel I/O-bound operations
+CALIENNE's orchestrator manages multiple parallel I/O-bound operations
 (RAG vector searches, concurrent agent calls, multi-judge consensus
 matrices, web search, vector DB calls, streaming responses, repair loops,
 timeouts, cancellations). Bridging a sync-first execution manager with

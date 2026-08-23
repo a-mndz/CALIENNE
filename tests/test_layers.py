@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.schemas import AgentOutput, TaskProfile, aetherisOutput
+from core.schemas import AgentOutput, TaskProfile, calienneOutput
 from orchestrator.knowledge_layer import KnowledgeLayer
 from orchestrator.reasoning_layer import ReasoningLayer
 from orchestrator.retrieval import RetrievalService, SourceCandidate, StaticOverrideProvider
@@ -18,7 +18,7 @@ class _DecisionStub:
         return output, output
 
     async def execute_judge_synthesis(self, **kwargs):
-        return aetherisOutput(
+        return calienneOutput(
             final_answer="validated",
             overall_confidence="High",
             overall_bias_risk="Low",

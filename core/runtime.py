@@ -1,5 +1,5 @@
 """
-aetheris — Runtime Engine with contract enforcement.
+calienne — Runtime Engine with contract enforcement.
 
 The RuntimeEngine orchestrates prompt execution with full contract enforcement
 for security, streaming, and resource management. It validates contracts before

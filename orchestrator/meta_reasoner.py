@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import Field
 
-from core.base import AetherisBaseModel
+from core.base import CalienneBaseModel
 from core.schemas import PipelineBudget, StageAssessment, TaskGraph, TaskNode, TaskProfile
 
 LOGGER = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ _REASONING_ORDER: dict[str, int] = {
 }
 
 
-class EarlyExitDecision(AetherisBaseModel):
+class EarlyExitDecision(CalienneBaseModel):
     """Decision from adaptive early-exit evaluation."""
 
     can_exit_early: bool = False
@@ -42,7 +42,7 @@ class EarlyExitDecision(AetherisBaseModel):
     escalate_complexity_to: str | None = None
 
 
-class MutationRecord(AetherisBaseModel):
+class MutationRecord(CalienneBaseModel):
     """Recorded graph mutation or bounded optimization event."""
 
     mutation_type: str
@@ -51,7 +51,7 @@ class MutationRecord(AetherisBaseModel):
     details: dict[str, Any] = Field(default_factory=dict)
 
 
-class MetaReasonerResult(AetherisBaseModel):
+class MetaReasonerResult(CalienneBaseModel):
     """Graph plus audit trail after bounded optimization."""
 
     graph: TaskGraph

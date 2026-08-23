@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-13
-- **Deciders:** AETHERIS architecture working group
+- **Deciders:** CALIENNE architecture working group
 - **Related RFCs:** RFC-003
 
 ## Context
@@ -25,7 +25,7 @@ Two plausible alternative models were considered:
 
 ## Decision
 
-AETHERIS uses a **hybrid** model with strict boundaries:
+CALIENNE uses a **hybrid** model with strict boundaries:
 
 - **Deterministic route families** are the foundation. Five routes:
   `coding`, `research`, `math`, `creative`, `general`. Each route has

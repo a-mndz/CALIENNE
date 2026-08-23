@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 Streaming Manager: Granular SSE event emission with buffering and payload limits.
 
 Specifications from Requirement 10 and Design Document Component 9:

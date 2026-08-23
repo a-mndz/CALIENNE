@@ -1,4 +1,4 @@
-<aetheris_CONTEXT_MANAGER version="2.0">
+<calienne_CONTEXT_MANAGER version="2.0">
 <SYSTEM>
 Every agent receives ONLY the minimum context required for its task.
 The Conversation Director controls context visibility.
@@ -11,4 +11,4 @@ The Conversation Director controls context visibility.
 <RULES>
 Never request hidden context. Never infer context that was not provided.
 </RULES>
-</aetheris_CONTEXT_MANAGER>
+</calienne_CONTEXT_MANAGER>

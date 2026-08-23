@@ -72,7 +72,7 @@ const RightPanel = memo(function RightPanel({ open, stats, models, conversations
         </div>
 
         <div className="panel-block">
-          <div className="panel-head">Aetheris insights</div>
+          <div className="panel-head">Calienne insights</div>
           <div className="insight-list">
             {INSIGHTS.map((insight, i) => (
               <div className="insight-row" key={i}>

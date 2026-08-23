@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>calienne — Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *, *::before, *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --surface-900: #05060a;
+        --surface-800: #0b0d14;
+        --surface-700: #11141d;
+        --surface-600: #171b27;
+        --surface-500: #1e2333;
+        --accent-cyan: #22d3ee;
+        --accent-violet: #8b5cf6;
+        --accent-rose: #fb7185;
+        --text-primary: #f1f5f9;
+        --text-secondary: #cbd5e1;
+        --text-tertiary: #94a3b8;
+        --border-default: #334155;
+      }
+
+      html, body {
+        height: 100%;
+        font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+        background: var(--surface-900);
+        color: var(--text-primary);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        background: linear-gradient(135deg, var(--surface-900) 0%, #0c0a1a 100%);
+      }
+
+      .login-container {
+        width: 100%;
+        max-width: 400px;
+        padding: 1.5rem;
+      }
+
+      .login-card {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 1rem;
+        padding: 2rem;
+      }
+
+      .logo-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 2rem;
+      }
+
+      .logo-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 1rem;
+        background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(139, 92, 246, 0.1));
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+        box-shadow: 0 0 24px rgba(34, 211, 238, 0.15);
+      }
+
+      .logo-icon svg {
+        width: 28px;
+        height: 28px;
+      }
+
+      .logo-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: 0.025em;
+      }
+
+      .logo-subtitle {
+        font-size: 0.8rem;
+        color: var(--text-tertiary);
+        margin-top: 0.35rem;
+        text-align: center;
+        line-height: 1.5;
+      }
+
+      .form-group {
+        margin-bottom: 1.25rem;
+      }
+
+      .form-label {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+        margin-bottom: 0.5rem;
+      }
+
+      .form-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background: var(--surface-800);
+        border: 1px solid var(--surface-600);
+        border-radius: 0.5rem;
+        color: var(--text-primary);
+        font-size: 0.9rem;
+        font-family: inherit;
+        transition: border-color 150ms, box-shadow 150ms;
+        outline: none;
+      }
+
+      .form-input::placeholder {
+        color: #64748b;
+      }
+
+      .form-input:focus {
+        border-color: rgba(34, 211, 238, 0.5);
+        box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.15);
+      }
+
+      .form-input:focus-visible {
+        outline: 2px solid var(--accent-cyan);
+        outline-offset: 2px;
+      }
+
+      .btn-login {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background: linear-gradient(135deg, #06b6d4, #8b5cf6);
+        color: white;
+        font-size: 0.9rem;
+        font-weight: 600;
+        font-family: inherit;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: opacity 150ms, transform 150ms, box-shadow 150ms;
+        outline: none;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .btn-login:hover:not(:disabled) {
+        opacity: 0.9;
+        box-shadow: 0 0 24px rgba(34, 211, 238, 0.25);
+      }
+
+      .btn-login:active:not(:disabled) {
+        transform: scale(0.98);
+      }
+
+      .btn-login:focus-visible {
+        outline: 2px solid var(--accent-cyan);
+        outline-offset: 2px;
+      }
+
+      .btn-login:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .btn-login .spinner {
+        display: none;
+        width: 18px;
+        height: 18px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        margin-right: 0.5rem;
+      }
+
+      .btn-login.loading .spinner {
+        display: inline-block;
+      }
+
+      .btn-login.loading .btn-text {
+        opacity: 0.8;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      .error-message {
+        display: none;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        background: rgba(251, 113, 133, 0.08);
+        border: 1px solid rgba(251, 113, 133, 0.2);
+        border-radius: 0.5rem;
+        color: #fda4af;
+        font-size: 0.8rem;
+        margin-bottom: 1.25rem;
+        line-height: 1.4;
+      }
+
+      .error-message.visible {
+        display: flex;
+      }
+
+      .error-message svg {
+        flex-shrink: 0;
+        width: 16px;
+        height: 16px;
+        color: var(--accent-rose);
+      }
+
+      .footer-text {
+        text-align: center;
+        font-size: 0.7rem;
+        color: #475569;
+        margin-top: 1.5rem;
+        line-height: 1.5;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.001ms !important;
+          transition-duration: 0.001ms !important;
+        }
+      }
+
+      *:focus-visible {
+        outline: 2px solid var(--accent-cyan);
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="login-container" role="main">
+      <div class="login-card">
+        <div class="logo-container">
+          <div class="logo-icon" aria-hidden="true">
+            <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="20" r="5" stroke="#22d3ee" stroke-width="1.5" fill="none"/>
+              <circle cx="28" cy="20" r="5" stroke="#8b5cf6" stroke-width="1.5" fill="none"/>
+              <path d="M17 20 L23 20" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="12" cy="20" r="2" fill="#22d3ee" opacity="0.6"/>
+              <circle cx="28" cy="20" r="2" fill="#8b5cf6" opacity="0.6"/>
+              <circle cx="20" cy="20" r="1.5" fill="#f59e0b" opacity="0.8"/>
+            </svg>
+          </div>
+          <h1 class="logo-title">calienne</h1>
+          <p class="logo-subtitle">Adaptive Multi-Model Reasoning Orchestrator</p>
+        </div>
+
+        <div id="error-message" class="error-message" role="alert" aria-live="polite">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span id="error-text"></span>
+        </div>
+
+        <form id="login-form" novalidate>
+          <div class="form-group">
+            <label for="email" class="form-label">Email</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              class="form-input"
+              placeholder="you@example.com"
+              autocomplete="email"
+              required
+              autofocus
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="password" class="form-label">Password</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              class="form-input"
+              placeholder="Enter your password"
+              autocomplete="current-password"
+              required
+            />
+          </div>
+
+          <button type="submit" class="btn-login" id="login-btn">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="btn-text">Sign In</span>
+          </button>
+        </form>
+
+        <p class="footer-text">
+          Sign in to access the multi-agent reasoning system.
+        </p>
+      </div>
+    </main>
+
+    <script>
+      (function() {
+        var token = localStorage.getItem('access_token');
+        if (token) {
+          window.location.href = '/';
+          return;
+        }
+
+        var form = document.getElementById('login-form');
+        var loginBtn = document.getElementById('login-btn');
+        var errorContainer = document.getElementById('error-message');
+        var errorText = document.getElementById('error-text');
+        var emailInput = document.getElementById('email');
+        var passwordInput = document.getElementById('password');
+
+        var API_BASE_URL = (typeof __VITE_API_BASE_URL__ !== 'undefined')
+          ? __VITE_API_BASE_URL__
+          : (localStorage.getItem('api_base_url') || 'http://localhost:8000');
+
+        function showError(message) {
+          errorText.textContent = message;
+          errorContainer.classList.add('visible');
+        }
+
+        function hideError() {
+          errorContainer.classList.remove('visible');
+          errorText.textContent = '';
+        }
+
+        function setLoading(loading) {
+          if (loading) {
+            loginBtn.classList.add('loading');
+            loginBtn.disabled = true;
+            loginBtn.querySelector('.btn-text').textContent = 'Signing in...';
+          } else {
+            loginBtn.classList.remove('loading');
+            loginBtn.disabled = false;
+            loginBtn.querySelector('.btn-text').textContent = 'Sign In';
+          }
+        }
+
+        form.addEventListener('submit', function(e) {
+          e.preventDefault();
+          hideError();
+
+          var email = emailInput.value.trim();
+          var password = passwordInput.value;
+
+          if (!email) {
+            showError('Please enter your email address.');
+            emailInput.focus();
+            return;
+          }
+
+          if (!password) {
+            showError('Please enter your password.');
+            passwordInput.focus();
+            return;
+          }
+
+          var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailPattern.test(email)) {
+            showError('Please enter a valid email address.');
+            emailInput.focus();
+            return;
+          }
+
+          setLoading(true);
+
+          fetch(API_BASE_URL + '/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, password: password })
+          })
+          .then(function(response) {
+            if (response.status === 401 || response.status === 403) {
+              throw new Error('Invalid email or password. Please try again.');
+            }
+            if (!response.ok) {
+              if (response.status >= 500) {
+                throw new Error('Server error. Please try again later.');
+              }
+              throw new Error('Login failed. Please check your credentials.');
+            }
+            return response.json();
+          })
+          .then(function(data) {
+            if (!data.access_token && !data.token) {
+              throw new Error('Login response missing authentication token.');
+            }
+
+            var token = data.access_token || data.token;
+            localStorage.setItem('access_token', token);
+            localStorage.setItem('user_email', email);
+
+            if (data.refresh_token) {
+              localStorage.setItem('refresh_token', data.refresh_token);
+            }
+
+            window.location.href = '/';
+          })
+          .catch(function(err) {
+            setLoading(false);
+            if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
+              showError('Cannot connect to server. Check your connection and try again.');
+            } else {
+              showError(err.message || 'An unexpected error occurred.');
+            }
+            passwordInput.value = '';
+            passwordInput.focus();
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

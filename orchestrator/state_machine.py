@@ -1,5 +1,5 @@
 """
-aetheris — State Machine for Pipeline Transitions
+calienne — State Machine for Pipeline Transitions
 Manages pipeline state transitions with validation, hooks, and event emission.
 """
 

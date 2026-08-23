@@ -31,7 +31,7 @@ Method: dual-agent (A: `ses_0c1ee73e6ffelyLL9xg4YKelh8` · B: `ses_0c1eca58affe7
 
 ## Overall Impression
 
-The landing page has the right temperature. It feels darker, more deliberate, and more exact than generic AI marketing. The weak point is proof. It says Aetheris preserves reasoning, but the page still proves itself mostly with rhetoric, percentages, and testimonials instead of inspectable decision artifacts.
+The landing page has the right temperature. It feels darker, more deliberate, and more exact than generic AI marketing. The weak point is proof. It says Calienne preserves reasoning, but the page still proves itself mostly with rhetoric, percentages, and testimonials instead of inspectable decision artifacts.
 
 ## What's Working
 
@@ -85,7 +85,7 @@ The landing page has the right temperature. It feels darker, more deliberate, an
 
 ## Questions To Consider
 
-- What is the single most inspectable artifact Aetheris can show instead of another claim?
+- What is the single most inspectable artifact Calienne can show instead of another claim?
 - Are the hero metrics defensible product signals, or placeholders that should be removed until they are real?
 - Should the first 45 seconds optimize for mood, or for immediate operational comprehension by technical buyers?
 

@@ -7,7 +7,7 @@ import { MAX_MESSAGE_CHARS } from "../src/constants/input.js";
 
 test("message limit is shared and enforced at input boundary", async () => {
   const input = await readFile(new URL("../src/components/ChatInputBar.jsx", import.meta.url), "utf8");
-  const dashboard = await readFile(new URL("../src/AetherisDashboard.jsx", import.meta.url), "utf8");
+  const dashboard = await readFile(new URL("../src/CalienneDashboard.jsx", import.meta.url), "utf8");
 
   assert.equal(MAX_MESSAGE_CHARS, 4000);
   assert.match(input, /maxLength=\{MAX_MESSAGE_CHARS\}/);

@@ -1,5 +1,5 @@
 """
-aetheris — Adaptive Multi-Model Reasoning Orchestrator
+calienne — Adaptive Multi-Model Reasoning Orchestrator
 Decision Engine facade: Breaker → Logician/Creative → Judge gate architecture.
 
 God-object decomposition (ISSUES_AND_FIXES CRITICAL item, 2026-08-22): the
@@ -11,7 +11,7 @@ the thin orchestrating facade CRIT-001 requires to stay the sole decision path �
 - ``orchestrator/decision_support.py``  — metrics collector, task safety, dispatch
 
 Timing specifications (from Requirement 9):
-- Breaker timeout: AETHERIS_BREAKER_TIMEOUT_MS (default 100ms — simulation;
+- Breaker timeout: CALIENNE_BREAKER_TIMEOUT_MS (default 100ms — simulation;
   live round-trips need ~5-8s); fails OPEN on expiry.
 - Parallel agent timeout: 30 seconds
 - Conditional threshold: 0.7 (Creative runs only if Logician < 0.7)
@@ -27,7 +27,7 @@ from typing import Any, Optional
 from api_gateway.rate_limiter import AsyncAPIGateway, ProviderPool
 from api_gateway.strategy import ProviderStrategy
 from core.passport import ExecutionPassport
-from core.schemas import AgentOutput, aetherisOutput
+from core.schemas import AgentOutput, calienneOutput
 from orchestrator.breaker_gate import BreakerGate
 from orchestrator.decision_support import (  # noqa: F401  (re-export)
     DecisionMetrics,
@@ -160,7 +160,7 @@ class DecisionEngine:
         passport: ExecutionPassport,
         lessons: str = "",
         history: list[dict[str, str]] | None = None,
-    ) -> aetherisOutput:
+    ) -> calienneOutput:
         """
         Execute the Judge agent to synthesize outputs.
 
@@ -192,13 +192,13 @@ class DecisionEngine:
         )
 
         if isinstance(judge_output, dict):
-            # Parse failure — wrap in a safe aetherisOutput
+            # Parse failure — wrap in a safe calienneOutput
             logger.error("Judge returned raw dict, wrapping: %s", judge_output)
-            judge_output = aetherisOutput(
+            judge_output = calienneOutput(
                 final_answer=judge_output.get("final_answer", "Judge synthesis failed"),
                 overall_confidence="Low",
                 overall_bias_risk="High",
-                disagreement_notes=["Judge output was not a valid aetherisOutput"],
+                disagreement_notes=["Judge output was not a valid calienneOutput"],
                 validation_score=0.0,
             )
 
