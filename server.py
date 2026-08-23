@@ -24,7 +24,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
 from pydantic import Field as PField
-from sqlalchemy import delete, select
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -51,11 +51,11 @@ from core.security import (
     verify_password,
 )
 from orchestrator import metrics
+from orchestrator.background_tasks import cancel_background_tasks, create_background_tasks
 from orchestrator.calienne_orchestrator import (
     create_request_passport,
     initialize_calienne_components,
 )
-from orchestrator.background_tasks import cancel_background_tasks, create_background_tasks
 from orchestrator.conversation import ConversationState
 from orchestrator.memory_search import hydrate_history
 from orchestrator.pipelines import _build_frontend_payload
@@ -161,7 +161,7 @@ async def lifespan(app: FastAPI):
     _pool = _bootstrap_pool(_strategy)
     get_provider_registry().bootstrap(_strategy, _pool)
     _gateway = AsyncAPIGateway()
-    _calienne = initialize_calienne_components()
+    _calienne = initialize_calienne_components(streaming_manager=_streaming_mgr)
 
     # Publish singletons to the api/ route modules (late-bound, no cycles).
     from api.state import state as _api_state
@@ -173,26 +173,7 @@ async def lifespan(app: FastAPI):
     _api_state.streaming_manager = _streaming_mgr
 
     # Create background tasks for cleanup operations
-    # Add streaming_manager to components if not already present
-    calienne_with_streaming = dict(_calienne)
-    if "streaming_manager" not in calienne_with_streaming:
-        calienne_with_streaming["streaming_manager"] = _streaming_mgr
-    _background_tasks = create_background_tasks(calienne_with_streaming)
-
-    # Ensure initial database users have admin access
-    try:
-        from core.database import async_session_factory
-        async with async_session_factory() as session:
-            stmt = select(User)
-            res = await session.execute(stmt)
-            all_users = res.scalars().all()
-            if all_users and not any(u.role == "admin" for u in all_users):
-                for u in all_users:
-                    u.role = "admin"
-                await session.commit()
-                logger.info("Automatically promoted user(s) to admin role.")
-    except Exception as exc:
-        logger.debug("User role sync note: %s", exc)
+    _background_tasks = create_background_tasks(_calienne)
 
     logger.info(
         "Calienne Web Server ready — mode=%s, providers=%d, background_tasks=%d",
@@ -688,7 +669,8 @@ def _is_model_configured(model_str: str) -> bool:
 
 
 def _get_dynamic_models() -> list[dict[str, Any]]:
-    """Return dynamic model list with health status, latency, roles, and primary flags from active strategy."""
+    """Return dynamic model list with health status, latency, roles, and
+    primary flags from active strategy."""
     if not _strategy:
         return []
 
@@ -975,8 +957,11 @@ async def discover_provider_models(
     try:
         models = await get_provider_registry().discover_models(req.base_url, req.api_key)
         return {"status": "success", "models": models}
-    except Exception as exc:
+    except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("Provider discovery failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=400, detail="Model discovery failed. Check server logs.") from exc
 
 
 @app.get("/api/providers")
@@ -1019,8 +1004,11 @@ async def save_provider_endpoint(
             "provider": spec.model_dump(),
             "models": _get_dynamic_models(),
         }
-    except Exception as exc:
+    except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("Provider save failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=400, detail="Failed to save provider. Check server logs.") from exc
 
 
 @app.delete("/api/providers/{provider_id}")

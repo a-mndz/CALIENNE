@@ -7,7 +7,7 @@ Generated from the live FastAPI OpenAPI schema (`app.openapi()` in
 `server.py`). Run `python tools/generate_api_reference.py` after changing
 routes; CI fails if this file is stale.
 
-**Title:** calienne  
+**Title:** Calienne  
 **Version:** 1.0.0
 
 ## `GET /`
@@ -15,16 +15,6 @@ routes; CI fails if this file is stale.
 Serve Index
 
 Serve the main HTML page.
-
-**Responses:**
-
-- `200` Successful Response
-
-## `GET /calienne_hero_video_graded.mp4`
-
-Serve Login Hero Video
-
-Serve the login HTML hero video.
 
 **Responses:**
 
@@ -207,6 +197,19 @@ Dynamically register a new model in the active strategy and pool.
 - `200` Successful Response — `object`
 - `422` Validation Error — `HTTPValidationError`
 
+## `POST /api/models/chain`
+
+Update Model Chain Endpoint
+
+Update the priority order / fallback chain of models for a role.
+
+**Request body:** `ModelChainUpdateRequest`
+
+**Responses:**
+
+- `200` Successful Response — `object`
+- `422` Validation Error — `HTTPValidationError`
+
 ## `POST /api/models/custom`
 
 Register Custom Model
@@ -214,6 +217,45 @@ Register Custom Model
 Register a custom model and optional gateway URL in orchestrator.
 
 **Request body:** `CustomModelRequest`
+
+**Responses:**
+
+- `200` Successful Response — `object`
+- `422` Validation Error — `HTTPValidationError`
+
+## `POST /api/models/delete`
+
+Delete Model Endpoint
+
+Remove a model from the active orchestrator strategy.
+
+**Request body:** `ModelDeleteRequest`
+
+**Responses:**
+
+- `200` Successful Response — `object`
+- `422` Validation Error — `HTTPValidationError`
+
+## `POST /api/models/primary`
+
+Set Primary Model Endpoint
+
+Designate a model as the Primary model for a role (e.g. Primary Judge).
+
+**Request body:** `ModelPrimaryUpdateRequest`
+
+**Responses:**
+
+- `200` Successful Response — `object`
+- `422` Validation Error — `HTTPValidationError`
+
+## `POST /api/models/roles`
+
+Update Model Roles Endpoint
+
+Update role assignments (e.g. Judge, Generation, Breaker) for any model.
+
+**Request body:** `ModelRolesUpdateRequest`
 
 **Responses:**
 
@@ -233,6 +275,42 @@ Enable or disable a model provider in the active pool.
 - `200` Successful Response — `object`
 - `422` Validation Error — `HTTPValidationError`
 
+## `GET /api/providers`
+
+List Providers Endpoint
+
+List all custom providers with secure masked status and model counts.
+
+**Responses:**
+
+- `200` Successful Response — `object`
+
+## `POST /api/providers`
+
+Save Provider Endpoint
+
+Register or update a custom provider, saving key securely in OS Keyring.
+
+**Request body:** `ProviderSaveRequest`
+
+**Responses:**
+
+- `200` Successful Response — `object`
+- `422` Validation Error — `HTTPValidationError`
+
+## `POST /api/providers/discover`
+
+Discover Provider Models
+
+Probe model provider endpoint to automatically fetch available models.
+
+**Request body:** `ProviderDiscoverRequest`
+
+**Responses:**
+
+- `200` Successful Response — `object`
+- `422` Validation Error — `HTTPValidationError`
+
 ## `GET /api/providers/health`
 
 Get Providers Health
@@ -242,6 +320,21 @@ Return health metrics for all registered providers.
 **Responses:**
 
 - `200` Successful Response — array of `ProviderHealthResponse`
+
+## `DELETE /api/providers/{provider_id}`
+
+Delete Provider Endpoint
+
+Delete a custom provider and purge its secrets from OS Keyring.
+
+**Parameters:**
+
+- `provider_id` (path) (required): `string`
+
+**Responses:**
+
+- `200` Successful Response — `object`
+- `422` Validation Error — `HTTPValidationError`
 
 ## `POST /api/providers/{provider_name}/recovery`
 
@@ -426,6 +519,16 @@ Register a new user, checking if the email already exists.
 
 - `201` Successful Response
 - `422` Validation Error — `HTTPValidationError`
+
+## `GET /calienne_hero_video_graded.mp4`
+
+Serve Login Hero Video
+
+Serve the login HTML hero video.
+
+**Responses:**
+
+- `200` Successful Response
 
 ## `GET /login`
 

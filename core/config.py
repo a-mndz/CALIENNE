@@ -48,7 +48,7 @@ class CalienneConfig(BaseSettings):
     def _sanitize_provider_key(cls, field_name: str, value: str) -> str:
         """Reject any non-empty key carrying a known live prefix unless allowed."""
         if value and any(value.startswith(prefix) for prefix in cls.LEAKED_KEY_PREFIXES):
-            if os.environ.get("CALIENNE_ALLOW_LIVE_KEYS") == "1" and os.environ.get("CALIENNE_ALLOW_LIVE_KEYS") == "1":
+            if os.environ.get("CALIENNE_ALLOW_LIVE_KEYS") == "1":
                 logger.warning(
                     "Override active (CALIENNE_ALLOW_LIVE_KEYS=1); "
                     "loading live %s. Audit trail: %s.",
@@ -61,12 +61,12 @@ class CalienneConfig(BaseSettings):
 
     OPENROUTER_API_KEY: str = Field(
         default="",
-        validation_alias=AliasChoices("CALIENNE_OPENROUTER_API_KEY", "CALIENNE_OPENROUTER_API_KEY", "OPENROUTER_API_KEY"),
+        validation_alias=AliasChoices("CALIENNE_OPENROUTER_API_KEY", "OPENROUTER_API_KEY"),
         description="API key for the OpenRouter inference gateway. Leave empty for Simulation Mode.",
     )
     NVIDIA_NIM_API_KEY: str = Field(
         default="",
-        validation_alias=AliasChoices("CALIENNE_NVIDIA_NIM_API_KEY", "CALIENNE_NVIDIA_NIM_API_KEY", "NVIDIA_NIM_API_KEY"),
+        validation_alias=AliasChoices("CALIENNE_NVIDIA_NIM_API_KEY", "NVIDIA_NIM_API_KEY"),
         description="API key for NVIDIA NIM micro-services. Leave empty for Simulation Mode.",
     )
     GROQ_API_KEY: str = Field(
@@ -81,7 +81,7 @@ class CalienneConfig(BaseSettings):
     )
     MISTRAL_API_KEY: str = Field(
         default="",
-        validation_alias=AliasChoices("CALIENNE_MISTRAL_API_KEY", "CALIENNE_MISTRAL_API_KEY", "MISTRAL_API_KEY"),
+        validation_alias=AliasChoices("CALIENNE_MISTRAL_API_KEY", "MISTRAL_API_KEY"),
         description="API key for Mistral.",
     )
     GOOGLE_API_KEY: str = Field(
@@ -101,7 +101,7 @@ class CalienneConfig(BaseSettings):
     )
     UNLI_DEV_API_KEY: str = Field(
         default="",
-        validation_alias=AliasChoices("CALIENNE_UNLI_DEV_API_KEY", "CALIENNE_UNLI_DEV_API_KEY", "UNLI_DEV_API_KEY"),
+        validation_alias=AliasChoices("CALIENNE_UNLI_DEV_API_KEY", "UNLI_DEV_API_KEY"),
         description="API key for UNLI.dev. Leave empty for Simulation Mode.",
     )
 
@@ -159,7 +159,7 @@ class CalienneConfig(BaseSettings):
     # HIGH-014: per-IP rate limit on /auth/login and /auth/register.
     AUTH_RATE_LIMIT_PER_MINUTE: int = Field(
         default=5,
-        validation_alias=AliasChoices("CALIENNE_AUTH_RATE_LIMIT_PER_MINUTE", "CALIENNE_AUTH_RATE_LIMIT_PER_MINUTE"),
+        validation_alias=AliasChoices("CALIENNE_AUTH_RATE_LIMIT_PER_MINUTE"),
         description="Maximum number of /auth/* requests a single IP may issue per minute.",
     )
 
@@ -238,7 +238,7 @@ class CalienneConfig(BaseSettings):
 
     LOCAL_MODEL_VRAM_LIMIT_MB: int = Field(
         default=6144,  # 6 GB = 6 × 1024 MB
-        validation_alias=AliasChoices("CALIENNE_LOCAL_MODEL_VRAM_LIMIT_MB", "CALIENNE_LOCAL_MODEL_VRAM_LIMIT_MB"),
+        validation_alias=AliasChoices("CALIENNE_LOCAL_MODEL_VRAM_LIMIT_MB"),
         description=(
             "Hard ceiling (in MB) on VRAM that local fallback models may "
             "allocate. Defaults to 6 144 MB (6 GB) to prevent OOM crashes "

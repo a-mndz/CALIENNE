@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from api_gateway.strategy import ProviderStrategy
+import pytest
+
 from api_gateway.rate_limiter import ProviderPool
-from core.provider_registry import ProviderRegistry, CustomModelSpec, CustomProviderSpec
+from api_gateway.strategy import ProviderStrategy
+from core.provider_registry import CustomModelSpec, CustomProviderSpec, ProviderRegistry
 
 
 @pytest.fixture
@@ -153,11 +154,13 @@ async def test_discover_models_endpoint(temp_registry: ProviderRegistry) -> None
 
 @pytest.mark.asyncio
 async def test_fastapi_discover_endpoint() -> None:
-    import httpx
     import uuid
-    from server import app
-    from core.security import get_current_user
+
+    import httpx
+
     from core.models import User
+    from core.security import get_current_user
+    from server import app
 
     fake_admin = User(id=uuid.uuid4(), email="admin@test.com", password_hash="hash", role="admin")
     app.dependency_overrides[get_current_user] = lambda: fake_admin

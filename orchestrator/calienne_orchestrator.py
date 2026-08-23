@@ -32,8 +32,17 @@ from orchestrator.streaming import StreamingManager
 logger = logging.getLogger(__name__)
 
 
-def initialize_calienne_components() -> dict[str, Any]:
+def initialize_calienne_components(
+    streaming_manager: StreamingManager | None = None,
+) -> dict[str, Any]:
     """Instantiate all Calienne components and wire their dependencies.
+
+    Parameters
+    ----------
+    streaming_manager:
+        Optional pre-built StreamingManager to share across components.
+        When omitted a new one is created.  The web server passes its
+        module-level manager so SSE clients receive engine-level events.
 
     Returns
     -------
@@ -75,7 +84,8 @@ def initialize_calienne_components() -> dict[str, Any]:
     logger.info("ClaimManager initialized.")
 
     # ── Streaming ────────────────────────────────────────────────────
-    streaming_manager = StreamingManager()
+    if streaming_manager is None:
+        streaming_manager = StreamingManager()
     logger.info("StreamingManager initialized.")
 
     # ── Decision Engine ──────────────────────────────────────────────

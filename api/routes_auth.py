@@ -82,12 +82,9 @@ async def serve_login():
 
 
 @router.get("/calienne_hero_video_graded.mp4")
-@router.get("/calienne_hero_video_graded.mp4")
 async def serve_login_hero_video():
     """Serve the login HTML hero video."""
     video_path = Path(__file__).resolve().parent.parent / "calienne_hero_video_graded.mp4"
-    if not video_path.exists():
-        video_path = Path(__file__).resolve().parent.parent / "calienne_hero_video_graded.mp4"
     if not video_path.exists():
         raise HTTPException(status_code=404, detail="Hero video not found.")
     return FileResponse(video_path, media_type="video/mp4")
@@ -114,7 +111,7 @@ async def register_user(req: AuthRegisterRequest, request: Request, db: AsyncSes
     # Check if this is the first user registered
     stmt_count = select(User)
     existing_users = (await db.execute(stmt_count)).scalars().all()
-    user_role = "admin" if (not existing_users or get_settings().ENVIRONMENT == "development") else "user"
+    user_role = "admin" if not existing_users else "user"
 
     # Hash the password and store the user
     hashed = hash_password(req.password)

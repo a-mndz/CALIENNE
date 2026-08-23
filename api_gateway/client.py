@@ -70,7 +70,10 @@ class AsyncHTTPClient:
             return val.strip()
 
         # 3. Direct OS environ lookup fallback
-        env_val = os.environ.get(f"CALIENNE_{provider.upper()}_API_KEY", "") or os.environ.get(f"{provider.upper()}_API_KEY", "")
+        env_val = (
+            os.environ.get(f"CALIENNE_{provider.upper()}_API_KEY", "")
+            or os.environ.get(f"{provider.upper()}_API_KEY", "")
+        )
         return env_val.strip()
 
     async def post_request(self, model: str, prompt: str, system_prompt: Optional[str] = None, history: list[dict[str, str]] | None = None, max_tokens: Optional[int] = None) -> str:  # noqa: E501

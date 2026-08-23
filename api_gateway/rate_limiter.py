@@ -327,6 +327,8 @@ class ProviderPool:
                 return True
             return False
         if state.status is ProviderStatus.DEAD:
+            if state.cooldown_until and time.time() >= state.cooldown_until:
+                return True
             return False
         return state.is_available
 
@@ -364,6 +366,7 @@ class ProviderPool:
 
         if error_rate >= self.DEGRADED_ERROR_RATE_THRESHOLD:
             state.status = ProviderStatus.DEAD
+            state.cooldown_until = time.time() + self.CIRCUIT_BREAKER_COOLDOWN_SEC
             return "dead"
         elif error_rate >= self.HEALTHY_ERROR_RATE_THRESHOLD:
             state.status = ProviderStatus.DEGRADED

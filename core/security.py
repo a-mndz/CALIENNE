@@ -382,7 +382,7 @@ def require_role(required_role: str):
         current_user: Annotated[User, Depends(get_current_user)],
     ) -> User:
         user_role = getattr(current_user, "role", "user") or "user"
-        if user_role != required_role and user_role != "admin" and settings.ENVIRONMENT != "development":
+        if user_role != required_role and user_role != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Role '{required_role}' required (current role: '{user_role}').",

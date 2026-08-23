@@ -9,10 +9,13 @@ secure OS Keyring storage of API credentials, and runtime role assignment
 
 from __future__ import annotations
 
+import asyncio
+import ipaddress
 import json
 import logging
 import os
 import re
+import socket
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -24,6 +27,44 @@ from core.base import CalienneBaseModel
 logger = logging.getLogger("calienne.providers")
 
 _CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "custom_providers.json"
+
+
+class DisallowedEndpointError(ValueError):
+    """Raised when a discovery target resolves to a blocked address range."""
+
+
+async def _assert_allowed_endpoint(url: str) -> None:
+    """SSRF guard for model discovery (SSRF-001).
+
+    Link-local, unspecified, reserved and multicast targets are rejected so the
+    probe cannot reach cloud metadata services (169.254.169.254) or other
+    non-routable sinks. Loopback and RFC1918 hosts stay reachable on purpose —
+    local model servers (Ollama, LM Studio, vLLM) are the feature's primary
+    use case.
+    """
+    parsed = httpx.URL(url)
+    if parsed.scheme not in ("http", "https") or not parsed.host:
+        raise DisallowedEndpointError(
+            f"Unsupported endpoint URL scheme '{parsed.scheme or '(none)'}' — use http or https."
+        )
+    try:
+        loop = asyncio.get_running_loop()
+        addrinfos = await loop.getaddrinfo(parsed.host, parsed.port or 443, type=socket.SOCK_STREAM)
+    except (socket.gaierror, OSError):
+        # Unresolvable host: let the HTTP client surface a clean connect error.
+        return
+    for info in addrinfos:
+        raw_addr = info[4][0].split("%")[0]
+        ip = ipaddress.ip_address(raw_addr)
+        if ip.version == 6 and ip.ipv4_mapped is not None:
+            ip = ip.ipv4_mapped
+        if ip.is_loopback:
+            continue
+        if ip.is_link_local or ip.is_unspecified or ip.is_reserved or ip.is_multicast:
+            raise DisallowedEndpointError(
+                f"Endpoint host '{parsed.host}' resolves to a blocked address range "
+                f"and cannot be probed."
+            )
 _KEYRING_SERVICE = os.environ.get(
     "CALIENNE_KEYRING_SERVICE",
     os.environ.get("CALIENNE_KEYRING_SERVICE", "Calienne")
@@ -219,8 +260,19 @@ class ProviderRegistry:
                 seen_urls.add(u)
                 urls_to_try.append(u)
 
+        await _assert_allowed_endpoint(base)
+
+        async def _validate_request(request: httpx.Request) -> None:
+            # Re-validate on every redirect hop so a public URL cannot bounce
+            # the probe into a blocked range.
+            await _assert_allowed_endpoint(str(request.url))
+
         last_error = "Could not connect to model endpoint."
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            timeout=15.0,
+            follow_redirects=True,
+            event_hooks={"request": [_validate_request]},
+        ) as client:
             for url in urls_to_try:
                 try:
                     res = await client.get(url, headers=headers)
@@ -230,9 +282,14 @@ class ProviderRegistry:
                         if models:
                             return models
                     elif res.status_code in (401, 403):
-                        last_error = f"Authentication failed (HTTP {res.status_code}). Please check your API key."
+                        last_error = (
+                            f"Authentication failed (HTTP {res.status_code}). "
+                            "Please check your API key."
+                        )
                     else:
-                        last_error = f"Endpoint {url} returned HTTP {res.status_code}: {res.text[:150]}"
+                        last_error = f"Endpoint {url} returned HTTP {res.status_code}."
+                except DisallowedEndpointError:
+                    raise
                 except httpx.ConnectError:
                     last_error = f"Connection refused connecting to {url}. Ensure the server is running."
                 except httpx.TimeoutException:
