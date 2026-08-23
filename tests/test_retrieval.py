@@ -330,7 +330,8 @@ def test_load_routing_weights_honors_env_json_override() -> None:
         config_path=_scratch_file("missing.json"),
         env={"AETHERIS_RETRIEVAL_WEIGHTS_JSON": payload},
     )
-    assert weights == {"relevance": 0.5, "credibility": 0.2, "freshness": 0.2, "consensus": 0.1}
+    expected = {"relevance": 0.5, "credibility": 0.2, "freshness": 0.2, "consensus": 0.1}
+    assert weights == pytest.approx(expected)
 
 
 def test_load_routing_weights_normalizes_misbalanced_weights() -> None:

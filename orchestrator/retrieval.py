@@ -562,6 +562,8 @@ def _normalize_weights(weights: dict[str, float]) -> dict[str, float]:
     total = sum(max(0.0, float(value)) for value in weights.values())
     if total <= 0:
         return dict(DEFAULT_RANKING_WEIGHTS)
+    if math.isclose(total, 1.0, rel_tol=1e-9, abs_tol=1e-9):
+        return {key: max(0.0, float(value)) for key, value in weights.items()}
     return {key: max(0.0, float(value)) / total for key, value in weights.items()}
 
 
