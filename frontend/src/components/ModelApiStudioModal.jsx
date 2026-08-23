@@ -26,7 +26,7 @@ export default function ModelApiStudioModal({
   // Providers list state
   const [customProviders, setCustomProviders] = useState([]);
   const [loadingProviders, setLoadingProviders] = useState(false);
-  const [rolePreferences, setRolePreferences] = useState({});
+  const [, setRolePreferences] = useState({});
 
   // Tab 2: Add Provider & Discover Models state
   const [providerName, setProviderName] = useState("");
@@ -50,9 +50,71 @@ export default function ModelApiStudioModal({
   const [savingKey, setSavingKey] = useState({});
   const [vaultMsg, setVaultMsg] = useState({});
 
+  // Studio-wide notice bar (auth errors, failed actions). Replaces silent
+  // `if (res.ok)` branches and native alert()/confirm() dialogs.
+  const [studioNotice, setStudioNotice] = useState(null);
+  const noticeTimerRef = useRef(null);
+  // Two-step delete confirmation: first click arms, second click executes.
+  const [pendingDelete, setPendingDelete] = useState(null); // { kind, id }
+  const pendingDeleteTimerRef = useRef(null);
+
   const dialogRef = useRef(null);
   const closeRef = useRef(null);
   const previousFocusRef = useRef(null);
+
+  const showNotice = useCallback((type, text, sticky = false) => {
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    setStudioNotice({ type, text });
+    if (!sticky) {
+      noticeTimerRef.current = setTimeout(() => setStudioNotice(null), 6000);
+    }
+  }, []);
+
+  useEffect(() => () => {
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+  }, []);
+
+  // fetch wrapper: surfaces auth failures instead of silently dropping them.
+  const requestApi = useCallback(async (url, options = {}) => {
+    const res = await fetch(url, { credentials: "include", ...options });
+    if (res.status === 401) {
+      showNotice("error", "Your session has expired — redirecting to login…", true);
+      setTimeout(() => { window.location.href = "/login"; }, 1600);
+    }
+    return res;
+  }, [showNotice]);
+
+  // Shared failure feedback for action handlers: 403 gets a plain-language
+  // admin message (backend detail is role jargon), other errors show detail.
+  const reportActionError = useCallback(async (res, fallback) => {
+    if (res.status === 401) return; // requestApi already notified + redirecting
+    if (res.status === 403) {
+      showNotice("error", "Admin access is required for this action. Log in with an admin account.", true);
+      return;
+    }
+    const err = await res.json().catch(() => ({}));
+    showNotice("error", err.detail || fallback);
+  }, [showNotice]);
+
+  // Returns true when this click confirms a previously-armed delete.
+  const pendingDeleteRef = useRef(null);
+  const armDelete = useCallback((kind, id) => {
+    const current = pendingDeleteRef.current;
+    if (current && current.kind === kind && current.id === id) {
+      pendingDeleteRef.current = null;
+      setPendingDelete(null);
+      return true;
+    }
+    pendingDeleteRef.current = { kind, id };
+    setPendingDelete({ kind, id });
+    if (pendingDeleteTimerRef.current) clearTimeout(pendingDeleteTimerRef.current);
+    pendingDeleteTimerRef.current = setTimeout(() => {
+      pendingDeleteRef.current = null;
+      setPendingDelete(null);
+    }, 4000);
+    return false;
+  }, []);
 
   useFocusTrap(!inline && isOpen, dialogRef);
   useEscapeKey(useCallback(() => {
@@ -69,33 +131,38 @@ export default function ModelApiStudioModal({
   const fetchProviders = useCallback(async () => {
     setLoadingProviders(true);
     try {
-      const res = await fetch("/api/providers", { credentials: "include" });
+      const res = await requestApi("/api/providers");
       if (res.ok) {
         const data = await res.json();
         setCustomProviders(data.providers || []);
         setRolePreferences(data.preferences || {});
+      } else {
+        await reportActionError(res, "Could not load custom providers.");
       }
     } catch (err) {
       console.error("Could not fetch custom providers", err);
+      showNotice("error", "Could not load custom providers — the backend may be unreachable.");
     } finally {
       setLoadingProviders(false);
     }
-  }, []);
+  }, [requestApi, reportActionError, showNotice]);
 
   const fetchVaultStatus = useCallback(async () => {
     setLoadingVault(true);
     try {
-      const res = await fetch("/api/config/vault", { credentials: "include" });
+      const res = await requestApi("/api/config/vault");
       if (res.ok) {
         const data = await res.json();
         setVaultProviders(data.providers || []);
+      } else {
+        await reportActionError(res, "Could not load the key vault.");
       }
     } catch (err) {
       console.error("Could not fetch vault status", err);
     } finally {
       setLoadingVault(false);
     }
-  }, []);
+  }, [requestApi, reportActionError]);
 
   useEffect(() => {
     if (isOpen) {
@@ -104,12 +171,45 @@ export default function ModelApiStudioModal({
     }
   }, [isOpen, fetchProviders, fetchVaultStatus]);
 
+  // Derived state — must stay above the early return so hooks run unconditionally.
+  const filteredModels = useMemo(() => {
+    if (roleFilter === "all") return models;
+    if (roleFilter === "configured") return models.filter((m) => m.configured || m.custom);
+    return models.filter((m) => (m.roles || []).includes(roleFilter));
+  }, [models, roleFilter]);
+
+  const filteredDiscoveredModels = useMemo(() => {
+    if (!modelSearchTerm.trim()) return discoveredModels;
+    const term = modelSearchTerm.toLowerCase();
+    return discoveredModels.filter(
+      (m) => m.id.toLowerCase().includes(term) || (m.name && m.name.toLowerCase().includes(term))
+    );
+  }, [discoveredModels, modelSearchTerm]);
+
+  const primaryGenModel = useMemo(() => {
+    return models.find((m) => m.is_primary_generation)?.full_id || "";
+  }, [models]);
+
+  const primaryJudgeModel = useMemo(() => {
+    return models.find((m) => m.is_primary_judge)?.full_id || "";
+  }, [models]);
+
+  const primaryBreakerModel = useMemo(() => {
+    return models.find((m) => m.is_primary_breaker)?.full_id || "";
+  }, [models]);
+
+  const [strategyMode, setStrategyMode] = useState("HYBRID");
+
   if (!isOpen) return null;
 
   // ── Step 1: Discover models from Provider URL + API Key ─────────────────────
-  const handleDiscoverModels = async (e) => {
-    if (e) e.preventDefault();
-    if (!providerUrl.trim()) return;
+  // urlOverride lets callers (e.g. the providers tab's re-discover button)
+  // probe a URL that was set in the same tick — reading providerUrl state
+  // immediately after setProviderUrl would still see the previous value.
+  const handleDiscoverModels = async (e, urlOverride) => {
+    if (e && typeof e !== "string") e.preventDefault();
+    const targetUrl = (urlOverride || providerUrl).trim();
+    if (!targetUrl) return;
 
     setFetchingModels(true);
     setProviderMsg(null);
@@ -118,12 +218,11 @@ export default function ModelApiStudioModal({
     setModelRoleOverrides({});
 
     try {
-      const res = await fetch("/api/providers/discover", {
+      const res = await requestApi("/api/providers/discover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
-          base_url: providerUrl.trim(),
+          base_url: targetUrl,
           api_key: providerKey.trim() || undefined,
         }),
       });
@@ -143,6 +242,8 @@ export default function ModelApiStudioModal({
             text: `Connected successfully! Found ${found.length} available model(s). Select which ones to import below.`,
           });
         }
+      } else if (res.status === 403) {
+        await reportActionError(res);
       } else {
         const err = await res.json().catch(() => ({ detail: "Connection failed" }));
         setProviderMsg({ type: "error", text: err.detail || "Failed to discover models from provider." });
@@ -225,23 +326,24 @@ export default function ModelApiStudioModal({
         models: modelsToImport,
       };
 
-      const res = await fetch("/api/providers", {
+      const res = await requestApi("/api/providers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         setProviderMsg({
           type: "success",
-          text: `🎉 Successfully imported ${modelsToImport.length} model(s)! API Key securely locked in OS Keyring.`,
+          text: `Successfully imported ${modelsToImport.length} model(s)! API Key securely locked in OS Keyring.`,
         });
         setProviderKey("");
         fetchProviders();
         if (onRefresh) onRefresh();
         // Switch to models tab after short delay
         setTimeout(() => setActiveTab("models"), 1200);
+      } else if (res.status === 403) {
+        await reportActionError(res);
       } else {
         const err = await res.json().catch(() => ({ detail: "Failed to save provider" }));
         setProviderMsg({ type: "error", text: err.detail || "Failed to register provider." });
@@ -264,79 +366,85 @@ export default function ModelApiStudioModal({
       : [...currentRoles, roleToToggle];
 
     if (nextRoles.length === 0) {
-      alert("A model must have at least one assigned role.");
+      showNotice("error", "A model must keep at least one assigned role.");
       return;
     }
 
     try {
-      const res = await fetch("/api/models/roles", {
+      const res = await requestApi("/api/models/roles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ model_id: fullModelId, roles: nextRoles }),
       });
       if (res.ok) {
         if (onRefresh) onRefresh();
         fetchProviders();
+      } else {
+        await reportActionError(res, "Could not update model roles.");
       }
     } catch (err) {
       console.error("Failed to update model roles", err);
+      showNotice("error", "Could not update model roles — the backend may be unreachable.");
     }
   };
 
   // ── Set Primary Judge or Generation Model ──────────────────────────────────
   const handleSetPrimaryModel = async (role, fullModelId) => {
     try {
-      const res = await fetch("/api/models/primary", {
+      const res = await requestApi("/api/models/primary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ role, model_id: fullModelId }),
       });
       if (res.ok) {
         if (onRefresh) onRefresh();
         fetchProviders();
+      } else {
+        await reportActionError(res, "Could not set the primary model.");
       }
     } catch (err) {
       console.error("Failed to set primary model", err);
+      showNotice("error", "Could not set the primary model — the backend may be unreachable.");
     }
   };
 
   // ── Delete Custom Provider ────────────────────────────────────────────────
   const handleDeleteProvider = async (providerId) => {
-    if (!confirm(`Are you sure you want to remove provider "${providerId}" and its keyring credentials?`)) {
-      return;
-    }
+    if (!armDelete("provider", providerId)) return;
     try {
-      const res = await fetch(`/api/providers/${providerId}`, {
+      const res = await requestApi(`/api/providers/${providerId}`, {
         method: "DELETE",
-        credentials: "include",
       });
       if (res.ok) {
         fetchProviders();
         if (onRefresh) onRefresh();
+      } else {
+        await reportActionError(res, "Could not delete the provider.");
       }
     } catch (err) {
       console.error("Failed to delete provider", err);
+      showNotice("error", "Could not delete the provider — the backend may be unreachable.");
     }
   };
 
   // ── Delete Single Custom Model ────────────────────────────────────────────
   const handleDeleteCustomModel = async (fullModelId) => {
-    if (!confirm(`Remove model "${fullModelId}" from the orchestrator?`)) return;
+    if (!armDelete("model", fullModelId)) return;
     try {
-      const res = await fetch("/api/models/delete", {
+      const res = await requestApi("/api/models/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ id: fullModelId }),
       });
       if (res.ok) {
         if (onRefresh) onRefresh();
         fetchProviders();
+      } else {
+        await reportActionError(res, "Could not delete the model.");
       }
     } catch (err) {
       console.error("Failed to delete model", err);
+      showNotice("error", "Could not delete the model — the backend may be unreachable.");
     }
   };
 
@@ -348,10 +456,9 @@ export default function ModelApiStudioModal({
     setSavingKey((p) => ({ ...p, [account]: true }));
     setVaultMsg((p) => ({ ...p, [account]: null }));
     try {
-      const res = await fetch("/api/config/vault", {
+      const res = await requestApi("/api/config/vault", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ account, secret }),
       });
       if (res.ok) {
@@ -360,6 +467,8 @@ export default function ModelApiStudioModal({
         setKeyInputs((p) => ({ ...p, [account]: "" }));
         const storageLabel = data.storage === "keyring" ? "OS keyring" : "process memory";
         setVaultMsg((p) => ({ ...p, [account]: { type: "success", text: `Saved to ${storageLabel}.` } }));
+      } else if (res.status === 403) {
+        setVaultMsg((p) => ({ ...p, [account]: { type: "error", text: "Admin access is required to manage vault keys." } }));
       } else {
         setVaultMsg((p) => ({ ...p, [account]: { type: "error", text: "Failed to save secret" } }));
       }
@@ -370,51 +479,22 @@ export default function ModelApiStudioModal({
     }
   };
 
-  // Filter models for Tab 1
-  const filteredModels = useMemo(() => {
-    if (roleFilter === "all") return models;
-    if (roleFilter === "configured") return models.filter((m) => m.configured || m.custom);
-    return models.filter((m) => (m.roles || []).includes(roleFilter));
-  }, [models, roleFilter]);
-
-  // Filter discovered models in Tab 2
-  const filteredDiscoveredModels = useMemo(() => {
-    if (!modelSearchTerm.trim()) return discoveredModels;
-    const term = modelSearchTerm.toLowerCase();
-    return discoveredModels.filter(
-      (m) => m.id.toLowerCase().includes(term) || (m.name && m.name.toLowerCase().includes(term))
-    );
-  }, [discoveredModels, modelSearchTerm]);
-
-  // Find currently active primary models
-  const primaryGenModel = useMemo(() => {
-    return models.find((m) => m.is_primary_generation)?.full_id || "";
-  }, [models]);
-
-  const primaryJudgeModel = useMemo(() => {
-    return models.find((m) => m.is_primary_judge)?.full_id || "";
-  }, [models]);
-
-  const primaryBreakerModel = useMemo(() => {
-    return models.find((m) => m.is_primary_breaker)?.full_id || "";
-  }, [models]);
-
-  const [strategyMode, setStrategyMode] = useState("HYBRID");
-
   const handleSetStrategyMode = async (mode) => {
     try {
-      const res = await fetch("/api/strategy/mode", {
+      const res = await requestApi("/api/strategy/mode", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ mode }),
       });
       if (res.ok) {
         setStrategyMode(mode);
         if (onRefresh) onRefresh();
+      } else {
+        await reportActionError(res, "Could not change the strategy mode.");
       }
     } catch (err) {
       console.error("Failed to update strategy mode", err);
+      showNotice("error", "Could not change the strategy mode — the backend may be unreachable.");
     }
   };
 
@@ -431,17 +511,19 @@ export default function ModelApiStudioModal({
     newChain[targetIdx] = temp;
 
     try {
-      const res = await fetch("/api/models/chain", {
+      const res = await requestApi("/api/models/chain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ role, chain: newChain }),
       });
       if (res.ok) {
         if (onRefresh) onRefresh();
+      } else {
+        await reportActionError(res, "Could not reorder the model chain.");
       }
     } catch (err) {
       console.error("Failed to reorder chain", err);
+      showNotice("error", "Could not reorder the model chain — the backend may be unreachable.");
     }
   };
 
@@ -457,7 +539,7 @@ export default function ModelApiStudioModal({
       {/* Modal Header */}
       <div className="studio-modal-header">
         <div>
-          <div className="studio-modal-tag">⚡ SYSTEM SETTINGS &amp; PROVIDERS</div>
+          <div className="studio-modal-tag">SYSTEM SETTINGS &amp; PROVIDERS</div>
           <h2 id="studio-modal-title" className="studio-modal-title">Model &amp; Provider Studio</h2>
           <p className="studio-modal-subtitle">
             Add AI providers, auto-discover &amp; import models with OS Keyring protection, and configure the Consensus Audit Judge.
@@ -502,6 +584,14 @@ export default function ModelApiStudioModal({
             <span>🔒</span> Keyring Vault
           </button>
         </div>
+
+        {/* Studio-wide notice: auth problems and failed actions */}
+        {studioNotice && (
+          <div className={`studio-alert alert-${studioNotice.type}`} role="alert" style={{ margin: "12px 20px 0" }}>
+            {studioNotice.type === "error" ? "⚠ " : ""}
+            {studioNotice.text}
+          </div>
+        )}
 
         {/* Tab Contents */}
         <div className="studio-modal-body">
@@ -666,7 +756,7 @@ export default function ModelApiStudioModal({
                   </button>
                 </div>
                 <button className="studio-refresh-btn" onClick={onRefresh}>
-                  🔄 Refresh Status
+                  Refresh Status
                 </button>
               </div>
 
@@ -801,11 +891,17 @@ export default function ModelApiStudioModal({
 
                           <button
                             type="button"
-                            className="studio-delete-btn"
+                            className={`studio-delete-btn ${pendingDelete?.kind === "model" && pendingDelete?.id === m.full_id ? "armed" : ""}`}
                             onClick={() => handleDeleteCustomModel(m.full_id)}
-                            title="Remove model from orchestrator"
+                            title={
+                              pendingDelete?.kind === "model" && pendingDelete?.id === m.full_id
+                                ? "Click again to confirm removal"
+                                : "Remove model from orchestrator"
+                            }
                           >
-                            🗑️
+                            {pendingDelete?.kind === "model" && pendingDelete?.id === m.full_id
+                              ? "Confirm?"
+                              : "Remove"}
                           </button>
                           <button
                             className={`studio-toggle-switch ${m.active ? "on" : "off"}`}
@@ -899,8 +995,9 @@ export default function ModelApiStudioModal({
                         className="vault-eye-btn"
                         onClick={() => setShowProviderKey((v) => !v)}
                         title="Toggle visibility"
+                        aria-label={showProviderKey ? "Hide API key" : "Show API key"}
                       >
-                        {showProviderKey ? "🙈" : "👁️"}
+                        {showProviderKey ? "Hide" : "Show"}
                       </button>
                     </div>
                     <small>🔒 Protected by OS Keyring (Windows Credential Manager / Keychain). Zero plaintext disk storage.</small>
@@ -909,7 +1006,7 @@ export default function ModelApiStudioModal({
 
                 <div className="studio-form-actions">
                   <button type="submit" className="studio-primary-btn" disabled={fetchingModels || !providerUrl.trim()}>
-                    {fetchingModels ? "🔄 Probing Provider & Fetching Models..." : "🔍 Fetch & Discover Models"}
+                    {fetchingModels ? "Probing provider & fetching models…" : "Discover Models"}
                   </button>
                 </div>
               </form>
@@ -1087,7 +1184,7 @@ export default function ModelApiStudioModal({
                   className="studio-refresh-btn"
                   onClick={() => setActiveTab("add_provider")}
                 >
-                  ➕ Add New Provider
+                  Add New Provider
                 </button>
               </div>
 
@@ -1112,11 +1209,17 @@ export default function ModelApiStudioModal({
                           </span>
                           <button
                             type="button"
-                            className="studio-delete-btn"
+                            className={`studio-delete-btn ${pendingDelete?.kind === "provider" && pendingDelete?.id === prov.id ? "armed" : ""}`}
                             onClick={() => handleDeleteProvider(prov.id)}
-                            title="Delete provider and purge keyring credentials"
+                            title={
+                              pendingDelete?.kind === "provider" && pendingDelete?.id === prov.id
+                                ? "Click again to confirm — this purges keyring credentials"
+                                : "Delete provider and purge keyring credentials"
+                            }
                           >
-                            🗑️
+                            {pendingDelete?.kind === "provider" && pendingDelete?.id === prov.id
+                              ? "Confirm delete?"
+                              : "Remove"}
                           </button>
                         </div>
                       </div>
@@ -1148,10 +1251,10 @@ export default function ModelApiStudioModal({
                             setProviderName(prov.name);
                             setProviderUrl(prov.base_url);
                             setActiveTab("add_provider");
-                            handleDiscoverModels();
+                            handleDiscoverModels(null, prov.base_url);
                           }}
                         >
-                          🔄 Re-discover / Import More Models
+                          Re-discover / Import More Models
                         </button>
                       </div>
                     </div>
@@ -1219,8 +1322,9 @@ export default function ModelApiStudioModal({
                                 setShowKey((prev) => ({ ...prev, [account]: !prev[account] }))
                               }
                               title="Toggle Key Visibility"
+                              aria-label={isVisible ? "Hide key" : "Show key"}
                             >
-                              {isVisible ? "🙈" : "👁️"}
+                              {isVisible ? "Hide" : "Show"}
                             </button>
                           </div>
                           <button

@@ -168,7 +168,7 @@ function splitEmbeddedCodeBlocks(str) {
 
 function renderInlineFormatting(str) {
   if (!str) return null;
-  const parts = str.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\bO\([1n](?:\s*log\s*n|\^2)?\))/g);
+  const parts = str.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g);
   return parts.map((part, idx) => {
     if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
       return (
@@ -182,13 +182,6 @@ function renderInlineFormatting(str) {
     }
     if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
       return <em key={idx}>{part.slice(1, -1)}</em>;
-    }
-    if (/^O\([1n](?:\s*log\s*n|\^2)?\)$/.test(part)) {
-      return (
-        <span key={idx} className="fmt-complexity-badge">
-          {part}
-        </span>
-      );
     }
     return part;
   });
@@ -250,7 +243,7 @@ function renderTextStructure(textStr, baseKey) {
       if (numMatch) {
         elements.push(
           <div key={elKey} className="fmt-list-item">
-            <span className="fmt-list-num">{numMatch[1]}</span>
+            <span className="fmt-list-num">{numMatch[1]}.</span>
             <div className="fmt-list-content">{renderInlineFormatting(numMatch[2])}</div>
           </div>
         );
@@ -261,27 +254,8 @@ function renderTextStructure(textStr, baseKey) {
       if (bulletMatch) {
         elements.push(
           <div key={elKey} className="fmt-list-item">
-            <span className="fmt-list-bullet">◆</span>
+            <span className="fmt-list-bullet">•</span>
             <div className="fmt-list-content">{renderInlineFormatting(bulletMatch[1])}</div>
-          </div>
-        );
-        return;
-      }
-
-      if (/^(However,|Both solutions|Recommendation:|Synthesis:|In conclusion,|Note:|Important:)/i.test(line)) {
-        elements.push(
-          <div key={elKey} className="fmt-takeaway-box">
-            {renderInlineFormatting(line)}
-          </div>
-        );
-        return;
-      }
-
-      if (/time complexity|space complexity|O\(log n\)|O\(n log n\)|O\(n\)|O\(1\)/i.test(line)) {
-        elements.push(
-          <div key={elKey} className="fmt-analysis-card">
-            <div className="fmt-analysis-title">Technical Complexity Breakdown</div>
-            <div className="fmt-analysis-content">{renderInlineFormatting(line)}</div>
           </div>
         );
         return;

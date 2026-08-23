@@ -15,6 +15,7 @@ import { useEscapeKey } from "./hooks/useEscapeKey.js";
 import Header from "./components/Header.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import HomeHero from "./components/HomeHero.jsx";
+import NewChatGreeting from "./components/NewChatGreeting.jsx";
 import ChatThread from "./components/ChatThread.jsx";
 import PlaceholderView from "./components/PlaceholderView.jsx";
 import ChatInputBar from "./components/ChatInputBar.jsx";
@@ -95,6 +96,9 @@ export default function CalienneDashboard({ onExitLanding = null }) {
   });
   const [activeId, setActiveId] = useState(null);
   const [messages, setMessages] = useState([]);
+  // 0 = fresh session (full HomeHero). Incremented on each "New Conversation" click so the
+  // blank-thread greeting renders instead, and its entrance animation replays via key.
+  const [newChatCount, setNewChatCount] = useState(0);
   const [typingAgent, setTypingAgent] = useState(null);
   const [streaming, setStreaming] = useState(false);
   const sendingRef = useRef(false);
@@ -320,6 +324,7 @@ export default function CalienneDashboard({ onExitLanding = null }) {
     setMessages([]);
     setView("home");
     setInputValue("");
+    setNewChatCount((c) => c + 1);
   }, [cancelActiveStream]);
 
   const deleteConversation = useCallback(async (convId) => {
@@ -568,9 +573,6 @@ export default function CalienneDashboard({ onExitLanding = null }) {
 
   return (
     <div className="calienne-app">
-      <div className="fx-scanlines" aria-hidden="true" />
-      <div className="fx-noise" aria-hidden="true" />
-
       <Header
         models={models} toggleModel={toggleModel} addModel={addModel}
         isAdmin={!currentUser || currentUser?.role === "admin" || currentUser?.role === "user"} userEmail={currentUser?.email}
@@ -610,13 +612,15 @@ export default function CalienneDashboard({ onExitLanding = null }) {
                   isNarrow={isNarrow}
                 />
                 </div>
-              ) : (
+              ) : newChatCount === 0 ? (
                 <HomeHero
                   onQuickPrompt={(t) => handleSend(t)}
                   onFocusInput={() => inputRef.current?.focus()}
                   onOpenSettings={openSettingsView}
                   onOpenTelemetry={openTelemetryPanel}
                 />
+              ) : (
+                <NewChatGreeting key={newChatCount} user={currentUser} />
               )
             ) : view === "settings" || view === "integrations" ? (
               <div className="settings-page-wrapper">
