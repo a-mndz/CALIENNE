@@ -109,6 +109,8 @@ calienne now incorporates the Adaptive Multi-Model Reasoning Orchestrator (CALIE
   * `/sessions`, `/sessions/{session_id}`, `/sessions/{session_id}/history` - Manage conversation sessions.
   * `/checkpoints/{request_id}`, `/checkpoints/{checkpoint_id}/restore` - Pipeline checkpoints.
   * `/providers/health`, `/providers/{provider_name}/recovery` - Monitor and recover provider health.
+  * `/providers/discover`, `/providers` (GET/POST), `/providers/{provider_id}` (DELETE) - Custom-provider management. `discover` probes a base URL for its model list behind an SSRF guard: the host is DNS-resolved and link-local/reserved/multicast ranges are blocked, while loopback and RFC1918 stay allowed for local LLM gateways (Ollama / vLLM / LiteLLM); httpx redirect hops are re-validated so a redirect cannot escape the guard. Provider secrets are stored in the OS keyring, never in the database.
+  * `/strategy/mode` - Switch FREE / HYBRID / PAID at runtime.
   * `/telemetry` - Aggregated metrics for decision engine, resources, and security.
   * `/auth/login`, `/auth/register`, `/auth/logout`, `/auth/refresh` - Secure authentication routes with rate limiting.
   * `/conversations` - List (ordered by recency) and save conversations; `DELETE /api/conversations/{id}` removes one, `DELETE /api/conversations` purges every conversation owned by the caller (GDPR Art. 17 erasure - sessions cascade to messages).
@@ -120,6 +122,7 @@ calienne now incorporates the Adaptive Multi-Model Reasoning Orchestrator (CALIE
 ### 5. Persistent Storage, Memory & Security Layer
 * **PostgreSQL ORM Layer (`core/database.py` & `core/models.py`)**: Stores user accounts (`User`), active dialogue sessions (`ConversationSessionRecord`), and historical turns (`ConversationMessageRecord`) via SQLAlchemy 2.0 async sessions. Sessions carry `owner_email` — per-user isolation is a row-level property (HIGH-015).
 * **Enterprise Auth & CSRF Protection (`core/security.py`)**: All sensitive operations enforce JWT authentication delivered via `httpOnly`, `SameSite=Strict` cookies, with automatic CSRF origin verification on state-changing requests.
+* **Role-Based Access Control**: Accounts register as `user`; the **first account registered on a fresh deployment bootstraps as `admin`**. `require_role` is enforced identically in every environment — including development — with no bypasses and no startup mass-promotion. Admin-only surface: custom provider/model management, the key vault, and strategy switching; the frontend surfaces an explicit admin-required message for non-admin sessions instead of failing silently.
 * **Owner-Scoped Turn Memory (`orchestrator/memory_search.py`)**: Stored turns are lexically searchable per user — PostgreSQL `tsvector` generated column + GIN index, no LLM extraction (ReFind pattern). When a query endpoint receives no client history, it is hydrated from the owner's recent plus topically relevant turns. Tenancy is enforced in SQL: every statement joins `conversation_sessions` and filters `owner_email`, and a missing owner returns nothing (fail-closed). Hydration itself is fail-open — a storage hiccup degrades to no memory, never a failed query. Requires migration 005 (`alembic upgrade head`).
 
 ---
@@ -274,7 +277,7 @@ pip install keyring
 "..."          | keyring set Calienne UNLI_DEV_API_KEY
 ```
 
-The keyring service name is `Calienne` (with automatic fallback to `Calienne` for backward compatibility). The account names are the bare config field names.
+The keyring service name is `Calienne`. The account names are the bare config field names.
 
 Use `.env` only for non-secret local runtime settings, for example:
 ```bash
@@ -303,10 +306,12 @@ python main.py --web
 
 The dashboard is served from `frontend/dist/` — build it first (`cd frontend && npm install && npm run build`) or run the Vite dev server against the API in development.
 
+The **Model & Provider Studio** (gear icon → settings) manages the model fleet from the UI: add custom providers by URL + API key, auto-discover and import their models, assign pipeline roles (generation / judge / breaker), reorder fallback chains, and store provider keys in the OS keyring vault. Mutations are admin-only and every action reports failures inline (expired-session redirect, admin-required messages, backend error detail).
+
 ### Deployment notes
 * Run `alembic upgrade head` before serving traffic — the chain runs 001→005 (004 adds `updated_at` for recency ordering; 005 adds the memory-search `tsvector` column + GIN/composite indexes). Startup verifies the schema revision and refuses to boot on drift, so a skipped migration fails loudly, not silently.
 * Production (`CALIENNE_ENVIRONMENT=production`) hard-requires: a real provider key (simulation fallback refused), `CALIENNE_METRICS_TOKEN` (the `/metrics` endpoint refuses to serve without it), `DATABASE_SSL=true`, and an explicit CORS origin allowlist (wildcards are rejected at startup).
-* Both `/api/config/vault` endpoints are admin-only; the frontend degrades gracefully for non-admins.
+* All model/provider mutations — `/api/providers*`, `/api/models/*`, `/api/config/vault`, `/api/strategy/mode` — are admin-only; the first account registered on a fresh deployment is the bootstrap admin.
 
 ---
 
