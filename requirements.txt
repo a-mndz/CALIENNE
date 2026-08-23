@@ -29,4 +29,5 @@ pgvector>=0.2.0
 # venv but intentionally undeclared until the tracing step lands.
 structlog>=26.1.0
 prometheus-client>=0.24.1
+backports.tarfile>=1.2.0; python_version < '3.12'
 
