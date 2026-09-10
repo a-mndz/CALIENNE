@@ -9,8 +9,11 @@ from typing import Any
 
 from core.schemas import PipelineBudget, StrategicPlan, TaskGraph, TaskNode, TaskProfile
 from orchestrator.contracts import FailureContract, InputContract, OutputContract
+from orchestrator.planner_command import DispatchNode, FanOut, SkipNode, apply_skip_node
 from orchestrator.routing import get_template, validate_or_fallback
-from orchestrator.skills import SkillComposer, SkillComposition
+from orchestrator.skills import KNOWN_SKILL_NAMES, SkillComposer, SkillComposition
+
+_KNOWN_SKILLS = frozenset(KNOWN_SKILL_NAMES)
 
 
 def _input_contract(*required_fields: str) -> InputContract:
@@ -133,6 +136,119 @@ class ExecutionPlanner:
         strategic_plan: StrategicPlan,
         budget: PipelineBudget,
     ) -> TaskGraph:
+        if strategic_plan.commands:
+            has_dispatch_or_fanout = any(
+                isinstance(cmd, (DispatchNode, FanOut)) for cmd in strategic_plan.commands
+            )
+            if has_dispatch_or_fanout:
+                nodes: list[TaskNode] = []
+                seen_ids: set[str] = set()
+
+                for cmd in strategic_plan.commands:
+                    if isinstance(cmd, DispatchNode):
+                        task_id = cmd.task_id or cmd.worker
+                        if task_id in seen_ids:
+                            count = sum(1 for sid in seen_ids if sid.startswith(task_id)) + 1
+                            task_id = f"{task_id}_{count}"
+                        seen_ids.add(task_id)
+
+                        objective = cmd.payload.get("objective") or f"Execute {cmd.worker} task"
+                        skills = [
+                            s
+                            for s in (
+                                [cmd.worker]
+                                if cmd.worker in _KNOWN_SKILLS
+                                else (strategic_plan.required_skills or [])
+                            )
+                            if s in _KNOWN_SKILLS
+                        ]
+                        if not skills:
+                            skills = ["explainer"]
+                        tier = cmd.payload.get("tier", self._choose_tier(task_profile))
+                        priority = cmd.payload.get("priority", "normal")
+                        deps = list(cmd.depends_on)
+                        can_parallel = cmd.payload.get("can_run_parallel", not bool(deps))
+
+                        nodes.append(
+                            self._make_node(
+                                task_id,
+                                objective,
+                                depends_on=deps,
+                                skills=skills,
+                                tier=tier,
+                                priority=priority,
+                                input_fields=tuple(cmd.payload.get("input_fields", ("request",))),
+                                output_fields=tuple(
+                                    cmd.payload.get("output_fields", (f"{task_id}_output",))
+                                ),
+                                can_run_parallel=can_parallel,
+                                expected_tokens=cmd.payload.get(
+                                    "expected_tokens", max(100, int(budget.total_tokens * 0.05))
+                                ),
+                                expected_latency_ms=cmd.payload.get("expected_latency_ms", 30),
+                            )
+                        )
+                    elif isinstance(cmd, FanOut):
+                        prefix = cmd.task_prefix or cmd.worker
+                        deps = list(cmd.depends_on)
+                        skills = [
+                            s
+                            for s in (
+                                [cmd.worker]
+                                if cmd.worker in _KNOWN_SKILLS
+                                else (strategic_plan.required_skills or [])
+                            )
+                            if s in _KNOWN_SKILLS
+                        ]
+                        if not skills:
+                            skills = ["explainer"]
+
+                        for idx, payload in enumerate(cmd.payloads, start=1):
+                            task_id = f"{prefix}_{idx}"
+                            seen_ids.add(task_id)
+                            objective = payload.get("objective") or f"Execute {cmd.worker} shard {idx}"
+                            tier = payload.get("tier", self._choose_tier(task_profile))
+                            priority = payload.get("priority", "normal")
+
+                            nodes.append(
+                                self._make_node(
+                                    task_id,
+                                    objective,
+                                    depends_on=list(deps),
+                                    skills=skills,
+                                    tier=tier,
+                                    priority=priority,
+                                    input_fields=tuple(payload.get("input_fields", ("request",))),
+                                    output_fields=tuple(
+                                        payload.get("output_fields", (f"{task_id}_output",))
+                                    ),
+                                    can_run_parallel=True,
+                                    expected_tokens=payload.get(
+                                        "expected_tokens", max(100, int(budget.total_tokens * 0.05))
+                                    ),
+                                    expected_latency_ms=payload.get("expected_latency_ms", 30),
+                                )
+                            )
+
+                for cmd in strategic_plan.commands:
+                    if isinstance(cmd, SkipNode):
+                        nodes = apply_skip_node(nodes, cmd.stage)
+
+                root_id = nodes[0].task_id if nodes else ""
+                final_id = nodes[-1].task_id if nodes else ""
+                for n in nodes:
+                    if n.task_id == "classify":
+                        root_id = "classify"
+                    if n.task_id == "final":
+                        final_id = "final"
+
+                return TaskGraph(
+                    nodes=nodes,
+                    root_task_id=root_id,
+                    final_task_id=final_id,
+                    planner_version=self.version,
+                )
+
         nodes: list[TaskNode] = [
             self._make_node(
                 "classify",
@@ -201,10 +317,20 @@ class ExecutionPlanner:
             )
         )
 
+        if strategic_plan.commands:
+            for cmd in strategic_plan.commands:
+                if isinstance(cmd, SkipNode):
+                    nodes = apply_skip_node(nodes, cmd.stage)
+
+        has_classify = any(n.task_id == "classify" for n in nodes)
+        root_id = "classify" if has_classify else (nodes[0].task_id if nodes else "")
+        has_final = any(n.task_id == "final" for n in nodes)
+        final_id = "final" if has_final else (nodes[-1].task_id if nodes else "")
+
         return TaskGraph(
             nodes=nodes,
-            root_task_id="classify",
-            final_task_id="final",
+            root_task_id=root_id,
+            final_task_id=final_id,
             planner_version=self.version,
         )
 

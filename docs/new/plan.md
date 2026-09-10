@@ -312,3 +312,12 @@ All four tools run in CI; any failure blocks merge.
   - `orchestrator/{strategic_planner,execution_planner,resource_manager,meta_reasoner,contracts,knowledge_layer,reasoning_layer,validation_layer,execution_replay,experience_db,prediction,budget,context_manager,execution_manager,scheduler,performance,uncertainty,repair,consensus,retrieval,memory_hierarchy,routing_feedback,versioning,execution_manifest,feature_flags,skills,planner,routing}.py`
   - `api_gateway/capabilities.py`
   - `core/base.py`
+
+## 8. Guardrails (deferred, v2 candidate)
+
+CALIENNE v1 intentionally separates correctness and safety validation from execution logic:
+- **Soft End-of-Run Firewall**: Implemented at [`orchestrator/validation_layer.py:91-131`](../orchestrator/validation_layer.py#L91-L131), evaluating confidence, unsupported claim counts, and contradictions before synthesis.
+- **Per-Node Contract Validation**: Implemented at [`orchestrator/contracts.py:79-122`](../orchestrator/contracts.py#L79-L122), asserting input presence (`validate_inputs`) and output schema compliance (`validate_outputs`) for each DAG node.
+
+While OpenAI Agents SDK 0.22.0 introduces inline tripwire primitives (`input_guardrail` and `output_guardrail`) that immediately abort or raise exceptions on prompt injection / safety breaches, CALIENNE defers inline tripwires to v2. Calienne's current architecture uses ADR-006 ("Validation Layer Always Runs") and the bounded repair loop (`orchestrator/repair.py`) to absorb recoverable deviations, reserving strict tripwires for when concrete untrusted-input poisoning vectors demand immediate branch termination.
+

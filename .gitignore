@@ -46,11 +46,16 @@ session-*.md
 .impeccable/
 .ua/
 
-# Python Coverage
+# Python Coverage & Test Caches
 .coverage
 coverage.xml
 htmlcov/
 .pytest_cache/
+.hypothesis/
+
+# Scratch & temporary scripts
+scratch/
+scratch_*.py
 
 # Node
 node_modules/
@@ -105,3 +110,7 @@ telemetry/replays/
 
 # pyenv local version pin
 .python-version
+research/CALIENNE_RESEARCH_ROADMAP.md
+research/CALIENNE_CODEBASE_OVERVIEW.md
+research/TODO_*/
+ORIGINAL_REQUEST.md

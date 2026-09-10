@@ -14,11 +14,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import (
     JSON,
+    Computed,
     DateTime,
+    FetchedValue,
     Float,
     ForeignKey,
     Index,
@@ -27,9 +29,16 @@ from sqlalchemy import (
     Text,
     Uuid,
 )
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.database import Base
+
+try:
+    from pgvector.sqlalchemy import Vector
+    _VectorType = Vector(1024).with_variant(JSON, "sqlite")
+except Exception:
+    _VectorType = JSON
 
 
 def _utcnow() -> datetime:
@@ -66,7 +75,12 @@ class ConversationSessionRecord(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     session_id: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
-    owner_email: Mapped[Optional[str]] = mapped_column(String(255), index=True, nullable=True)
+    owner_email: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        ForeignKey("users.email", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
+    )
     title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     state: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
     total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -84,10 +98,12 @@ class ConversationSessionRecord(Base):
     messages: Mapped[list["ConversationMessageRecord"]] = relationship(
         back_populates="session",
         cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
     __table_args__ = (
         Index("ix_sessions_owner_created", "owner_email", "created_at"),
+        Index("ix_sessions_owner_updated", "owner_email", "updated_at"),
     )
 
 
@@ -109,8 +125,18 @@ class ConversationMessageRecord(Base):
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
+    content_tsv: Mapped[Optional[Any]] = mapped_column(
+        TSVECTOR().with_variant(Text, "sqlite"),
+        server_default=FetchedValue(),
+        nullable=True,
+    )
 
     session: Mapped[ConversationSessionRecord] = relationship(back_populates="messages")
+
+    __table_args__ = (
+        Index("ix_conversation_messages_tsv", "content_tsv", postgresql_using="gin"),
+        Index("ix_conversation_messages_session_ts", "session_id", "timestamp"),
+    )
 
 
 class CheckpointRecord(Base):
@@ -121,9 +147,15 @@ class CheckpointRecord(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     checkpoint_id: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     request_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
-    user_email: Mapped[Optional[str]] = mapped_column(String(255), index=True, nullable=True)
+    session_id: Mapped[Optional[str]] = mapped_column(String(64), index=True, nullable=True)
+    user_email: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        ForeignKey("users.email", ondelete="CASCADE"),
+        index=True,
+        nullable=True,
+    )
     stage: Mapped[str] = mapped_column(String(64), nullable=False)
-    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    payload: Mapped[dict] = mapped_column(JSON().with_variant(JSONB, "postgresql"), nullable=False, default=dict)
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
@@ -208,10 +240,34 @@ class ExperienceLearningRecord(Base):
     user_satisfaction: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     graph_mutation_audit: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     replay_trace_id: Mapped[Optional[str]] = mapped_column(String(64), index=True, nullable=True)
+    embedding: Mapped[Optional[list[float]]] = mapped_column(_VectorType, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
 
     __table_args__ = (
         Index("ix_experience_learning_created", "created_at"),
+    )
+
+
+class DocumentChunkRecord(Base):
+    """Persistent document chunk with 1024-dim pgvector embedding (P1-03 / GAP-RAG-02)."""
+
+    __tablename__ = "document_chunks"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    document_id: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    token_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    metadata_payload: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=False, default=dict
+    )
+    embedding: Mapped[Optional[list[float]]] = mapped_column(_VectorType, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_document_chunks_doc_idx", "document_id", "chunk_index"),
     )

@@ -5,7 +5,10 @@ import LiveSparkline from "./LiveSparkline.jsx";
 import { StatTileSkeleton } from "./Skeleton.jsx";
 import { INSIGHTS } from "../constants/insights.js";
 
-const RightPanel = memo(function RightPanel({ open, stats, models, conversations, activeId, onSelect, isNarrow, isLoaded, onClose }) {
+const RightPanel = memo(function RightPanel({
+  open, stats, models, conversations, activeId, onSelect, isNarrow, isLoaded, onClose,
+  insights = INSIGHTS,
+}) {
   const innerRef = useRef(null);
   useFocusTrap(open && isNarrow, innerRef);
   return (
@@ -74,11 +77,11 @@ const RightPanel = memo(function RightPanel({ open, stats, models, conversations
         <div className="panel-block">
           <div className="panel-head">Calienne insights</div>
           <div className="insight-list">
-            {INSIGHTS.map((insight, i) => (
+            {(insights || INSIGHTS).map((insight, i) => (
               <div className="insight-row" key={i}>
-                {insight.kind === "warn" ? <AlertTriangle size={14} className="ins-warn" /> : <Check size={14} className="ins-ok" />}
+                {(insight.kind === "warn" || insight.status === "warn") ? <AlertTriangle size={14} className="ins-warn" /> : <Check size={14} className="ins-ok" />}
                 <div>
-                  <div className="insight-title">{insight.title}</div>
+                  <div className="insight-title">{insight.title || insight.text}</div>
                   <div className="insight-sub">{insight.sub}</div>
                 </div>
               </div>

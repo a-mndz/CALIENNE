@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 from pydantic import Field as PField
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -28,6 +28,8 @@ class ConversationSaveRequest(_StrictRequestModel):
 
 @router.get("/api/conversations")
 async def get_conversations(
+    limit: int = 50,
+    offset: int = 0,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -37,6 +39,8 @@ async def get_conversations(
         .where(ConversationSessionRecord.owner_email == current_user.email)
         .options(selectinload(ConversationSessionRecord.messages))
         .order_by(ConversationSessionRecord.updated_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
     res = await db.execute(stmt)
     sessions = res.scalars().all()
@@ -91,20 +95,25 @@ async def save_conversation(
         )
         db.add(session_rec)
         await db.flush()
+        new_turns = req.transcript
     else:
         session_rec.title = req.title[:255]
         session_rec.state = req.mode[:32]
-        session_rec.turn_count = len(req.transcript)
-        # Force the bump even when title/state/turn_count are unchanged, so a
-        # re-save always refreshes list ordering (onupdate fires only on UPDATE).
         session_rec.updated_at = datetime.now(timezone.utc)
-        await db.execute(
-            delete(ConversationMessageRecord).where(
-                ConversationMessageRecord.session_id == session_rec.id
+        existing_count = len(session_rec.messages) if session_rec.messages else 0
+        if len(req.transcript) < existing_count:
+            # Client truncated or reset conversation: wipe and re-insert
+            await db.execute(
+                delete(ConversationMessageRecord).where(
+                    ConversationMessageRecord.session_id == session_rec.id
+                )
             )
-        )
+            new_turns = req.transcript
+        else:
+            # Append-only: preserve existing message IDs and prevent O(N^2) churn
+            new_turns = req.transcript[existing_count:]
 
-    for turn in req.transcript:
+    for turn in new_turns:
         msg_text = turn.get("text") or ""
         msg_role = turn.get("role") or "user"
         msg_rec = ConversationMessageRecord(
@@ -149,12 +158,14 @@ async def purge_conversations(
     messages (ON DELETE CASCADE), and the memory-search index is a GENERATED
     column over those messages, so nothing user-authored survives this call.
     """
-    stmt = select(ConversationSessionRecord).where(
+    stmt_count = select(func.count(ConversationSessionRecord.id)).where(
         ConversationSessionRecord.owner_email == current_user.email
     )
-    res = await db.execute(stmt)
-    sessions = res.scalars().all()
-    for session_rec in sessions:
-        await db.delete(session_rec)
+    count = (await db.scalar(stmt_count)) or 0
+    await db.execute(
+        delete(ConversationSessionRecord).where(
+            ConversationSessionRecord.owner_email == current_user.email
+        )
+    )
     await db.commit()
-    return {"status": "purged", "deleted_sessions": len(sessions)}
+    return {"status": "purged", "deleted_sessions": count}

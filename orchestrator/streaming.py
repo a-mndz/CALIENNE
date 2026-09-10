@@ -55,6 +55,8 @@ class EventType(str, Enum):
     RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
     QUEUE_FULL = "queue_full"
     PROVIDER_DEGRADED = "provider_degraded"
+    TOKEN_DELTA = "token_delta"
+    CONSENSUS_COMPUTED = "consensus_computed"
 
 
 # ── Stream Event ─────────────────────────────────────────────────────────

@@ -106,6 +106,16 @@ FREE_MODELS: Dict[str, List[str]] = {
         "groq/openai/gpt-oss-120b",
         "groq/openai/gpt-oss-20b",
     ],
+    "logician": [
+        "groq/openai/gpt-oss-120b",
+        "google/gemini-3.5-flash-lite",
+        "groq/openai/gpt-oss-20b",
+    ],
+    "creative": [
+        "google/gemini-3.5-flash-lite",
+        "groq/openai/gpt-oss-120b",
+        "groq/openai/gpt-oss-20b",
+    ],
     "breaker": [
         "google/gemini-3.5-flash-lite",
         "groq/openai/gpt-oss-20b",
@@ -118,6 +128,16 @@ FREE_MODELS: Dict[str, List[str]] = {
 
 HYBRID_MODELS: Dict[str, List[str]] = {
     "generation": [
+        "google/gemini-3.7-flash",
+        "groq/openai/gpt-oss-120b",
+        "google/gemini-3.5-flash-lite",
+    ],
+    "logician": [
+        "groq/openai/gpt-oss-120b",
+        "google/gemini-3.7-flash",
+        "google/gemini-3.5-flash-lite",
+    ],
+    "creative": [
         "google/gemini-3.7-flash",
         "groq/openai/gpt-oss-120b",
         "google/gemini-3.5-flash-lite",
@@ -135,6 +155,16 @@ HYBRID_MODELS: Dict[str, List[str]] = {
 
 PAID_MODELS: Dict[str, List[str]] = {
     "generation": [
+        "openrouter/anthropic/claude-sonnet-5",
+        "google/gemini-pro-latest",
+        "google/gemini-3.7-flash",
+    ],
+    "logician": [
+        "google/gemini-pro-latest",
+        "openrouter/anthropic/claude-sonnet-5",
+        "google/gemini-3.7-flash",
+    ],
+    "creative": [
         "openrouter/anthropic/claude-sonnet-5",
         "google/gemini-pro-latest",
         "google/gemini-3.7-flash",

@@ -120,6 +120,10 @@ class AgentOutput(CalienneBaseModel):
         ...,
         description="Agent self-assessed confidence.",
     )
+    token_count: int = Field(
+        default=0,
+        description="Observed or estimated token count for this output.",
+    )
 
     @field_validator("confidence", mode="before")
     @classmethod
@@ -202,6 +206,10 @@ class calienneOutput(CalienneBaseModel):
     validation_score: float = Field(
         ...,
         description="Scoring indicating overall logical consistency.",
+    )
+    token_count: int = Field(
+        default=0,
+        description="Total token count consumed during reasoning and synthesis.",
     )
 
 
@@ -312,6 +320,7 @@ class StrategicPlan(CalienneBaseModel):
     success_criteria: list[str] = Field(default_factory=list)
     required_skills: list[str] = Field(default_factory=list)
     risk_notes: list[str] = Field(default_factory=list)
+    commands: list["PlannerCommand"] = Field(default_factory=list)
 
 
 class PipelineBudget(CalienneBaseModel):
@@ -435,10 +444,12 @@ class VersionStamp(CalienneBaseModel):
     graph_fingerprint: str | None = None
 
 
-# Resolve forward references introduced by Step 2 contracts.
+# Resolve forward references introduced by Step 2 contracts and PlannerCommand.
 from orchestrator.contracts import FailureContract, InputContract, OutputContract
 from orchestrator.execution_manifest import ExecutionManifest
+from orchestrator.planner_command import PlannerCommand
 
 PipelinePlan.model_rebuild()
 TaskNode.model_rebuild()
 TaskGraph.model_rebuild()
+StrategicPlan.model_rebuild()

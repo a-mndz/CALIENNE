@@ -102,3 +102,39 @@ class TestHistoryManagement:
         self.director.add_turn(self.session_id, "assistant", "B", token_count=8)
         metadata = self.director.get_metadata(self.session_id)
         assert metadata["total_tokens"] == 13
+
+
+@pytest.mark.asyncio
+async def test_conversation_director_db_sync_round_trip(tmp_path: Any) -> None:
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+    import core.models
+
+    db_path = tmp_path / "test_conv.db"
+    test_engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
+    async with test_engine.begin() as conn:
+        await conn.run_sync(lambda sc: core.models.User.__table__.create(sc))
+        await conn.run_sync(lambda sc: core.models.ConversationSessionRecord.__table__.create(sc))
+        await conn.run_sync(lambda sc: core.models.ConversationMessageRecord.__table__.create(sc))
+
+    session_factory = async_sessionmaker(bind=test_engine, class_=AsyncSession, expire_on_commit=False)
+
+    director = ConversationDirector()
+    director.create_session("sess-db-1", owner_email="user@test.com")
+    director.add_turn("sess-db-1", "user", "Test question", token_count=4)
+    director.add_turn("sess-db-1", "assistant", "Test answer", token_count=6)
+
+    async with session_factory() as db_session:
+        await director.persist_session_to_db("sess-db-1", db_session)
+
+    new_director = ConversationDirector()
+    async with session_factory() as db_session:
+        loaded = await new_director.load_session_from_db("sess-db-1", db_session)
+
+    assert loaded is not None
+    assert loaded.session_id == "sess-db-1"
+    assert loaded.owner_email == "user@test.com"
+    assert len(loaded.history) == 2
+    assert loaded.total_tokens == 10
+
+    await test_engine.dispose()
+

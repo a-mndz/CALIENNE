@@ -358,10 +358,19 @@ class ClaimManager:
         claim.provenance = existing_provenance
 
         if supporting_evidence:
-            claim.validation_status = (
-                ValidationStatus.CONTRADICTED if contradicted else ValidationStatus.VERIFIED
+            has_ground_truth = any(
+                item.get("evidence_type") != "reasoning"
+                for item in supporting_evidence
             )
-            claim.confidence = 0.2 if contradicted else 0.85
+            if claim.claim_type == ClaimType.FACTUAL and not has_ground_truth:
+                claim.validation_status = ValidationStatus.UNVERIFIED
+                claim.confidence = 0.45
+                existing_provenance["unverified_reason"] = "circular_sibling_reasoning_only"
+            else:
+                claim.validation_status = (
+                    ValidationStatus.CONTRADICTED if contradicted else ValidationStatus.VERIFIED
+                )
+                claim.confidence = 0.2 if contradicted else 0.85
         else:
             claim.validation_status = ValidationStatus.UNVERIFIED
             claim.confidence = 0.25

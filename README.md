@@ -41,13 +41,18 @@ Dedicated dark-mode glassmorphism login and registration page (`/login`) with JW
 
 * **Core Backend:** Python 3.11+ (`asyncio`, `httpx.AsyncClient`)
 * **API Framework:** FastAPI & Uvicorn for asynchronous server endpoints with strict CORS allowlists and CSRF origin checks
-* **Database & Persistence:** Async PostgreSQL via SQLAlchemy 2.0 (`asyncpg`) with an Alembic-managed schema (001→005) — startup verifies the database is at the required revision and refuses to boot on drift
+* **Database & Persistence:** Async PostgreSQL via SQLAlchemy 2.0 (`asyncpg`) with an Alembic-managed schema (001→007) and `pgvector` dense embeddings — startup verifies the database is at the required revision and refuses to boot on drift
+* **Dense Vector & Semantic RAG:** `pgvector` 1024-dim dense embeddings (`orchestrator/embeddings.py`), HNSW index search, syntax-aware recursive document chunking (`core/chunking.py`), and Reciprocal Rank Fusion (`orchestrator/retrieval.py`)
+* **Agent Execution Tools:** Sandboxed Python REPL (`PythonREPLTool` in `core/tools.py`) with AST safety guardrails, structured web search matching `14_web_search.xml` (`WebSearchTool`), and JSON Schema tool registry (`ToolRegistry`)
+* **Frontier Reasoning & Search:** Tree-of-Thoughts / MCTS (`orchestrator/mcts.py`) guided by Process Reward Models (PRMs) for multi-step reasoning trajectories
+* **Multi-Judge Consensus:** Dynamic judge allocation and consensus engine (`orchestrator/decisions.py`) with telemetry tracking
+* **Calibrated Quality Evaluation:** Multi-dimensional 0–5 LLM-as-a-Judge semantic rubrics (`evals/rubric.py`) scoring Accuracy, Factual Consistency, and Reasoning Soundness
 * **Security & Auth:** Secure JWT authentication via `httpOnly`, `SameSite=Strict` cookies, password strength verification, and IP-scoped rate limiting
 * **Data Validation:** Pydantic V2 & Pydantic-Settings for config validation and data contracts
 * **Output Processing:** `json-repair` for parsing and correcting malformed JSON LLM outputs
 * **Prompt Layout:** Strictly validated XML formats layered dynamically at runtime
-* **Frontend Web Dashboard:** Modern React 19 + Vite + GSAP 3 animation engine with triadic dark-mode glassmorphism (`frontend/`)
-* **Authentication UI:** Dedicated responsive HTML5/CSS3 cosmic dark-mode login interface (`calienne_login.html`)
+* **Frontend Web Dashboard:** Modern React 19 + Vite + GSAP 3 animation engine with triadic dark-mode glassmorphism and restrained fluid motion architecture (`frontend/`)
+* **Authentication UI:** Dedicated responsive HTML5/CSS3 cosmic dark-mode login interface (`calienne_login.html`) with externalized streaming media
 * **LLM Providers:** Native integration with OpenRouter, OpenAI, Google AI Studio, Groq, and custom/local gateways (Ollama / vLLM / LiteLLM). Model routes verified live 2026-08; dead routes (GitHub Models, Llama 3.x, Claude 3.5) are gone from the strategy maps
 
 ---
@@ -224,6 +229,9 @@ That baseline is also the evidence the parked DAG verdict (behind all-off flags)
 | **Dark-mode Web UI** | A premium React 19 + GSAP glassmorphism interface with animated pipeline progress, expandable agent reasoning, telemetry dashboard, and responsive design. |
 | **Async-Native** | Built on `asyncio`, `httpx.AsyncClient`, and `FastAPI`. Handles concurrent agent calls without blocking. |
 | **Three Operating Modes** | `FREE` (open-weight models only), `HYBRID` (premium + free fallback), `PAID` (top-tier models only). Switch without code changes. |
+| **pgvector & Semantic RAG** | 1024-dim dense vector embeddings with HNSW indexing, syntax-preserving chunking, and Reciprocal Rank Fusion (RRF) for high-accuracy retrieval. |
+| **Agent Execution Tools** | Subprocess-isolated Python REPL with AST safety guards and structured web search tools for empirical verification. |
+| **Tree-of-Thoughts / MCTS** | Search guided by Process Reward Models (PRMs) exploring complex reasoning trajectories with backtracking. |
 
 ---
 
@@ -309,7 +317,12 @@ The dashboard is served from `frontend/dist/` — build it first (`cd frontend &
 The **Model & Provider Studio** (gear icon → settings) manages the model fleet from the UI: add custom providers by URL + API key, auto-discover and import their models, assign pipeline roles (generation / judge / breaker), reorder fallback chains, and store provider keys in the OS keyring vault. Mutations are admin-only and every action reports failures inline (expired-session redirect, admin-required messages, backend error detail).
 
 ### Deployment notes
-* Run `alembic upgrade head` before serving traffic — the chain runs 001→005 (004 adds `updated_at` for recency ordering; 005 adds the memory-search `tsvector` column + GIN/composite indexes). Startup verifies the schema revision and refuses to boot on drift, so a skipped migration fails loudly, not silently.
+* Run `alembic upgrade head` before serving traffic — the chain runs 001→007:
+  - 004 adds `updated_at` for recency ordering.
+  - 005 adds the memory-search `tsvector` column + GIN/composite indexes.
+  - 006 adds `ix_sessions_owner_updated` composite index, checkpoint `session_id`, and `ON DELETE CASCADE`.
+  - 007 enables the `vector` extension, adds `embedding vector(1024)` to `experience_learning`, and creates the `document_chunks` table with an HNSW cosine index.
+  Startup verifies the schema revision and refuses to boot on drift, so a skipped migration fails loudly, not silently.
 * Production (`CALIENNE_ENVIRONMENT=production`) hard-requires: a real provider key (simulation fallback refused), `CALIENNE_METRICS_TOKEN` (the `/metrics` endpoint refuses to serve without it), `DATABASE_SSL=true`, and an explicit CORS origin allowlist (wildcards are rejected at startup).
 * All model/provider mutations — `/api/providers*`, `/api/models/*`, `/api/config/vault`, `/api/strategy/mode` — are admin-only; the first account registered on a fresh deployment is the bootstrap admin.
 
@@ -322,6 +335,7 @@ calienne/
 ├── main.py                    # CLI entry point (REPL + --web flag)
 ├── server.py                  # FastAPI web server & auth/page routing
 ├── calienne_login.html        # Dedicated dark-mode login & sign-up UI (/login)
+├── AUDIT_AND_GAPS.md          # Multi-agent architectural audit & prioritized backlog
 ├── requirements.txt           # Backend dependency ranges (starlette floor ≥0.47.2)
 ├── requirements.lock          # Hashed pins — what CI installs (G4-verified)
 ├── requirements-dev.txt       # pytest / ruff (contributors + CI)
@@ -331,54 +345,57 @@ calienne/
 ├── core/
 │   ├── config.py              # Pydantic-Settings configuration loader
 │   ├── database.py            # Async SQLAlchemy engine & PostgreSQL session maker
-│   ├── models.py              # ORM models (User, ConversationSessionRecord, etc.)
+│   ├── models.py              # ORM models (User, ConversationSessionRecord, DocumentChunkRecord, etc.)
 │   ├── security.py            # JWT auth, password hashing & role enforcement
-│   └── schemas.py             # Pydantic V2 data contracts
+│   ├── schemas.py             # Pydantic V2 data contracts
+│   ├── chunking.py            # Recursive boundary-preserving document chunking engine (P1-04)
+│   └── tools.py               # Sandboxed Python REPL & WebSearchTool (P2-01)
 │
 ├── api_gateway/
-│   ├── client.py              # HTTPX AsyncClient + simulation mode
+│   ├── client.py              # HTTPX AsyncClient + non-blocking async file I/O
 │   ├── rate_limiter.py        # Semaphore, circuit breaker, retry-with-backoff
-│   └── strategy.py            # FREE / HYBRID / PAID model mapping
+│   └── strategy.py            # FREE / HYBRID / PAID model mapping (decoupled triadic roles)
 │
 ├── agents/
 │   ├── parser.py              # JSON repair + Pydantic validation pipeline
-│   └── personas.py            # System prompts (Breaker, Logician, Creative, etc.)
+│   ├── personas.py            # System prompts (Breaker, Logician, Creative, etc.)
+│   └── prompt_manager.py      # Prefix-caching byte-0 prompt assembler (P0-10)
 │
 ├── orchestrator/
 │   ├── pipelines.py           # Micro-Mode async execution pipeline (legacy, load-bearing)
 │   ├── evaluation.py          # Synthesis judge (arbitrate + validate, G1-delimited prompts)
-│   ├── claims.py              # Hallucination firewall: claim extraction + v2 measured
-│   │                          #   support scoring (coverage gate, frozen corpus G3)
-│   ├── memory_search.py       # Owner-scoped lexical turn search (tsvector + GIN) +
-│   │                          #   hydrate_history fallback for the query endpoints
+│   ├── claims.py              # Hallucination firewall: claim extraction + anti-circular GSAR rule
+│   ├── memory_search.py       # Owner-scoped lexical turn search (tsvector + GIN) + hydrate_history
 │   ├── reasoning_graph.py     # Failure-pattern graph (owner-scoped)
-│   ├── conversation.py        # Conversation state & dialogue tracking
-│   ├── streaming.py           # Real-time SSE event streaming
-│   ├── memory.py              # Epistemic failure-tracking bus (owner-scoped)
+│   ├── conversation.py        # Conversation state, DB persistence & dialogue tracking (P2-10)
+│   ├── streaming.py           # Real-time SSE token-level event streaming (P0-07)
+│   ├── memory.py              # Epistemic failure-tracking bus with token Jaccard retrieval
+│   ├── embeddings.py          # 1024-dim dense vector embedding service & cosine similarity (P1-03)
+│   ├── mcts.py                # Tree-of-Thoughts / MCTS guided by Process Reward Models (P2-04)
 │   │                          # --- Adaptive v1 runtime (flag-gated, default off) ---
 │   ├── feature_flags.py       # Typed CALIENNE_ENABLE_* accessor (env > file > off)
 │   ├── strategic_planner.py   # LLM-assisted decomposition → StrategicPlan
 │   ├── execution_planner.py   # Rule-based DAG builder + template fallback
 │   ├── scheduler.py           # Event-driven async scheduler (asyncio.Condition)
-│   ├── execution_manager.py   # Owns the event loop; builds & stamps the manifest
+│   ├── execution_manager.py   # Owns the event loop; builds & stamps the manifest; memory persistence
 │   ├── resource_manager.py    # Global/route/model concurrency ceilings (ADR-004)
 │   ├── prediction.py          # Cost/latency/token/confidence estimation
 │   ├── budget.py              # Token Budget Manager (circuit breaker)
-│   ├── context_manager.py     # Importance ranking + per-node window assembly
+│   ├── context_manager.py     # Strict context window capacity enforcement (P2-08)
 │   ├── skills.py              # Dynamic skill composition
 │   ├── meta_reasoner.py       # merge/skip/downgrade/reorder graph mutation
 │   ├── uncertainty.py         # Structured ClarificationRequest
 │   ├── repair.py              # Reflection/repair loop (max_repairs=2)
-│   ├── consensus.py           # Weighted multi-judge consensus
-│   ├── retrieval.py           # Smart RAG (SourceCandidate ranking)
-│   ├── memory_hierarchy.py    # short/long/user/agent/shared/vector layers
+│   ├── consensus.py           # Weighted multi-judge consensus engine (P1-01)
+│   ├── retrieval.py           # Smart RAG with Reciprocal Rank Fusion & reranking (P1-05)
+│   ├── memory_hierarchy.py    # short/long/user/agent/shared/vector layers (P1-06)
 │   ├── knowledge_layer.py     # RFC-001 retrieval + provenance
 │   ├── reasoning_layer.py     # RFC-001 generation (no retrieval/judging)
 │   ├── validation_layer.py    # RFC-001 judge/consensus/repair/firewall
 │   ├── versioning.py          # VersionStamp + SHA-256 graph fingerprint
 │   ├── execution_manifest.py  # Immutable per-artifact ExecutionManifest
 │   ├── execution_replay.py    # Replay/shadow/simulate traces (30-day retention)
-│   ├── experience_db.py       # ExperienceRepository (offline-only, two tables)
+│   ├── experience_db.py       # ExperienceRepository (offline-only, two tables, P2-02)
 │   └── contracts.py           # Per-node I/O + failure contracts (RFC-003 §3.4)
 │
 ├── prompts/
@@ -391,8 +408,10 @@ calienne/
 │   └── capabilities/          # model_capabilities, provider_limits, pricing,
 │                              # routing_defaults, prediction_calibration
 │
-├── migrations/                # Alembic chain 001 → 005 (005: memory-search
-│                              #   tsvector + GIN + (session_id, timestamp DESC))
+├── migrations/                # Alembic chain 001 → 007:
+│                              #   005: memory-search tsvector + GIN
+│                              #   006: session composite index + FK cascades
+│                              #   007: pgvector dense embeddings + HNSW index
 ├── tools/                     # CI checkers: check_pins (G4 lockfile),
 │                              #   generate_api_reference (docs/api.md gate)
 │
@@ -401,12 +420,12 @@ calienne/
 │                              #   estimate_cost_usd, session reports
 │
 ├── frontend/                  # Modern React 19 + Vite + GSAP web dashboard
-│                              #   (the product frontend — served by server.py,
+│                              #   (served by server.py, restrained fluid motion,
 │                              #    cookie-auth, built + linted in CI)
 ├── evals/                     # Measurement layer: golden set (n=50) + frozen
-│                              #   firewall corpus (66 rows) + exact McNemar gate,
-│                              #   β tooling, live capture (`python -m evals.capture`)
-│                              #   and integrity validator (`python -m evals.validate`)
+│   ├── rubric.py              #   Calibrated 0-5 LLM-as-a-Judge semantic rubric (P2-03)
+│   ├── capture.py             #   Live capture runner (`python -m evals.capture`)
+│   └── validate.py            #   Integrity validator (`python -m evals.validate`)
 │
 └── docs/
     ├── images/                # Visual UI screenshots & previews

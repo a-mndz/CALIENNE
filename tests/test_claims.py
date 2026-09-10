@@ -29,3 +29,18 @@ def test_apply_firewall_qualifies_unsupported_claims() -> None:
     assert result.removed_or_qualified_count == 1
     assert "Qualifier:" in result.sanitized_text
     assert result.unsupported_claims[0].validation_status == ValidationStatus.UNVERIFIED
+
+
+def test_factual_claim_circular_sibling_reasoning_remains_unverified() -> None:
+    manager = ClaimManager()
+    claim = manager.extract_claims("The database is configured with 50 tables.", "creative")[0]
+
+    # Sibling agent output with evidence_type="reasoning"
+    status = manager.validate_claim(
+        claim,
+        [EvidenceRecord(source_id="logician", evidence_type="reasoning", content="The database is configured with 50 tables.")],
+    )
+
+    assert status == ValidationStatus.UNVERIFIED
+    assert claim.confidence < 0.5
+    assert claim.provenance.get("unverified_reason") == "circular_sibling_reasoning_only"

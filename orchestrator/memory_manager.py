@@ -44,6 +44,42 @@ class InsufficientCapacityError(Exception):
         )
 
 
+class TokenEstimatorRegistry:
+    """Multi-provider token estimation registry (GAP-RAG-08 / P2-07).
+
+    Selects accurate tokenization models per provider / model family:
+    - OpenAI / GPT-4o / GPT-4: cl100k_base or o200k_base (tiktoken)
+    - Anthropic / Claude: character ratio ~3.6 chars/token
+    - Google / Gemini: character ratio ~4.0 chars/token
+    - Fallback: calibrated word ratio (1.3 tokens/word)
+    """
+
+    @classmethod
+    def estimate_tokens(cls, text: str, model_name: str | None = None) -> int:
+        if not text:
+            return 0
+
+        model = (model_name or "").lower()
+
+        # 1. Anthropic / Claude models (~3.6 chars per token)
+        if "claude" in model or "anthropic" in model:
+            return max(1, int(len(text) / 3.6))
+
+        # 2. Google Gemini models (~4 chars per token)
+        if "gemini" in model or "google" in model:
+            return max(1, int(len(text) / 4.0))
+
+        # 3. Default / OpenAI tiktoken encoder
+        try:
+            import tiktoken
+
+            enc = tiktoken.get_encoding("cl100k_base")
+            return len(enc.encode(text))
+        except Exception:
+            words = text.split()
+            return max(1, int(len(words) * 1.3)) if words else 0
+
+
 class MemoryManager:
     """Enhanced memory management with multiple summarization strategies.
 
@@ -88,18 +124,12 @@ class MemoryManager:
                 self._token_encoder = None
         return self._token_encoder
 
-    def track_tokens(self, messages: list[dict[str, str]]) -> int:
-        """Count tokens for a list of messages.
-
-        Uses tiktoken when available, falls back to a word-count heuristic
-        (approximately 1.3 tokens per word).
-        """
+    def track_tokens(
+        self, messages: list[dict[str, str]], model_name: str | None = None
+    ) -> int:
+        """Count tokens for a list of messages using provider-calibrated estimation (GAP-RAG-08 / P2-07)."""
         text = " ".join(m.get("content", "") for m in messages)
-        encoder = self._get_encoder()
-        if encoder is not None:
-            return len(encoder.encode(text))
-        words = text.split()
-        return max(1, int(len(words) * 1.3)) if words else 0
+        return TokenEstimatorRegistry.estimate_tokens(text, model_name)
 
     def calculate_remaining_capacity(
         self, current_tokens: int, provider_max_limit: Optional[int] = None
@@ -201,6 +231,25 @@ class MemoryManager:
 
         return system_msgs + preserved, summary
 
+    @staticmethod
+    def _extract_semantic_core(content: str, max_chars: int = 240) -> str:
+        """Extract meaningful semantic content preserving sentences, numbers, and constraints (GAP-RAG-10)."""
+        if not content:
+            return ""
+        if len(content) <= max_chars:
+            return content
+        import re
+
+        sentences = [s.strip() for s in re.split(r"(?<=[.?!])\s+", content) if s.strip()]
+        result = []
+        cur_len = 0
+        for sent in sentences:
+            if cur_len + len(sent) > max_chars:
+                break
+            result.append(sent)
+            cur_len += len(sent) + 1
+        return " ".join(result) if result else content[:max_chars]
+
     def _semantic_compression(
         self, messages: list[dict[str, str]], preserve_recent: int
     ) -> tuple[list[dict[str, str]], Optional[str]]:
@@ -218,7 +267,7 @@ class MemoryManager:
         for msg in removed:
             content = msg.get("content", "")
             if content:
-                summary_parts.append(content[:200])
+                summary_parts.append(self._extract_semantic_core(content, 240))
 
         summary_text = " ".join(summary_parts)
         summary_text = self._truncate_to_tokens(summary_text, self.SEMANTIC_COMPRESSION_MAX_TOKENS)
@@ -242,7 +291,11 @@ class MemoryManager:
         level_summaries: list[str] = []
         for i in range(0, len(removed), chunk_size):
             chunk = removed[i : i + chunk_size]
-            chunk_text = " ".join(m.get("content", "")[:200] for m in chunk if m.get("content"))
+            chunk_text = " ".join(
+                self._extract_semantic_core(m.get("content", ""), 240)
+                for m in chunk
+                if m.get("content")
+            )
             chunk_summary = self._truncate_to_tokens(
                 chunk_text, self.HIERARCHICAL_SUMMARY_MAX_TOKENS
             )

@@ -85,3 +85,20 @@ async def test_context_manager_route_gates_retrieval_hooks() -> None:
     assert calls == ["research"]
     assert research_window.retrieved_snippets[0].content == "Source-backed research note."
     assert coding_window.retrieved_snippets == []
+
+
+@pytest.mark.asyncio
+async def test_context_manager_raises_insufficient_capacity_on_oversized_constraints() -> None:
+    from orchestrator.memory_manager import InsufficientCapacityError
+
+    manager = ContextManager(max_window_tokens=256)
+    node = _node()
+    huge_system_constraint = "System constraint rule: " + "repeat instruction " * 200
+
+    with pytest.raises(InsufficientCapacityError, match="insufficient context window capacity"):
+        await manager.assemble_window(
+            node,
+            user_query="Run task",
+            history=[{"role": "system", "content": huge_system_constraint}],
+            budget=PipelineBudget(total_tokens=256),
+        )

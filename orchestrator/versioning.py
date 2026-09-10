@@ -13,7 +13,7 @@ from typing import Any
 
 from core.schemas import TaskGraph, TaskNode, VersionStamp
 
-architecture_version = "0.1.8"
+architecture_version = "0.1.9"
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _CI_GIT_COMMIT_FILE = _REPO_ROOT / ".git_commit_sha"

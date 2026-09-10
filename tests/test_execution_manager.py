@@ -209,6 +209,7 @@ def test_component_factory_wires_execution_manager() -> None:
     components = initialize_calienne_components()
 
     assert isinstance(components["execution_manager"], ExecutionManager)
+    assert "experience_repository" in components
 
 
 @pytest.mark.asyncio

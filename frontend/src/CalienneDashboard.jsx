@@ -227,6 +227,7 @@ export default function CalienneDashboard({ onExitLanding = null }) {
   const inputRef = useRef(null);
 
   const [stats, setStats] = useState({ agentsOnline: "6/6", tokens: 0, avgResponse: "—", successRate: "—", sparkline: [] });
+  const [liveInsights, setLiveInsights] = useState(null);
   const [rightPanelLoaded, setRightPanelLoaded] = useState(false);
   const [studioOpen, setStudioOpen] = useState(false);
 
@@ -355,6 +356,33 @@ export default function CalienneDashboard({ onExitLanding = null }) {
     pushToast("Conversation deleted");
   }, [activeId, cancelActiveStream, pushToast]);
 
+  const handleResumeRun = useCallback(async (traceId, resumeValue) => {
+    if (!traceId) return;
+    try {
+      const response = await fetch(`/api/runs/${encodeURIComponent(traceId)}/resume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ value: resumeValue }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `Resume failed (${response.status})`);
+      }
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.role === "paused" && (msg.traceId === traceId || !msg.traceId)
+            ? { ...msg, resumed: true, resumeValue }
+            : msg
+        )
+      );
+      pushToast("Clarification submitted. Resuming run...");
+    } catch (err) {
+      pushToast(`Failed to resume: ${err.message}`, "error");
+      throw err;
+    }
+  }, [pushToast]);
+
   const pendingTimeouts = useRef([]);
   useEffect(() => () => pendingTimeouts.current.forEach(clearTimeout), []);
 
@@ -428,7 +456,25 @@ export default function CalienneDashboard({ onExitLanding = null }) {
                const payload = envelope.data || {};
                if (activeConversationRef.current !== convId) continue;
 
-              if (eventType === "agent_started" || eventType === "progress") {
+              if (eventType === "node_paused") {
+                const pause = payload.pause || {};
+                const traceId = pause.trace_id || payload.trace_id || convId;
+                const question = pause.payload?.question || pause.payload?.prompt || payload.reason || "Human clarification required to proceed";
+                setTypingAgent(null);
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: randId(),
+                    role: "paused",
+                    traceId,
+                    question,
+                    text: question,
+                    resumed: false,
+                    resumeValue: "",
+                  },
+                ]);
+                pushToast("Execution paused: clarification required", "warn");
+              } else if (eventType === "agent_started" || eventType === "progress") {
                 const agentName = payload.agent || payload.agent_name;
                 if (agentName) setTypingAgent(agentName);
               } else if (eventType === "agent_completed" || eventType === "draft_answer") {
@@ -451,6 +497,34 @@ export default function CalienneDashboard({ onExitLanding = null }) {
                 }
               } else if (eventType === "result") {
                 const resData = payload.payload || payload;
+                if (resData.consensus_score !== undefined) {
+                  setLiveInsights([
+                    {
+                      id: "i-consensus",
+                      title: `Consensus: ${(Number(resData.consensus_score) * 100).toFixed(1)}%`,
+                      text: `Consensus: ${(Number(resData.consensus_score) * 100).toFixed(1)}%`,
+                      sub: resData.passport_id ? `Verification passport: ${String(resData.passport_id).slice(0, 12)}...` : "Cross-agent consensus computed",
+                      kind: Number(resData.consensus_score) >= 0.7 ? "ok" : "warn",
+                      status: Number(resData.consensus_score) >= 0.7 ? "ok" : "warn",
+                    },
+                    {
+                      id: "i-contradiction",
+                      title: resData.contradiction_score != null && Number(resData.contradiction_score) > 0.3 ? "Contradiction detected" : "Low contradiction level",
+                      text: resData.contradiction_score != null && Number(resData.contradiction_score) > 0.3 ? "Contradiction detected" : "Low contradiction level",
+                      sub: resData.contradiction_score != null ? `Contradiction index: ${(Number(resData.contradiction_score) * 100).toFixed(1)}%` : "Deduplication optimal",
+                      kind: resData.contradiction_score != null && Number(resData.contradiction_score) > 0.3 ? "warn" : "ok",
+                      status: resData.contradiction_score != null && Number(resData.contradiction_score) > 0.3 ? "warn" : "ok",
+                    },
+                    {
+                      id: "i-routing",
+                      title: "Dynamic orchestration active",
+                      text: "Dynamic orchestration active",
+                      sub: `Resolved via ${models.filter((m) => m.active).length || 6} active providers`,
+                      kind: "ok",
+                      status: "ok",
+                    },
+                  ]);
+                }
                 const finalAnswer = resData.answer ?? resData.final_answer;
                 if (finalAnswer) {
                   setMessages((prev) => {
@@ -610,6 +684,7 @@ export default function CalienneDashboard({ onExitLanding = null }) {
                   pushToast={pushToast}
                   onBack={goBackToConversationList}
                   isNarrow={isNarrow}
+                  onResume={handleResumeRun}
                 />
                 </div>
               ) : newChatCount === 0 ? (
@@ -651,6 +726,7 @@ export default function CalienneDashboard({ onExitLanding = null }) {
             open={rightOpen} stats={stats} models={models}
             conversations={conversations} activeId={activeId} onSelect={openConversation}
             isNarrow={isNarrow} isLoaded={rightPanelLoaded} onClose={closeMobilePanels}
+            insights={liveInsights}
           />
         </ErrorBoundary>
       </div>

@@ -232,8 +232,8 @@ function HomeHero({ onQuickPrompt, onFocusInput, onOpenSettings, onOpenTelemetry
                       <p>Longer proofs, slower confidence, and clearer edges around irreversible choices.</p>
                     </div>
                     <div className="mode-rail-card">
-                      <span>Web Search</span>
-                      <p>Pull outside context into the same thread when internal memory is not enough.</p>
+                      <span>Fast</span>
+                      <p>Rapid heuristic evaluation with immediate pre-execution safety screening.</p>
                     </div>
                   </div>
                 </>

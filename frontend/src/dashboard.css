@@ -9,7 +9,7 @@
   --border-strong: rgba(0, 240, 255, 0.45);
   --text: #F4F6FC;
   --text-dim: #969DB8;
-  --text-faint: #5C637C;
+  --text-faint: #7E87A5;
   --c-cyan: #00F0FF;
   --c-cyan-dim: rgba(0, 240, 255, 0.12);
   --c-cyan-soft: rgba(0, 240, 255, 0.22);
@@ -500,6 +500,7 @@
 .msg-copy { background: none; border: none; color: var(--text-faint); opacity: 0; transition: opacity .1s; padding: 2px; flex-shrink: 0; margin-top: 2px; }
 .msg:hover .msg-copy { opacity: 1; }
 .msg-copy:hover { color: var(--text); }
+.msg-copy:focus-visible { opacity: 1; outline: 2px solid var(--c-cyan); }
 
 .typing-dots { display: inline-flex; gap: 4px; }
 .typing-dots span { width: 5px; height: 5px; background: var(--text-faint); animation: bounce 1.2s infinite ease-in-out; }
@@ -2687,4 +2688,394 @@
   padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
+
+/* ---------- HITL Clarification Message Card ---------- */
+.msg-paused {
+  width: 100%;
+  max-width: 100%;
+  align-self: center;
+  margin: 8px 0;
+}
+
+.msg-paused-card {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--c-yellow);
+  box-shadow: 0 0 16px rgba(242, 169, 59, 0.12);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.msg-paused-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.msg-paused-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--c-yellow);
+}
+
+.msg-paused-trace {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.msg-paused-question {
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.5;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 10px 12px;
+  border-left: 3px solid var(--c-yellow);
+}
+
+.msg-paused-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.msg-paused-input {
+  flex: 1;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.msg-paused-input:focus {
+  border-color: var(--c-cyan);
+}
+
+.msg-paused-input:disabled {
+  opacity: 0.6;
+}
+
+.msg-paused-btn {
+  background: var(--c-yellow);
+  color: #050508;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 8px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.msg-paused-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.msg-paused-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.msg-paused-resumed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  background: rgba(46, 209, 107, 0.08);
+  border: 1px solid rgba(46, 209, 107, 0.25);
+  padding: 8px 12px;
+}
+
+.msg-paused-resumed .text-ok {
+  color: var(--c-green);
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Apple Fluid Design Foundations (WWDC Principles: Motion, Depth, Response)
+   ========================================================================== */
+
+:root {
+  /* Apple Critically Damped Springs & Timing Tokens */
+  --apple-spring-crit: cubic-bezier(0.16, 1, 0.3, 1);    /* damping 1.0, response 0.35s - settle without overshoot */
+  --apple-spring-snap: cubic-bezier(0.32, 0.72, 0, 1);    /* rapid direct interaction snap */
+  --apple-spring-flick: cubic-bezier(0.34, 1.4, 0.64, 1); /* damping ~0.8 - momentum-driven bounce */
+  --apple-press-scale: scale(0.972);
+  --apple-glass-blur: blur(24px) saturate(180%);
+  --apple-specular-edge: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+/* 1. Response & Tactile Feedback — Instant Pointer-Down Depression */
+.button:active:not(:disabled),
+.hero-main-btn:active:not(:disabled),
+.hero-ghost-btn:active:not(:disabled),
+.text-btn:active:not(:disabled),
+.icon-btn:active:not(:disabled),
+.chip:active:not(:disabled),
+.prompt-card:active,
+.agent-card:active,
+.nav-item:active:not(:disabled),
+.activity-row:active,
+.msg-paused-btn:active:not(:disabled),
+.return-btn:active,
+.thread-back:active {
+  transform: var(--apple-press-scale) !important;
+  transition: transform 70ms var(--apple-spring-snap) !important;
+}
+
+/* 2. Fluid Transitions with Critically Damped Springs */
+.chip,
+.text-btn,
+.icon-btn,
+.prompt-card,
+.agent-card,
+.activity-row,
+.panel-block,
+.stat-tile,
+.hero-main-btn,
+.hero-ghost-btn,
+.return-btn,
+.thread-back,
+.msg-paused-btn {
+  transition:
+    transform 220ms var(--apple-spring-crit),
+    background 180ms ease,
+    border-color 180ms ease,
+    box-shadow 220ms var(--apple-spring-crit),
+    opacity 180ms ease;
+  will-change: transform;
+}
+
+/* 3. Translucent Materials & Specular Edge Lighting */
+.header {
+  backdrop-filter: var(--apple-glass-blur);
+  -webkit-backdrop-filter: var(--apple-glass-blur);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.input-bar {
+  backdrop-filter: var(--apple-glass-blur);
+  -webkit-backdrop-filter: var(--apple-glass-blur);
+  border-top: var(--apple-specular-edge);
+}
+
+.sidebar {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.rightpanel {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* 4. Optical Typography Tuning */
+/* Large Display Headings: Negative tracking and tight leading */
+.hero-title,
+.greeting-title,
+.placeholder h2,
+.err-boundary-title {
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+  font-optical-sizing: auto;
+}
+
+/* Body & Message Reading: Comfortable leading with neutral tracking */
+.msg-bubble,
+.fmt-message,
+.placeholder p,
+.hero-subtitle,
+.greeting-sub {
+  line-height: 1.62;
+  letter-spacing: -0.005em;
+  text-rendering: optimizeLegibility;
+}
+
+/* Small Metadata & Tabular Tags: Positive optical tracking for small sizes */
+.stat-label,
+.brand-ver,
+.thread-badge,
+.msg-paused-trace,
+.mono,
+.char-count,
+.input-hint,
+.activity-meta {
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 5. Tri-Signal Accessibility System */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    transform: none !important;
+    scroll-behavior: auto !important;
+  }
+  .msg,
+  .toast,
+  .stat-grid-loaded,
+  .thread-enter {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .header,
+  .input-bar,
+  .sidebar,
+  .rightpanel,
+  .panel-block,
+  .msg-paused-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: #090b12 !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .calienne-app {
+    --border: rgba(255, 255, 255, 0.45);
+    --border-strong: rgba(0, 240, 255, 0.8);
+    --text-dim: #c5cbe0;
+  }
+  .button,
+  .chip,
+  .panel-block,
+  .msg-paused-card {
+    border-width: 2px !important;
+  }
+}
+
+/* ==========================================================================
+   Restrained Fluid Motion Architecture (Ticket P2-13 / UI-08)
+   The 6 High-Leverage Transitions:
+   1. Streaming token entrance fade (120ms) with sticky scroll lock
+   2. Triadic pipeline progression bar (240ms SVG path draw)
+   3. Persistent circuit breaker slide-in warning banner (220ms) with pulsing badge
+   4. HITL card height expansion (260ms) and scale-fade resume morph
+   5. Feedback carousel cross-dissolve (240ms)
+   6. Hold-to-confirm delete progress fill (3s linear clip-path)
+   ========================================================================== */
+
+/* 1. Streaming token entrance fade (120ms) */
+@keyframes tokenFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.token-entrance {
+  animation: tokenFadeIn 120ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
+
+/* 2. Triadic pipeline progression bar (240ms SVG path draw) */
+.triadic-progression-path {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  transition: stroke-dashoffset 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: stroke-dashoffset;
+}
+
+.triadic-progression-path.active {
+  stroke-dashoffset: 0;
+}
+
+/* 3. Persistent circuit breaker slide-in warning banner (220ms) with pulsing badge */
+@keyframes breakerSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes breakerPulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(230, 62, 62, 0.4);
+  }
+  50% {
+    opacity: 0.85;
+    box-shadow: 0 0 0 4px rgba(230, 62, 62, 0);
+  }
+}
+
+.breaker-warning-banner {
+  animation: breakerSlideIn 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.breaker-pulsing-badge {
+  animation: breakerPulse 1.8s infinite cubic-bezier(0.4, 0, 0.6, 1);
+  will-change: box-shadow, opacity;
+}
+
+/* 4. HITL card height expansion (260ms) and scale-fade resume morph */
+.hitl-card-morph {
+  transition: height 260ms cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 260ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: height, opacity, transform;
+  overflow: hidden;
+}
+
+.hitl-card-morph.resumed {
+  opacity: 0.6;
+  transform: scale(0.98);
+}
+
+/* 5. Feedback carousel cross-dissolve (240ms) */
+.feedback-crossfade {
+  transition: opacity 240ms ease-in-out, transform 240ms ease-in-out;
+  will-change: opacity, transform;
+}
+
+.feedback-crossfade-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.97);
+}
+
+/* 6. Hold-to-confirm delete progress fill (3s linear clip-path) */
+.hold-delete-fill {
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0s;
+  will-change: clip-path;
+}
+
+.hold-delete-fill.holding {
+  clip-path: inset(0 0 0 0);
+  transition: clip-path 3000ms linear;
+}
+
+
 

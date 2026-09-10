@@ -150,3 +150,41 @@ async def test_execution_manager_consensus_off_leaves_result_none(
         pool=stub_pool,
     )
     assert result["consensus_result"] is None
+
+
+@pytest.mark.asyncio
+async def test_decision_engine_execute_judge_synthesis_high_complexity_consensus(
+    stub_gateway, stub_strategy, stub_pool
+) -> None:
+    from unittest.mock import AsyncMock, MagicMock
+    from core.passport import ExecutionPassport
+    from core.schemas import AgentOutput
+    from orchestrator.decisions import DecisionEngine
+    from orchestrator.streaming import EventType
+
+    engine = DecisionEngine()
+    streaming_mock = MagicMock()
+    streaming_mock.emit_event = AsyncMock()
+    engine.streaming_manager = streaming_mock
+
+    logician = AgentOutput(answer="Premise: X is true. Conclusion: Y is valid.", confidence=0.9)
+    creative = AgentOutput(answer="Alternative: X may be false in state Z. Consider W.", confidence=0.8)
+    passport = ExecutionPassport()
+
+    result = await engine.execute_judge_synthesis(
+        query="Analyze multi-agent Byzantine fault tolerance under partial network partition.",
+        logician_output=logician,
+        creative_output=creative,
+        gateway=stub_gateway,
+        strategy=stub_strategy,
+        pool=stub_pool,
+        passport=passport,
+        complexity="high",
+    )
+
+    assert result is not None
+    assert result.validation_score >= 0.0
+    assert streaming_mock.emit_event.called
+    calls = streaming_mock.emit_event.call_args_list
+    events = [call.kwargs.get("event") or call.args[1] for call in calls if len(call.args) > 1 or "event" in call.kwargs]
+    assert any(getattr(e, "event", None) == EventType.CONSENSUS_COMPUTED for e in events)

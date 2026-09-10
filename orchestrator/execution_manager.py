@@ -30,6 +30,7 @@ from orchestrator.execution_replay import (
     prompt_fingerprint,
 )
 from orchestrator.feature_flags import FeatureFlags, load_flags
+from orchestrator.hitl import HitlPause, interrupt
 from orchestrator.memory_hierarchy import MemoryEntry, MemoryHierarchy
 from orchestrator.memory_manager import MemoryManager
 from orchestrator.meta_reasoner import EarlyExitDecision, MetaReasoner
@@ -170,8 +171,10 @@ class ExecutionManager:
         retrieval_service: RetrievalService | None = None,
         replay_store: ReplayStore | None = None,
         runtime_engine: Any | None = None,
+        experience_repository: Any | None = None,
     ) -> None:
         self._flags = flags or load_flags()
+        self._experience_repository = experience_repository
         self._intent_analyzer = intent_analyzer
         self._strategic_planner = strategic_planner or StrategicPlanner()
         self._execution_planner = execution_planner or ExecutionPlanner()
@@ -392,9 +395,24 @@ class ExecutionManager:
             "quality.unsupported_claim_count": initial_stage_assessment.unsupported_claim_count,
         }
         if uncertainty_decision.outcome == "ask_user_clarification":
+            clarification_trace = (
+                recorder.trace_id
+                if recorder is not None
+                else (getattr(passport, "request_id", None) or uuid.uuid4().hex)
+            )
+            pause = interrupt(
+                uncertainty_decision.clarification_request,
+                trace_id=clarification_trace,
+                paused_at_stage="uncertainty_evaluation",
+                replay_recorder=recorder,
+            )
             if passport is not None:
                 passport.update_stage("needs_clarification")
-            self._emit(recorder, "node_cancelled", payload={"reason": "needs_clarification"})
+            self._emit(
+                recorder,
+                "node_paused",
+                payload={"reason": "needs_clarification", "pause": pause.to_dict()},
+            )
             clarification_trace_id = self._finalize_replay(
                 recorder,
                 graph=graph,
@@ -403,7 +421,7 @@ class ExecutionManager:
                 strategic_plan=strategic_plan,
                 resource_snapshot=resource_metrics,
                 prediction_actual=None,
-                final_outcome={"status": "needs_clarification"},
+                final_outcome={"status": "needs_clarification", "paused": True},
                 manifest=execution_manifest,
             )
             return {
@@ -425,6 +443,7 @@ class ExecutionManager:
                 "skill_plan": skill_plan,
                 "uncertainty_decision": uncertainty_decision,
                 "clarification_request": uncertainty_decision.clarification_request,
+                "pause_info": pause,
                 "rag_telemetry": None,
                 "memory_telemetry": memory_telemetry,
                 "replay_trace_id": clarification_trace_id,
@@ -475,7 +494,31 @@ class ExecutionManager:
             self._emit(recorder, "node_completed", node_id=node_id)
         repair_result = None
         if self._flags.repair:
-            LOGGER.warning("DAG repair is unavailable until a real defect-driven repair dispatcher is wired")
+            from orchestrator.repair import Defect, run_repair_loop
+            defects: list[Defect] = []
+            for nid, res in results.items():
+                if isinstance(res, dict) and res.get("status") in ("failed", "error", "defect"):
+                    defects.append(
+                        Defect(
+                            kind="validation_error",
+                            description=str(res.get("error", "Task execution defect")),
+                            location=nid,
+                        )
+                    )
+            final_res = results.get(graph.final_task_id, {})
+            repair_result = run_repair_loop(
+                generated_output=final_res,
+                judge_defects=defects,
+                budget_manager=self._budget_manager,
+                budget=budget,
+                used_total_tokens=budget_snapshot.used_tokens,
+            )
+            LOGGER.info(
+                "DAG repair completed: repaired=%s, count=%d",
+                repair_result.repaired,
+                repair_result.repair_count,
+            )
+
         consensus_result = None
         if self._flags.consensus:
             LOGGER.warning("DAG consensus is unavailable until independent judge dispatch is wired")
@@ -561,6 +604,12 @@ class ExecutionManager:
             prediction_actual=prediction_telemetry,
             final_outcome={"status": "success"},
             manifest=execution_manifest,
+        )
+        await self._persist_execution_memory(
+            user_query=user_query,
+            final_output=final_output,
+            results=results,
+            firewall_result=firewall_result,
         )
         return {
             "status": "success",
@@ -657,6 +706,81 @@ class ExecutionManager:
             LOGGER.warning(
                 "memory hierarchy history seed failed: %s", exc, exc_info=False
             )
+
+    async def _persist_execution_memory(
+        self,
+        *,
+        user_query: str,
+        final_output: Any,
+        results: dict[str, Any],
+        firewall_result: dict[str, Any],
+    ) -> None:
+        """Persist finalized session data to multi-layer memory hierarchy (GAP-RAG-06)."""
+        if not self._flags.context or self._memory_hierarchy is None:
+            return
+
+        try:
+            # 1. Long-term memory: finalized session response
+            ans_text = getattr(final_output, "final_answer", "") or str(final_output)
+            if ans_text:
+                await self._memory_hierarchy.write(
+                    MemoryEntry(
+                        key=MemoryHierarchy.build_key("summary", user_query[:64]),
+                        content=f"Q: {user_query}\nA: {ans_text[:500]}",
+                        layer="long_term",
+                        tags=["final_answer", "summary"],
+                        source="execution_manager",
+                    )
+                )
+
+            # 2. Agent memory: node execution success/failure telemetry
+            for node_id, res in results.items():
+                if isinstance(res, dict):
+                    status = res.get("status", "completed")
+                    await self._memory_hierarchy.write(
+                        MemoryEntry(
+                            key=MemoryHierarchy.build_key("agent_perf", node_id),
+                            content=f"node={node_id} status={status} tokens={res.get('actual_tokens', 0)}",
+                            layer="agent_memory",
+                            tags=["agent_metric", status],
+                            source="scheduler",
+                        )
+                    )
+
+            # 3. Shared cache: verified claims & sources
+            verified_claims = firewall_result.get("claims", [])
+            for c in verified_claims:
+                c_content = getattr(c, "content", "") if not isinstance(c, dict) else c.get("content", "")
+                if c_content:
+                    await self._memory_hierarchy.write(
+                        MemoryEntry(
+                            key=MemoryHierarchy.build_key("claim", c_content[:64]),
+                            content=c_content,
+                            layer="shared_cache",
+                            tags=["verified_claim"],
+                            source="firewall",
+                        )
+                    )
+        except Exception as exc:
+            LOGGER.warning("Multi-layer memory hierarchy persistence failed: %s", exc)
+
+        # 4. Durable Experience Database wiring (GAP-AI-06 / DB-13 / P2-02)
+        if self._experience_repository is not None and getattr(self._flags, "experience_db", True):
+            try:
+                import hashlib
+                from orchestrator.experience_db import OperationalExperience
+
+                fp = hashlib.sha256(user_query.encode("utf-8")).hexdigest()[:64]
+                await self._experience_repository.record_operational(
+                    OperationalExperience(
+                        prompt_fingerprint=fp,
+                        task_profile={"query_length": len(user_query)},
+                        prediction_actual_deltas={},
+                        latency_ms=0.0,
+                    )
+                )
+            except Exception as exp_err:
+                LOGGER.warning("ExperienceRepository persistence degraded: %s", exp_err)
 
     @staticmethod
     def _make_node_executor(
@@ -770,11 +894,19 @@ class ExecutionManager:
                         for key, value in incoming.items()
                         if key not in {"task_profile", "strategic_plan"}
                     }
-                    prompt = (
-                        f"User request:\n{user_query}\n\n"
-                        f"Current task:\n{node.objective}\n\n"
-                        f"Upstream results:\n{json.dumps(upstream, default=str)}"
+                    snippets_text = "\n\n".join(
+                        f"[{getattr(s, 'source', 'context')}] {s.content}"
+                        for s in getattr(context_window, "retrieved_snippets", [])
+                        if getattr(s, "content", None)
                     )
+                    prompt_sections = [f"User request:\n{user_query}"]
+                    if snippets_text:
+                        prompt_sections.append(f"Retrieved Context:\n{snippets_text}")
+                    prompt_sections.extend([
+                        f"Current task:\n{node.objective}",
+                        f"Upstream results:\n{json.dumps(upstream, default=str)}",
+                    ])
+                    prompt = "\n\n".join(prompt_sections)
                     role = "judge" if node.task_id == "final" else "generation"
                     # Ask for exactly the declared contract keys so a merged
                     # node (MetaReasoner union contracts) is satisfiable by an

@@ -47,6 +47,8 @@ async def arbitrate_and_synthesize(
     pool: Optional[ProviderPool] = None,
     lessons: str = "",
     history: list[dict[str, str]] | None = None,
+    runtime_engine: Any = None,
+    passport: Optional[Any] = None,
 ) -> calienneOutput | dict:
     """
     Invokes the synthesizer judge to score logical consistency
@@ -123,14 +125,38 @@ Output strictly in raw JSON following the calienneOutput schema layout:
     # truncated live responses mid-JSON, losing final_answer (which models
     # emit last, after their reasoning_steps) — found on the first live
     # capture, 2026-08-22.
-    raw_judge_output = await gateway.execute_with_fallback(
-        prompt=evaluation_prompt,
-        system_prompt=system_prompt,
-        role="judge",
-        strategy=strategy,
-        pool=pool,
-        history=history,
-        max_tokens=8192,
-    )
+    if runtime_engine is not None and passport is not None and hasattr(runtime_engine, "execute_with_contracts"):
+        try:
+            raw_judge_output = await runtime_engine.execute_with_contracts(
+                prompt=evaluation_prompt,
+                system_prompt=system_prompt,
+                role="judge",
+                passport=passport,
+                gateway=gateway,
+                strategy=strategy,
+                pool=pool,
+                history=history,
+            )
+        except Exception as exc:
+            logger.warning("runtime_engine.execute_with_contracts degraded for judge; falling back: %s", exc)
+            raw_judge_output = await gateway.execute_with_fallback(
+                prompt=evaluation_prompt,
+                system_prompt=system_prompt,
+                role="judge",
+                strategy=strategy,
+                pool=pool,
+                history=history,
+                max_tokens=8192,
+            )
+    else:
+        raw_judge_output = await gateway.execute_with_fallback(
+            prompt=evaluation_prompt,
+            system_prompt=system_prompt,
+            role="judge",
+            strategy=strategy,
+            pool=pool,
+            history=history,
+            max_tokens=8192,
+        )
 
     return parse_and_repair(raw_judge_output, calienneOutput)

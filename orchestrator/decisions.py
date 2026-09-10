@@ -21,6 +21,7 @@ Timing specifications (from Requirement 9):
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Optional
 
@@ -160,11 +161,14 @@ class DecisionEngine:
         passport: ExecutionPassport,
         lessons: str = "",
         history: list[dict[str, str]] | None = None,
+        complexity: str = "medium",
     ) -> calienneOutput:
         """
         Execute the Judge agent to synthesize outputs.
 
         Failed agents receive placeholders with ``confidence=0.0``.
+        For high or critical complexity, allocates multi-judge consensus
+        engine and computes weighted agreement matrix.
         Tracks ``_judge_history`` and ``_synthesis_scores``.
         """
         if logician_output is None:
@@ -180,6 +184,84 @@ class DecisionEngine:
                 confidence=0.0,
             )
 
+        # Wire multi-judge consensus engine for high/critical complexity queries (GAP-PIPE-02 / P1-01)
+        if complexity in ("high", "critical"):
+            try:
+                from orchestrator.consensus import JudgeOutput, allocate_judges, compute_consensus
+
+                judge_plan = allocate_judges(complexity, early_exit_failed=True, task_type="general")
+                if judge_plan.requires_consensus and judge_plan.judge_count >= 2:
+                    count = max(3, judge_plan.judge_count) if complexity == "critical" else judge_plan.judge_count
+                    roles = judge_plan.judge_roles if len(judge_plan.judge_roles) >= count else ["judge"] * count
+
+                    eval_prompt = (
+                        f"Evaluate the two agent answers for query: {query}\n\n"
+                        f"Logician Answer:\n{logician_output.answer}\n\n"
+                        f"Creative Answer:\n{creative_output.answer}\n"
+                        "Provide your evaluation, state claims, and confidence."
+                    )
+                    sys_prompt = "You are an expert Judge Arbiter. Analyze and output key claims."
+
+                    async def _run_judge(idx: int, role_name: str) -> JudgeOutput:
+                        try:
+                            raw = await self._dispatch_provider_call(
+                                prompt=eval_prompt,
+                                system_prompt=sys_prompt,
+                                role="judge",
+                                gateway=gateway,
+                                strategy=strategy,
+                                pool=pool,
+                                passport=passport,
+                                history=history,
+                            )
+                            claims = [c.strip("- *").strip() for c in raw.splitlines() if c.strip().startswith(("-", "*"))]
+                            if not claims and raw:
+                                import re
+                                claims = [s.strip() for s in re.split(r"[.!?]", raw) if len(s.strip()) > 8][:3]
+                            return JudgeOutput(
+                                model_id=f"judge_{idx}_{role_name}",
+                                claims=claims,
+                                confidence=0.85,
+                                answer=raw[:200] if raw else "",
+                            )
+                        except Exception as j_err:
+                            logger.warning("Judge %d execution failed: %s", idx, j_err)
+                            return JudgeOutput(
+                                model_id=f"judge_{idx}_{role_name}",
+                                claims=[],
+                                confidence=0.0,
+                                answer="[Judge execution error]",
+                            )
+
+                    judge_outputs = await asyncio.gather(*[_run_judge(i, r) for i, r in enumerate(roles[:count])])
+                    consensus = compute_consensus(list(judge_outputs), task_type="general", judge_plan=judge_plan)
+
+                    if self.streaming_manager and hasattr(passport, "request_id"):
+                        safe_create_task_broadcast(
+                            self.streaming_manager.emit_event(
+                                request_id=passport.request_id,
+                                event=StreamEvent(
+                                    event=EventType.CONSENSUS_COMPUTED,
+                                    data={
+                                        "weighted_agreement": consensus.weighted_agreement,
+                                        "raw_agreement": consensus.raw_agreement,
+                                        "majority_claims": consensus.majority_claims,
+                                        "minority_views": [mv.model_dump() for mv in consensus.minority_views],
+                                    },
+                                ),
+                            ),
+                            name="consensus-computed-broadcast",
+                        )
+
+                    consensus_notes = [f"Agreement: {consensus.weighted_agreement:.2f}"]
+                    if consensus.majority_claims:
+                        consensus_notes.append(f"Majority: {', '.join(consensus.majority_claims[:3])}")
+                    if consensus.minority_views:
+                        consensus_notes.append(f"Minority: {', '.join(mv.reason for mv in consensus.minority_views[:2])}")
+                    lessons = f"{lessons}\n[Multi-Judge Consensus]: {' | '.join(consensus_notes)}" if lessons else f"[Multi-Judge Consensus]: {' | '.join(consensus_notes)}"
+            except Exception as c_err:
+                logger.warning("Multi-judge consensus synthesis degraded: %s", c_err)
+
         judge_output = await arbitrate_and_synthesize(
             query=query,
             answer_a=logician_output.answer,
@@ -189,6 +271,8 @@ class DecisionEngine:
             pool=pool,
             lessons=lessons,
             history=history,
+            runtime_engine=self.runtime_engine,
+            passport=passport,
         )
 
         if isinstance(judge_output, dict):

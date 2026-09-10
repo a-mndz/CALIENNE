@@ -319,11 +319,11 @@ def assemble_agent_prompt(
     prompts_dir: Optional[str] = None,
 ) -> str:
     """
-    Assembles the hierarchical calienne prompt layout with dynamic role injection:
+    Assembles the hierarchical calienne prompt layout with prefix-caching invariant layout:
 
-    1. <ROLE> block
-    2. Runtime contracts (00-11) sorted by numeric prefix
-    3. Agent-specific system prompt
+    1. Runtime contracts (00-11) sorted by numeric prefix (static at byte 0)
+    2. Agent-specific system prompt (static)
+    3. <ROLE> block (dynamic per-request metadata appended at end to preserve prefix caching)
 
     Args:
         role: Current agent role name

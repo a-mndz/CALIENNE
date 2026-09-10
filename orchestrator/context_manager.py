@@ -480,10 +480,20 @@ class ContextManager:
             return messages
 
         constraints, turns = self._split_constraints(messages)
+        constraint_tokens = self._memory_manager.track_tokens(constraints)
+        if constraint_tokens > 0.9 * token_limit:
+            from orchestrator.memory_manager import InsufficientCapacityError
+            raise InsufficientCapacityError(
+                required_tokens=constraint_tokens,
+                available_tokens=token_limit,
+                compression_attempted=False,
+            )
+
+        available_for_turns = max(64, token_limit - constraint_tokens)
         compressed_turns, summary = self._memory_manager.compress_history(
             turns,
             strategy=SummarizationStrategy.HIERARCHICAL,
-            max_limit=token_limit,
+            max_limit=available_for_turns,
         )
         bounded = list(constraints) + compressed_turns
         if summary:
@@ -493,4 +503,14 @@ class ContextManager:
                     "content": f"[Window summary] {summary}",
                 }
             )
+
+        # Strict post-compression token enforcement: evict oldest non-constraint turn if over budget
+        while self._memory_manager.track_tokens(bounded) > token_limit and len(bounded) > len(constraints):
+            for i, msg in enumerate(bounded):
+                if msg not in constraints:
+                    bounded.pop(i)
+                    break
+            else:
+                break
+
         return bounded

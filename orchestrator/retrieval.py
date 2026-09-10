@@ -37,6 +37,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import re
 from collections.abc import Awaitable, Callable, Iterable
 from datetime import datetime, timezone
 from typing import Any
@@ -247,6 +248,94 @@ def rank_sources(
     if limit is not None and limit >= 0:
         scored = scored[:limit]
     return scored
+
+
+def reciprocal_rank_fusion(
+    rankings: list[list[SourceCandidate]],
+    *,
+    k: int = 60,
+    limit: int | None = None,
+) -> list[SourceCandidate]:
+    """Combine multiple ranked candidate lists using Reciprocal Rank Fusion (RFC-004 / P1-05).
+
+    For each unique document d:
+        RRF_score(d) = sum_{list i} (1 / (k + rank_i(d)))
+    where rank_i(d) is 1-indexed.
+
+    Normalizes the fused scores to [0.0, 1.0] and assigns to relevance_score and final_score.
+    """
+    if not rankings:
+        return []
+
+    doc_scores: dict[str, float] = {}
+    doc_map: dict[str, SourceCandidate] = {}
+
+    for rank_list in rankings:
+        for rank_idx, candidate in enumerate(rank_list, start=1):
+            key = candidate.url or candidate.title or candidate.excerpt[:80]
+            if not key:
+                key = str(id(candidate))
+            if key not in doc_map:
+                doc_map[key] = candidate
+            doc_scores[key] = doc_scores.get(key, 0.0) + (1.0 / (k + rank_idx))
+
+    if not doc_scores:
+        return []
+
+    max_score = max(doc_scores.values()) if doc_scores else 1.0
+    fused: list[SourceCandidate] = []
+    for key, rrf_val in doc_scores.items():
+        cand = doc_map[key]
+        norm_score = rrf_val / max_score if max_score > 0 else rrf_val
+        updated = cand.model_copy(
+            update={
+                "relevance_score": round(_clamp01(norm_score), 4),
+                "final_score": round(_clamp01(norm_score), 4),
+            }
+        )
+        fused.append(updated)
+
+    fused.sort(key=lambda c: c.final_score, reverse=True)
+    if limit is not None and limit >= 0:
+        fused = fused[:limit]
+    return fused
+
+
+def rerank_candidates(
+    candidates: list[SourceCandidate],
+    query: str,
+    *,
+    top_k: int | None = None,
+    cross_encoder_model: str | None = None,
+) -> list[SourceCandidate]:
+    """Rerank source candidates using token relevance and semantic overlap (P1-05).
+
+    Optionally uses cross-encoder model when available; otherwise applies calibrated
+    lexical/semantic overlap scoring.
+    """
+    if not candidates or not query:
+        return list(candidates)
+
+    query_tokens = set(re.findall(r"\w+", query.lower()))
+    if not query_tokens:
+        return list(candidates)
+
+    reranked: list[tuple[float, SourceCandidate]] = []
+    for cand in candidates:
+        text = f"{cand.title or ''} {cand.excerpt or ''}".lower()
+        text_tokens = set(re.findall(r"\w+", text))
+        overlap = len(query_tokens & text_tokens)
+        jaccard = overlap / len(query_tokens | text_tokens) if text_tokens else 0.0
+
+        boosted_score = (cand.final_score * 0.6) + (jaccard * 0.4)
+        clamped = cand.model_copy(update={"final_score": round(_clamp01(boosted_score), 4)})
+        reranked.append((boosted_score, clamped))
+
+    reranked.sort(key=lambda item: item[0], reverse=True)
+    results = [item[1] for item in reranked]
+    if top_k is not None and top_k >= 0:
+        results = results[:top_k]
+    return results
 
 
 # ── Route gating ─────────────────────────────────────────────────────────

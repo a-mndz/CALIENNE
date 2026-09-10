@@ -383,6 +383,23 @@ real time as each pipeline stage completes.
 - `200` Successful Response
 - `422` Validation Error — `HTTPValidationError`
 
+## `POST /api/runs/{trace_id}/resume`
+
+Resume Run
+
+Resume a paused execution with human-in-the-loop input.
+
+**Parameters:**
+
+- `trace_id` (path) (required): `string`
+
+**Request body:** `ResumeRequest`
+
+**Responses:**
+
+- `200` Successful Response — `object`
+- `422` Validation Error — `HTTPValidationError`
+
 ## `POST /api/sessions`
 
 Create Session

@@ -591,17 +591,30 @@ async def _run_with_decision_engine(
             passport=passport or _null_passport(),
         )
     else:
-        final_output = await decision_engine.execute_judge_synthesis(
-            query=user_query,
-            logician_output=logician_output,
-            creative_output=creative_output,
-            gateway=gateway,
-            strategy=strategy,
-            pool=pool,
-            passport=passport or _null_passport(),
-            lessons=lessons,
-            history=history,
-        )
+        query_complexity = "medium"
+        try:
+            from orchestrator.routing import Router
+            query_complexity = Router.score_complexity(user_query)
+        except Exception:
+            pass
+
+        import inspect
+        judge_kwargs = {
+            "query": user_query,
+            "logician_output": logician_output,
+            "creative_output": creative_output,
+            "gateway": gateway,
+            "strategy": strategy,
+            "pool": pool,
+            "passport": passport or _null_passport(),
+            "lessons": lessons,
+            "history": history,
+        }
+        sig = inspect.signature(decision_engine.execute_judge_synthesis)
+        if "complexity" in sig.parameters:
+            judge_kwargs["complexity"] = query_complexity
+
+        final_output = await decision_engine.execute_judge_synthesis(**judge_kwargs)
 
     if passport is not None:
         passport.add_agent_output("judge", final_output)

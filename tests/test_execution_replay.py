@@ -187,5 +187,21 @@ def test_replay_trace_rejects_unknown_mode():
         replay_trace(trace, mode="bogus")  # type: ignore[arg-type]
 
 
-def test_all_eleven_event_types_registered():
-    assert len(REPLAY_EVENT_TYPES) == 11
+def test_all_event_types_registered():
+    assert len(REPLAY_EVENT_TYPES) == 12
+    assert "node_paused" in REPLAY_EVENT_TYPES
+
+
+def test_node_paused_event_in_vocabulary():
+    assert "node_paused" in REPLAY_EVENT_TYPES
+
+
+def test_node_paused_event_emits_and_persists(replay_dir):
+    recorder = ReplayRecorder(trace_id="t-pause")
+    recorder.emit("node_paused", node_id="n-clarify", payload={"reason": "needs_clarification"})
+    trace = recorder.finalize(graph_version="g1", prompt_fingerprint_value="fp1")
+    store = ReplayStore(base_dir=replay_dir)
+    store.record(trace)
+    loaded = store.load("t-pause")
+    assert loaded is not None
+    assert any(e.event_type == "node_paused" for e in loaded.events)

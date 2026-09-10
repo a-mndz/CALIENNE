@@ -10,7 +10,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Literal, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,7 @@ class PipelineState(str, Enum):
     BREACH_CHECKING = "breach_checking"
     GENERATING = "generating"
     EVALUATING = "evaluating"
+    PAUSED = "paused"
     SYNTHESIZING = "synthesizing"
     FORMATTING = "formatting"
     COMPLETED = "completed"
@@ -48,14 +49,32 @@ VALID_TRANSITIONS: dict[PipelineState, list[PipelineState]] = {
     PipelineState.IDLE: [PipelineState.NORMALIZING],
     PipelineState.NORMALIZING: [PipelineState.BREACH_CHECKING, PipelineState.FAILED],
     PipelineState.BREACH_CHECKING: [PipelineState.GENERATING, PipelineState.ABORTED, PipelineState.FAILED],
-    PipelineState.GENERATING: [PipelineState.EVALUATING, PipelineState.FAILED],
-    PipelineState.EVALUATING: [PipelineState.SYNTHESIZING, PipelineState.FAILED],
+    PipelineState.GENERATING: [PipelineState.EVALUATING, PipelineState.PAUSED, PipelineState.FAILED],
+    PipelineState.EVALUATING: [PipelineState.SYNTHESIZING, PipelineState.PAUSED, PipelineState.FAILED],
+    PipelineState.PAUSED: [
+        PipelineState.GENERATING,
+        PipelineState.EVALUATING,
+        PipelineState.FAILED,
+        PipelineState.ABORTED,
+    ],
     PipelineState.SYNTHESIZING: [PipelineState.FORMATTING, PipelineState.FAILED],
     PipelineState.FORMATTING: [PipelineState.COMPLETED, PipelineState.FAILED],
     PipelineState.COMPLETED: [],  # Terminal state
     PipelineState.FAILED: [],  # Terminal state
     PipelineState.ABORTED: [],  # Terminal state
 }
+
+TERMINAL_STATES: list[PipelineState] = [
+    PipelineState.COMPLETED,
+    PipelineState.FAILED,
+    PipelineState.ABORTED,
+]
+
+Termination = Literal[
+    PipelineState.COMPLETED,
+    PipelineState.FAILED,
+    PipelineState.ABORTED,
+]
 
 
 class StateMachine:

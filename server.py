@@ -39,7 +39,7 @@ from api_gateway.rate_limiter import (
     extract_provider_key,
 )
 from core.config import configure_logging, get_settings
-from core.database import get_db, verify_schema_current
+from core.database import async_session_maker, engine, get_db, verify_schema_current
 from core.models import ConversationMessageRecord, ConversationSessionRecord, User
 from core.provider_registry import get_provider_registry
 from core.security import (
@@ -161,7 +161,10 @@ async def lifespan(app: FastAPI):
     _pool = _bootstrap_pool(_strategy)
     get_provider_registry().bootstrap(_strategy, _pool)
     _gateway = AsyncAPIGateway()
-    _calienne = initialize_calienne_components(streaming_manager=_streaming_mgr)
+    _calienne = initialize_calienne_components(
+        streaming_manager=_streaming_mgr,
+        db_session_factory=async_session_maker,
+    )
 
     # Publish singletons to the api/ route modules (late-bound, no cycles).
     from api.state import state as _api_state
@@ -184,15 +187,22 @@ async def lifespan(app: FastAPI):
     yield
 
     # Cancel all background tasks gracefully
-    if _background_tasks:
-        logger.info("Cancelling %d background tasks...", len(_background_tasks))
-        await cancel_background_tasks(_background_tasks)
-        logger.info("All background tasks cancelled gracefully.")
+    try:
+        if _background_tasks:
+            logger.info("Cancelling %d background tasks...", len(_background_tasks))
+            await cancel_background_tasks(_background_tasks)
+            logger.info("All background tasks cancelled gracefully.")
 
-    if _gateway:
-        await _gateway.close()
-    observer.print_session_report()
-    logger.info("Calienne Web Server shut down.")
+        if _gateway:
+            await _gateway.close()
+    finally:
+        try:
+            await engine.dispose()
+            logger.info("Database connection pool disposed.")
+        except Exception as exc:
+            logger.warning("Error disposing database engine: %s", exc)
+        observer.print_session_report()
+        logger.info("Calienne Web Server shut down.")
 
 
 app = FastAPI(title="Calienne", version="1.0.0", lifespan=lifespan)
@@ -1147,6 +1157,35 @@ async def get_replay_trace(
         raise HTTPException(status_code=404, detail=f"Replay trace {trace_id} not found or expired")
 
     return trace.model_dump(mode="json")
+
+
+# ── HITL Resume Endpoint ──────────────────────────────────────────────────
+
+class ResumeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    value: Any
+
+
+@app.post("/api/runs/{trace_id}/resume")
+async def resume_run(
+    trace_id: str,
+    payload: ResumeRequest,
+    current_user: User = Depends(require_role("admin")),
+) -> dict[str, Any]:
+    """Resume a paused execution with human-in-the-loop input."""
+    from orchestrator.hitl import get_paused_run, resume_with
+
+    paused = get_paused_run(trace_id)
+    if paused is None:
+        raise HTTPException(status_code=404, detail=f"Paused run {trace_id} not found")
+
+    resume_cmd = resume_with(payload.value, trace_id=trace_id)
+    return {
+        "status": "resumed",
+        "trace_id": trace_id,
+        "resumed_with": payload.value,
+        "command": resume_cmd.to_dict(),
+    }
 
 
 @app.get("/metrics")

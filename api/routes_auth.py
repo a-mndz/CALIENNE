@@ -11,7 +11,8 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import field_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas import _StrictRequestModel
@@ -90,6 +91,15 @@ async def serve_login_hero_video():
     return FileResponse(video_path, media_type="video/mp4")
 
 
+@router.get("/calienne_poster.jpg")
+async def serve_login_poster():
+    """Serve the login HTML poster image."""
+    poster_path = Path(__file__).resolve().parent.parent / "calienne_poster.jpg"
+    if not poster_path.exists():
+        raise HTTPException(status_code=404, detail="Poster image not found.")
+    return FileResponse(poster_path, media_type="image/jpeg")
+
+
 @router.post("/auth/register", status_code=201)
 async def register_user(req: AuthRegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """Register a new user, checking if the email already exists."""
@@ -104,20 +114,26 @@ async def register_user(req: AuthRegisterRequest, request: Request, db: AsyncSes
     result = await db.execute(stmt)
     if result.scalars().first() is not None:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered",
         )
 
-    # Check if this is the first user registered
-    stmt_count = select(User)
-    existing_users = (await db.execute(stmt_count)).scalars().all()
-    user_role = "admin" if not existing_users else "user"
+    # Check if this is the first user registered using scalar count
+    user_count = (await db.scalar(select(func.count(User.id)))) or 0
+    user_role = "admin" if user_count == 0 else "user"
 
     # Hash the password and store the user
     hashed = hash_password(req.password)
     new_user = User(email=req.email, password_hash=hashed, role=user_role)
     db.add(new_user)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered",
+        )
     return {"message": "User registered successfully"}
 
 

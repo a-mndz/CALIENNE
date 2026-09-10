@@ -228,7 +228,7 @@ class AsyncHTTPClient:
         output_content = data["choices"][0]["message"]["content"]
 
         if get_settings().LOG_MODEL_IO:
-            try:
+            def _write_io_log() -> None:
                 log_dir = Path("logs")
                 log_dir.mkdir(exist_ok=True)
                 with open(log_dir / "model_io.log", "a", encoding="utf-8") as f:
@@ -240,6 +240,9 @@ class AsyncHTTPClient:
                     f.write(logged_messages + "\n")
                     f.write("--- OUTPUT ---\n")
                     f.write(self.security_validator.scrub_secrets(output_content) + "\n\n")
+
+            try:
+                await asyncio.to_thread(_write_io_log)
             except Exception as e:
                 logger.error(
                     "Failed to write IO log: %s",

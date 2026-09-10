@@ -137,6 +137,34 @@ class CalienneConfig(BaseSettings):
         ),
     )
 
+    DATABASE_POOL_SIZE: int = Field(
+        default=20,
+        ge=1,
+        le=100,
+        validation_alias=AliasChoices("CALIENNE_DATABASE_POOL_SIZE", "DATABASE_POOL_SIZE"),
+        description="Asyncpg database connection pool size.",
+    )
+    DATABASE_MAX_OVERFLOW: int = Field(
+        default=10,
+        ge=0,
+        le=50,
+        validation_alias=AliasChoices("CALIENNE_DATABASE_MAX_OVERFLOW", "DATABASE_MAX_OVERFLOW"),
+        description="Maximum overflow connections in the asyncpg pool.",
+    )
+    DATABASE_POOL_TIMEOUT: int = Field(
+        default=30,
+        ge=1,
+        le=300,
+        validation_alias=AliasChoices("CALIENNE_DATABASE_POOL_TIMEOUT", "DATABASE_POOL_TIMEOUT"),
+        description="Seconds to wait before timing out getting a connection from the pool.",
+    )
+    DATABASE_STATEMENT_CACHE_SIZE: int = Field(
+        default=0,
+        ge=0,
+        validation_alias=AliasChoices("CALIENNE_DATABASE_STATEMENT_CACHE_SIZE", "DATABASE_STATEMENT_CACHE_SIZE"),
+        description="Prepared statement cache size for asyncpg (set to 0 for PgBouncer transaction mode).",
+    )
+
     # CRIT-004: explicit CORS allowlist.  Wildcards combined with credentials
     # are forbidden by the CORS spec; we read a comma-separated allowlist
     # from CORS_ORIGINS and refuse the wildcard.
@@ -164,14 +192,13 @@ class CalienneConfig(BaseSettings):
     )
 
     BREAKER_TIMEOUT_MS: int = Field(
-        default=100,
+        default=5000,
         ge=100,
         le=60_000,
         validation_alias=AliasChoices("CALIENNE_BREAKER_TIMEOUT_MS", "CALIENNE_BREAKER_TIMEOUT_MS"),
         description=(
-            "Breaker gate budget in milliseconds. 100 (the default) fits "
-            "simulation mode; a live LLM round-trip needs ~5000-8000. On "
-            "expiry the gate fails open and the pipeline continues."
+            "Breaker gate budget in milliseconds. Defaults to 5000ms (5s) for "
+            "live LLM round-trips. On expiry the gate fails open and the pipeline continues."
         ),
     )
 

@@ -15,6 +15,7 @@ from typing import Any
 
 from core.schemas import PipelineBudget
 from orchestrator.budget import RepairBudgetDecision, TokenBudgetManager
+from orchestrator.termination import BudgetExhausted, MaxRepairsReached
 
 # ponytail: actionable defect types from RFC-003 §3.5 / §9.
 ACTIONABLE_DEFECTS: frozenset[str] = frozenset({
@@ -109,23 +110,24 @@ def run_repair_loop(
     tokens_spent = critique_repair_tokens_spent
 
     for cycle in range(1, max_repairs + 1):
-        decision = budget_manager.evaluate_repair_cycle(
+        budget_stop = BudgetExhausted(
+            budget_manager,
             budget=budget,
             estimated_repair_tokens=_ESTIMATED_TOKENS_PER_REPAIR,
-            critique_repair_tokens_spent=tokens_spent,
-            used_total_tokens=used_total_tokens + tokens_spent,
+            used_total_tokens=used_total_tokens,
         )
-        if not decision.allowed:
+        stop = budget_stop | MaxRepairsReached(max_repairs)
+        if stop.is_met(cycle=cycle, tokens_spent=tokens_spent, attempts=attempts):
             # Circuit breaker: synthesize with caveats.
             caveats = [
-                f"Repair cycle {cycle} skipped: {decision.reason}",
+                f"Repair cycle {cycle} skipped: {stop.reason}",
                 *(f"Unresolved {d.kind}: {d.description}" for d in actionable),
             ]
             return RepairResult(
                 output=best_output,
                 repaired=bool(attempts),
                 bypassed=True,
-                bypass_reason=decision.reason,
+                bypass_reason=stop.reason,
                 caveats=caveats,
                 attempts=attempts,
                 total_repair_tokens_spent=tokens_spent,
@@ -151,7 +153,7 @@ def run_repair_loop(
             defects_addressed=list(actionable),
             repaired_output=repaired,
             rejudge_passed=passed,
-            budget_decision=decision,
+            budget_decision=budget_stop.last_decision,
         )
         attempts.append(attempt)
         best_output = repaired

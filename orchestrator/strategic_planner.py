@@ -66,6 +66,7 @@ class StrategicPlanner:
             success_criteria=self._derive_success_criteria(task_profile),
             required_skills=_ROUTE_SKILLS.get(task_profile.task_type, ["explainer"]),
             risk_notes=self._derive_risk_notes(task_profile),
+            commands=[],
         )
         self._validate_plan(strategic_plan)
         return strategic_plan

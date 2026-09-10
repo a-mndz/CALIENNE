@@ -486,3 +486,99 @@ class ConversationDirector:
             return True
 
         return False
+
+    async def load_session_from_db(
+        self, session_id: str, db_session: Any
+    ) -> Optional[ConversationSession]:
+        """Load session and messages from PostgreSQL models into memory (DB-12 / P2-10)."""
+        if not isinstance(session_id, str) or not session_id.strip():
+            return None
+
+        clean_id = session_id.strip()
+        from sqlalchemy import select
+        from core.models import ConversationSessionRecord
+
+        from sqlalchemy.orm import selectinload
+
+        result = await db_session.execute(
+            select(ConversationSessionRecord)
+            .options(selectinload(ConversationSessionRecord.messages))
+            .where(ConversationSessionRecord.session_id == clean_id)
+        )
+        record = result.scalars().first()
+        if not record:
+            return None
+
+        history = [
+            ConversationTurn(
+                role=msg.role,
+                content=msg.content,
+                timestamp=msg.timestamp,
+                token_count=msg.token_count,
+            )
+            for msg in getattr(record, "messages", [])
+        ]
+        session = ConversationSession(
+            session_id=record.session_id,
+            state=ConversationState(record.state) if record.state in [s.value for s in ConversationState] else ConversationState.ACTIVE,
+            history=history,
+            total_tokens=record.total_tokens,
+            created_at=record.created_at,
+            expires_at=record.expires_at,
+            owner_email=record.owner_email,
+        )
+        self._sessions[clean_id] = session
+        return session
+
+    async def persist_session_to_db(
+        self, session_id: str, db_session: Any
+    ) -> None:
+        """Persist in-memory session and messages to PostgreSQL models (DB-12 / P2-10)."""
+        if not isinstance(session_id, str) or not session_id.strip():
+            return
+
+        clean_id = session_id.strip()
+        session = self._sessions.get(clean_id)
+        if not session:
+            return
+
+        from sqlalchemy import select
+        from core.models import ConversationMessageRecord, ConversationSessionRecord
+
+        from sqlalchemy.orm import selectinload
+
+        result = await db_session.execute(
+            select(ConversationSessionRecord)
+            .options(selectinload(ConversationSessionRecord.messages))
+            .where(ConversationSessionRecord.session_id == clean_id)
+        )
+        record = result.scalars().first()
+        if record is None:
+            record = ConversationSessionRecord(
+                session_id=session.session_id,
+                owner_email=session.owner_email,
+                state=session.state.value if hasattr(session.state, "value") else str(session.state),
+                total_tokens=session.total_tokens,
+                turn_count=len(session.history),
+                created_at=session.created_at,
+                expires_at=session.expires_at,
+            )
+            db_session.add(record)
+            existing_count = 0
+        else:
+            record.state = session.state.value if hasattr(session.state, "value") else str(session.state)
+            record.total_tokens = session.total_tokens
+            record.turn_count = len(session.history)
+            record.expires_at = session.expires_at
+            existing_count = len(record.messages)
+
+        for turn in session.history[existing_count:]:
+            record.messages.append(
+                ConversationMessageRecord(
+                    role=turn.role,
+                    content=turn.content,
+                    token_count=turn.token_count,
+                    timestamp=turn.timestamp,
+                )
+            )
+        await db_session.commit()

@@ -4,7 +4,7 @@ Provides async engine, sessionmaker, Base declarative class, and dependency inje
 """
 
 from pathlib import Path
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
@@ -23,12 +23,16 @@ settings = get_settings()
 def get_engine_kwargs(db_url: str) -> dict:
     kwargs = {"echo": False}
     if db_url.startswith("postgresql"):
+        connect_args: dict[str, Any] = {"ssl": settings.DATABASE_SSL}
+        if getattr(settings, "DATABASE_STATEMENT_CACHE_SIZE", None) is not None:
+            connect_args["statement_cache_size"] = settings.DATABASE_STATEMENT_CACHE_SIZE
         kwargs.update({
-            "pool_size": 20,
-            "max_overflow": 10,
+            "pool_size": getattr(settings, "DATABASE_POOL_SIZE", 20),
+            "max_overflow": getattr(settings, "DATABASE_MAX_OVERFLOW", 10),
+            "pool_timeout": getattr(settings, "DATABASE_POOL_TIMEOUT", 30),
             "pool_pre_ping": True,
             "pool_recycle": 3600,
-            "connect_args": {"ssl": settings.DATABASE_SSL},
+            "connect_args": connect_args,
         })
     return kwargs
 
@@ -59,7 +63,6 @@ async def verify_schema_current() -> None:
 
 async_session_maker = async_sessionmaker(
     bind=engine,
-    autocommit=False,
     autoflush=False,
     expire_on_commit=False,
     class_=AsyncSession,
@@ -74,11 +77,12 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     FastAPI dependency that yields an asynchronous database session.
     The session is automatically closed when the request block finishes.
+    Safely rolls back on BaseException (including asyncio.CancelledError).
     """
     session = async_session_maker()
     try:
         yield session
-    except Exception:
+    except BaseException:
         try:
             await session.rollback()
         except Exception:

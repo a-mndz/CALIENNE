@@ -50,15 +50,25 @@ class EpistemicMemory:
             "owner": owner,
         })
 
+    @staticmethod
+    def _similarity(a: str, b: str) -> float:
+        import re
+        tokens_a = set(re.findall(r"\w+", a.lower()))
+        tokens_b = set(re.findall(r"\w+", b.lower()))
+        if not tokens_a or not tokens_b:
+            return 0.0
+        if (tokens_a.issubset(tokens_b) or tokens_b.issubset(tokens_a)) and min(len(tokens_a), len(tokens_b)) >= 3:
+            return 0.75
+        return len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
+
     def get_lessons_learned(self, query: str, *, owner: str = "") -> str:
         """
         Retrieves lessons learned to pass back to the active prompt generator.
 
-        Matching uses case-insensitive substring containment so minor
-        rephrasing of the same query still retrieves relevant lessons.
-        Only records whose *owner* matches are visible — the global bus is
-        shared across requests, so unscoped matching would leak one user's
-        query content and failure notes into another user's prompts.
+        Matching uses token Jaccard similarity (>= 0.5) to avoid false-positive
+        substring containment on common short keywords, while preserving
+        rephrasings of the same query. Only records whose *owner* matches are
+        visible to avoid cross-user information leakage.
         """
         query_normalised = query.strip().lower()
         matching_failures = [
@@ -66,8 +76,7 @@ class EpistemicMemory:
             if f.get("owner", "") == owner
             and (
                 f["query_lower"] == query_normalised
-                or query_normalised in f["query_lower"]
-                or f["query_lower"] in query_normalised
+                or self._similarity(f["query_lower"], query_normalised) >= 0.5
             )
         ]
         if not matching_failures:

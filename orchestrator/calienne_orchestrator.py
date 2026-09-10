@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 def initialize_calienne_components(
     streaming_manager: StreamingManager | None = None,
+    db_session_factory: Any = None,
 ) -> dict[str, Any]:
     """Instantiate all Calienne components and wire their dependencies.
 
@@ -43,6 +44,10 @@ def initialize_calienne_components(
         Optional pre-built StreamingManager to share across components.
         When omitted a new one is created.  The web server passes its
         module-level manager so SSE clients receive engine-level events.
+    db_session_factory:
+        Optional async session factory for database-backed persistence
+        (checkpoints, etc.). When provided, CheckpointManager runs with
+        storage_backend="database".
 
     Returns
     -------
@@ -58,8 +63,13 @@ def initialize_calienne_components(
     logger.info("ConversationDirector initialized.")
 
     # ── Checkpoints ──────────────────────────────────────────────────
-    checkpoint_manager = CheckpointManager(storage_backend="memory", retention_days=7)
-    logger.info("CheckpointManager initialized (backend=memory, retention=7d).")
+    backend = "database" if db_session_factory is not None else "memory"
+    checkpoint_manager = CheckpointManager(
+        storage_backend=backend,
+        retention_days=7,
+        db_session_factory=db_session_factory,
+    )
+    logger.info("CheckpointManager initialized (backend=%s, retention=7d).", backend)
 
     # ── Execution Replay (Step 20a) ──────────────────────────────────
     # Only stand up the store when the flag is on; otherwise leave it
@@ -122,6 +132,13 @@ def initialize_calienne_components(
     )
 
     from orchestrator.resource_manager import ResourceManager as DagResourceManager
+    from orchestrator.experience_db import ExperienceRepository
+
+    experience_repository = ExperienceRepository(
+        db_session_factory=db_session_factory,
+        enabled=flags.experience_db,
+    )
+    logger.info("ExperienceRepository initialized (enabled=%s).", flags.experience_db)
 
     execution_manager = ExecutionManager(
         flags=flags,
@@ -130,6 +147,7 @@ def initialize_calienne_components(
         claim_manager=claim_manager,
         replay_store=replay_store,
         runtime_engine=runtime_engine,
+        experience_repository=experience_repository,
     )
 
     components: dict[str, Any] = {
@@ -145,6 +163,7 @@ def initialize_calienne_components(
         "resource_manager": resource_manager,
         "runtime_engine": runtime_engine,
         "execution_manager": execution_manager,
+        "experience_repository": experience_repository,
     }
 
     logger.info(

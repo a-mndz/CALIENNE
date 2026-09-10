@@ -74,3 +74,27 @@ def test_uncertainty_engine_can_synthesize_with_uncertainty() -> None:
     )
 
     assert decision.outcome == "synthesize_with_uncertainty"
+
+
+def test_clarification_branch_emits_pause_marker() -> None:
+    from orchestrator.hitl import clear_paused_runs, get_paused_run, interrupt
+
+    clear_paused_runs()
+    engine = UncertaintyEngine()
+    decision = engine.evaluate(
+        user_query="Fix this.",
+        task_profile=TaskProfile(task_type="coding", complexity="medium", requires_code_context=True),
+        available_context_keys=[],
+    )
+    assert decision.outcome == "ask_user_clarification"
+
+    pause = interrupt(
+        decision.clarification_request,
+        trace_id="test-trace-clarify",
+        paused_at_stage="uncertainty_evaluation",
+    )
+    assert pause.trace_id == "test-trace-clarify"
+    assert pause.paused_at_stage == "uncertainty_evaluation"
+    recorded = get_paused_run("test-trace-clarify")
+    assert recorded is not None
+    assert recorded["pause"].payload == decision.clarification_request
