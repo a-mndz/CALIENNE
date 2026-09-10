@@ -165,7 +165,10 @@ class WebSearchTool:
                 {
                     "url": f"https://verified.calienne.ai/factcheck?q={abs(hash(clean_query)) % 10000}",
                     "title": f"Authoritative Fact Check: {clean_query[:50]}",
-                    "snippet": f"Verified factual data matching '{clean_query}'. Confirmed by cross-referenced benchmark sources.",
+                    "snippet": (
+                        f"Verified factual data matching '{clean_query}'. "
+                        "Confirmed by cross-referenced benchmark sources."
+                    ),
                     "published_date": "2026-01-15",
                     "source_authority": "HIGH",
                     "relevance_score": 0.95,
@@ -180,9 +183,15 @@ class WebSearchTool:
             "query": clean_query,
             "search_performed": True,
             "results": results,
-            "synthesized_answer": f"Search synthesis for '{clean_query}': {len(results)} authoritative source(s) identified.",
+            "synthesized_answer": (
+                f"Search synthesis for '{clean_query}': "
+                f"{len(results)} authoritative source(s) identified."
+            ),
             "citations": [r.get("url") for r in results if "url" in r],
-            "confidence": {"level": "HIGH" if results else "LOW", "reason": "Evaluated against authoritative verified schemas."},
+            "confidence": {
+                "level": "HIGH" if results else "LOW",
+                "reason": "Evaluated against authoritative verified schemas.",
+            },
             "contradictions_found": [],
             "search_timestamp": timestamp,
             "warnings": [],
@@ -203,7 +212,10 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "execute_python",
-                    "description": "Execute sandboxed Python code to verify mathematics, algorithmic claims, or data calculations.",
+                    "description": (
+                        "Execute sandboxed Python code to verify mathematics, "
+                        "algorithmic claims, or data calculations."
+                    ),
                     "parameters": {
                         "type": "object",
                         "properties": {

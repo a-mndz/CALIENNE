@@ -161,7 +161,9 @@ class CalienneConfig(BaseSettings):
     DATABASE_STATEMENT_CACHE_SIZE: int = Field(
         default=0,
         ge=0,
-        validation_alias=AliasChoices("CALIENNE_DATABASE_STATEMENT_CACHE_SIZE", "DATABASE_STATEMENT_CACHE_SIZE"),
+        validation_alias=AliasChoices(
+            "CALIENNE_DATABASE_STATEMENT_CACHE_SIZE", "DATABASE_STATEMENT_CACHE_SIZE"
+        ),
         description="Prepared statement cache size for asyncpg (set to 0 for PgBouncer transaction mode).",
     )
 

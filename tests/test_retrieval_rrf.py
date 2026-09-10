@@ -1,4 +1,4 @@
-﻿"""Unit tests for Hybrid Reciprocal Rank Fusion (RRF) & Reranking (P1-05)."""
+"""Unit tests for Hybrid Reciprocal Rank Fusion (RRF) & Reranking (P1-05)."""
 
 from __future__ import annotations
 
@@ -47,8 +47,18 @@ def test_reciprocal_rank_fusion_respects_limit():
 
 
 def test_rerank_candidates_boosts_relevant_tokens():
-    cand_1 = SourceCandidate(url="http://1.com", title="Postgres database configuration", excerpt="Setting up connection pools", final_score=0.5)
-    cand_2 = SourceCandidate(url="http://2.com", title="Machine learning pipelines", excerpt="Training neural network models", final_score=0.6)
+    cand_1 = SourceCandidate(
+        url="http://1.com",
+        title="Postgres database configuration",
+        excerpt="Setting up connection pools",
+        final_score=0.5,
+    )
+    cand_2 = SourceCandidate(
+        url="http://2.com",
+        title="Machine learning pipelines",
+        excerpt="Training neural network models",
+        final_score=0.6,
+    )
 
     query = "postgres database connection pools"
     reranked = rerank_candidates([cand_2, cand_1], query=query)

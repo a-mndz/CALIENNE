@@ -157,6 +157,7 @@ async def test_decision_engine_execute_judge_synthesis_high_complexity_consensus
     stub_gateway, stub_strategy, stub_pool
 ) -> None:
     from unittest.mock import AsyncMock, MagicMock
+
     from core.passport import ExecutionPassport
     from core.schemas import AgentOutput
     from orchestrator.decisions import DecisionEngine
@@ -186,5 +187,9 @@ async def test_decision_engine_execute_judge_synthesis_high_complexity_consensus
     assert result.validation_score >= 0.0
     assert streaming_mock.emit_event.called
     calls = streaming_mock.emit_event.call_args_list
-    events = [call.kwargs.get("event") or call.args[1] for call in calls if len(call.args) > 1 or "event" in call.kwargs]
+    events = [
+        call.kwargs.get("event") or call.args[1]
+        for call in calls
+        if len(call.args) > 1 or "event" in call.kwargs
+    ]
     assert any(getattr(e, "event", None) == EventType.CONSENSUS_COMPUTED for e in events)

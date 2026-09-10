@@ -10,7 +10,8 @@ def test_semantic_judge_passing_response() -> None:
     query = "Explain why memoization speeds up recursive Fibonacci."
     response = (
         "Memoization speeds up the calculation because it stores the results of subproblems. "
-        "Therefore, instead of recalculating duplicate Fibonacci branches with exponential time complexity O(2^n), "
+        "Therefore, instead of recalculating duplicate Fibonacci branches "
+        "with exponential time complexity O(2^n), "
         "each subproblem is resolved once in O(1) table lookup, yielding overall linear time complexity O(n)."
     )
     result = judge.evaluate(

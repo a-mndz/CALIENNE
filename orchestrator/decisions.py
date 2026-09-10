@@ -191,8 +191,16 @@ class DecisionEngine:
 
                 judge_plan = allocate_judges(complexity, early_exit_failed=True, task_type="general")
                 if judge_plan.requires_consensus and judge_plan.judge_count >= 2:
-                    count = max(3, judge_plan.judge_count) if complexity == "critical" else judge_plan.judge_count
-                    roles = judge_plan.judge_roles if len(judge_plan.judge_roles) >= count else ["judge"] * count
+                    count = (
+                        max(3, judge_plan.judge_count)
+                        if complexity == "critical"
+                        else judge_plan.judge_count
+                    )
+                    roles = (
+                        judge_plan.judge_roles
+                        if len(judge_plan.judge_roles) >= count
+                        else ["judge"] * count
+                    )
 
                     eval_prompt = (
                         f"Evaluate the two agent answers for query: {query}\n\n"
@@ -214,10 +222,18 @@ class DecisionEngine:
                                 passport=passport,
                                 history=history,
                             )
-                            claims = [c.strip("- *").strip() for c in raw.splitlines() if c.strip().startswith(("-", "*"))]
+                            claims = [
+                                c.strip("- *").strip()
+                                for c in raw.splitlines()
+                                if c.strip().startswith(("-", "*"))
+                            ]
                             if not claims and raw:
                                 import re
-                                claims = [s.strip() for s in re.split(r"[.!?]", raw) if len(s.strip()) > 8][:3]
+                                claims = [
+                                    s.strip()
+                                    for s in re.split(r"[.!?]", raw)
+                                    if len(s.strip()) > 8
+                                ][:3]
                             return JudgeOutput(
                                 model_id=f"judge_{idx}_{role_name}",
                                 claims=claims,
@@ -233,8 +249,12 @@ class DecisionEngine:
                                 answer="[Judge execution error]",
                             )
 
-                    judge_outputs = await asyncio.gather(*[_run_judge(i, r) for i, r in enumerate(roles[:count])])
-                    consensus = compute_consensus(list(judge_outputs), task_type="general", judge_plan=judge_plan)
+                    judge_outputs = await asyncio.gather(
+                        *[_run_judge(i, r) for i, r in enumerate(roles[:count])]
+                    )
+                    consensus = compute_consensus(
+                        list(judge_outputs), task_type="general", judge_plan=judge_plan
+                    )
 
                     if self.streaming_manager and hasattr(passport, "request_id"):
                         safe_create_task_broadcast(
@@ -246,7 +266,9 @@ class DecisionEngine:
                                         "weighted_agreement": consensus.weighted_agreement,
                                         "raw_agreement": consensus.raw_agreement,
                                         "majority_claims": consensus.majority_claims,
-                                        "minority_views": [mv.model_dump() for mv in consensus.minority_views],
+                                        "minority_views": [
+                                            mv.model_dump() for mv in consensus.minority_views
+                                        ],
                                     },
                                 ),
                             ),
@@ -257,8 +279,10 @@ class DecisionEngine:
                     if consensus.majority_claims:
                         consensus_notes.append(f"Majority: {', '.join(consensus.majority_claims[:3])}")
                     if consensus.minority_views:
-                        consensus_notes.append(f"Minority: {', '.join(mv.reason for mv in consensus.minority_views[:2])}")
-                    lessons = f"{lessons}\n[Multi-Judge Consensus]: {' | '.join(consensus_notes)}" if lessons else f"[Multi-Judge Consensus]: {' | '.join(consensus_notes)}"
+                        min_notes = ", ".join(mv.reason for mv in consensus.minority_views[:2])
+                        consensus_notes.append(f"Minority: {min_notes}")
+                    c_summary = f"[Multi-Judge Consensus]: {' | '.join(consensus_notes)}"
+                    lessons = f"{lessons}\n{c_summary}" if lessons else c_summary
             except Exception as c_err:
                 logger.warning("Multi-judge consensus synthesis degraded: %s", c_err)
 

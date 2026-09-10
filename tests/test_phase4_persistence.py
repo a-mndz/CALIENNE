@@ -111,7 +111,7 @@ async def test_real_database_checkpoint_rejects_expired_read(tmp_path) -> None:
 def test_alembic_postgres_upgrade_and_downgrade() -> None:
     from testcontainers.postgres import PostgresContainer
 
-    with PostgresContainer("postgres:16-alpine") as postgres:
+    with PostgresContainer("pgvector/pgvector:pg16") as postgres:
         database_url = postgres.get_connection_url().replace(
             "postgresql+psycopg2", "postgresql+asyncpg"
         )

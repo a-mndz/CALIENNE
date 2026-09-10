@@ -276,6 +276,7 @@ def _testcontainers_available() -> bool:
 def test_experience_repository_postgres_round_trip():
     """All four repo methods against a real PostgreSQL container (ADR-008)."""
 
+    from sqlalchemy import text
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
     from testcontainers.postgres import PostgresContainer
 
@@ -284,7 +285,7 @@ def test_experience_repository_postgres_round_trip():
     # Importing the models registers both tables on ``Base.metadata``.
     from core.models import ExperienceLearningRecord, ExperienceOperationalRecord  # noqa: F401
 
-    with PostgresContainer("postgres:16-alpine") as postgres:
+    with PostgresContainer("pgvector/pgvector:pg16") as postgres:
         url = postgres.get_connection_url().replace(
             "postgresql+psycopg2", "postgresql+asyncpg"
         )
@@ -293,6 +294,10 @@ def test_experience_repository_postgres_round_trip():
             engine = create_async_engine(url)
             try:
                 async with engine.begin() as conn:
+                    try:
+                        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+                    except Exception:
+                        pass
                     await conn.run_sync(Base.metadata.create_all)
                 factory = async_sessionmaker(engine, expire_on_commit=False)
                 repo = ExperienceRepository(db_session_factory=factory, enabled=True)

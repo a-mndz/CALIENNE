@@ -26,7 +26,7 @@ def cosine_similarity(v1: Sequence[float], v2: Sequence[float]) -> float:
     dot = 0.0
     norm1 = 0.0
     norm2 = 0.0
-    for a, b in zip(v1, v2):
+    for a, b in zip(v1, v2, strict=True):
         dot += a * b
         norm1 += a * a
         norm2 += b * b

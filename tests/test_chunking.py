@@ -5,6 +5,7 @@ Unit tests for core.chunking DocumentChunker and Chunk dataclass.
 from __future__ import annotations
 
 import pytest
+
 from core.chunking import Chunk, DocumentChunker
 
 

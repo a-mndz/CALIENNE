@@ -131,8 +131,8 @@ def initialize_calienne_components(
         "runtime_engine=wired per HIGH-009)."
     )
 
-    from orchestrator.resource_manager import ResourceManager as DagResourceManager
     from orchestrator.experience_db import ExperienceRepository
+    from orchestrator.resource_manager import ResourceManager as DagResourceManager
 
     experience_repository = ExperienceRepository(
         db_session_factory=db_session_factory,

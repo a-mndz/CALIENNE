@@ -26,18 +26,29 @@ def upgrade() -> None:
     bind = op.get_bind()
     is_pg = bind.dialect.name == "postgresql"
 
-    # 1. Add vector extension if pg
+    has_vector = False
     if is_pg:
-        op.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        check = bind.execute(
+            sa.text("SELECT 1 FROM pg_available_extensions WHERE name = 'vector'")
+        ).scalar()
+        if check:
+            op.execute("CREATE EXTENSION IF NOT EXISTS vector")
+            has_vector = True
 
     # 2. Add embedding column to experience_learning
-    if is_pg:
-        op.execute("ALTER TABLE experience_learning ADD COLUMN IF NOT EXISTS embedding vector(1024)")
+    if is_pg and has_vector:
+        op.execute(
+            "ALTER TABLE experience_learning ADD COLUMN IF NOT EXISTS embedding vector(1024)"
+        )
+    elif is_pg:
+        op.execute(
+            "ALTER TABLE experience_learning ADD COLUMN IF NOT EXISTS embedding JSONB"
+        )
     else:
         op.add_column("experience_learning", sa.Column("embedding", sa.JSON(), nullable=True))
 
     # 3. Create document_chunks table
-    if is_pg:
+    if is_pg and has_vector:
         op.execute("""
             CREATE TABLE IF NOT EXISTS document_chunks (
                 id UUID PRIMARY KEY,
@@ -50,10 +61,30 @@ def upgrade() -> None:
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
         """)
-        op.execute("CREATE INDEX IF NOT EXISTS ix_document_chunks_doc_idx ON document_chunks (document_id, chunk_index)")
+        op.execute("""
+            CREATE INDEX IF NOT EXISTS ix_document_chunks_doc_idx
+            ON document_chunks (document_id, chunk_index)
+        """)
         op.execute("""
             CREATE INDEX IF NOT EXISTS ix_document_chunks_embedding_hnsw
             ON document_chunks USING hnsw (embedding vector_cosine_ops)
+        """)
+    elif is_pg:
+        op.execute("""
+            CREATE TABLE IF NOT EXISTS document_chunks (
+                id UUID PRIMARY KEY,
+                document_id VARCHAR(128) NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                token_count INTEGER NOT NULL DEFAULT 0,
+                metadata_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+                embedding JSONB,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+        op.execute("""
+            CREATE INDEX IF NOT EXISTS ix_document_chunks_doc_idx
+            ON document_chunks (document_id, chunk_index)
         """)
     else:
         op.create_table(
@@ -67,7 +98,9 @@ def upgrade() -> None:
             sa.Column("embedding", sa.JSON(), nullable=True),
             sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         )
-        op.create_index("ix_document_chunks_doc_idx", "document_chunks", ["document_id", "chunk_index"])
+        op.create_index(
+            "ix_document_chunks_doc_idx", "document_chunks", ["document_id", "chunk_index"]
+        )
 
 
 def downgrade() -> None:

@@ -768,6 +768,7 @@ class ExecutionManager:
         if self._experience_repository is not None and getattr(self._flags, "experience_db", True):
             try:
                 import hashlib
+
                 from orchestrator.experience_db import OperationalExperience
 
                 fp = hashlib.sha256(user_query.encode("utf-8")).hexdigest()[:64]

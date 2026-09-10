@@ -57,7 +57,10 @@ class EpistemicMemory:
         tokens_b = set(re.findall(r"\w+", b.lower()))
         if not tokens_a or not tokens_b:
             return 0.0
-        if (tokens_a.issubset(tokens_b) or tokens_b.issubset(tokens_a)) and min(len(tokens_a), len(tokens_b)) >= 3:
+        if (
+            (tokens_a.issubset(tokens_b) or tokens_b.issubset(tokens_a))
+            and min(len(tokens_a), len(tokens_b)) >= 3
+        ):
             return 0.75
         return len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
 

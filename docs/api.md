@@ -109,9 +109,15 @@ Get Conversations
 
 Return all conversation sessions owned by the current user from PostgreSQL.
 
+**Parameters:**
+
+- `limit` (query): `integer`
+- `offset` (query): `integer`
+
 **Responses:**
 
 - `200` Successful Response — `object`
+- `422` Validation Error — `HTTPValidationError`
 
 ## `POST /api/conversations`
 
@@ -542,6 +548,16 @@ Register a new user, checking if the email already exists.
 Serve Login Hero Video
 
 Serve the login HTML hero video.
+
+**Responses:**
+
+- `200` Successful Response
+
+## `GET /calienne_poster.jpg`
+
+Serve Login Poster
+
+Serve the login HTML poster image.
 
 **Responses:**
 

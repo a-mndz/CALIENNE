@@ -6,6 +6,8 @@ Authentication/Runtime repairs land.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from orchestrator.conversation import (
@@ -107,6 +109,7 @@ class TestHistoryManagement:
 @pytest.mark.asyncio
 async def test_conversation_director_db_sync_round_trip(tmp_path: Any) -> None:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
     import core.models
 
     db_path = tmp_path / "test_conv.db"

@@ -128,12 +128,12 @@ async def register_user(req: AuthRegisterRequest, request: Request, db: AsyncSes
     db.add(new_user)
     try:
         await db.commit()
-    except IntegrityError:
+    except IntegrityError as err:
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered",
-        )
+        ) from err
     return {"message": "User registered successfully"}
 
 

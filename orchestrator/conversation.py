@@ -496,9 +496,9 @@ class ConversationDirector:
 
         clean_id = session_id.strip()
         from sqlalchemy import select
-        from core.models import ConversationSessionRecord
-
         from sqlalchemy.orm import selectinload
+
+        from core.models import ConversationSessionRecord
 
         result = await db_session.execute(
             select(ConversationSessionRecord)
@@ -520,7 +520,11 @@ class ConversationDirector:
         ]
         session = ConversationSession(
             session_id=record.session_id,
-            state=ConversationState(record.state) if record.state in [s.value for s in ConversationState] else ConversationState.ACTIVE,
+            state=(
+                ConversationState(record.state)
+                if record.state in [s.value for s in ConversationState]
+                else ConversationState.ACTIVE
+            ),
             history=history,
             total_tokens=record.total_tokens,
             created_at=record.created_at,
@@ -543,9 +547,9 @@ class ConversationDirector:
             return
 
         from sqlalchemy import select
-        from core.models import ConversationMessageRecord, ConversationSessionRecord
-
         from sqlalchemy.orm import selectinload
+
+        from core.models import ConversationMessageRecord, ConversationSessionRecord
 
         result = await db_session.execute(
             select(ConversationSessionRecord)

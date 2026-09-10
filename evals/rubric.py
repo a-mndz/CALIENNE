@@ -58,9 +58,15 @@ class SemanticJudge:
                 overall_score=0.0,
                 passed=False,
                 scores={
-                    "accuracy": EvaluationScore("accuracy", 0.0, self.weights["accuracy"], "Empty response"),
-                    "consistency": EvaluationScore("consistency", 0.0, self.weights["consistency"], "Empty response"),
-                    "soundness": EvaluationScore("soundness", 0.0, self.weights["soundness"], "Empty response"),
+                    "accuracy": EvaluationScore(
+                        "accuracy", 0.0, self.weights["accuracy"], "Empty response"
+                    ),
+                    "consistency": EvaluationScore(
+                        "consistency", 0.0, self.weights["consistency"], "Empty response"
+                    ),
+                    "soundness": EvaluationScore(
+                        "soundness", 0.0, self.weights["soundness"], "Empty response"
+                    ),
                 },
                 failed_assertions=["Response must not be empty"],
                 verdict="REJECTED_EMPTY",
@@ -111,9 +117,24 @@ class SemanticJudge:
             soundness_score = 4.8
 
         scores = {
-            "accuracy": EvaluationScore("accuracy", round(acc_score, 2), self.weights["accuracy"], f"Assertion/reference fidelity: {acc_score:.1f}/5.0"),
-            "consistency": EvaluationScore("consistency", round(consistency_score, 2), self.weights["consistency"], f"Internal alignment: {consistency_score:.1f}/5.0"),
-            "soundness": EvaluationScore("soundness", round(soundness_score, 2), self.weights["soundness"], f"Structural deduction: {soundness_score:.1f}/5.0"),
+            "accuracy": EvaluationScore(
+                "accuracy",
+                round(acc_score, 2),
+                self.weights["accuracy"],
+                f"Assertion/reference fidelity: {acc_score:.1f}/5.0",
+            ),
+            "consistency": EvaluationScore(
+                "consistency",
+                round(consistency_score, 2),
+                self.weights["consistency"],
+                f"Internal alignment: {consistency_score:.1f}/5.0",
+            ),
+            "soundness": EvaluationScore(
+                "soundness",
+                round(soundness_score, 2),
+                self.weights["soundness"],
+                f"Structural deduction: {soundness_score:.1f}/5.0",
+            ),
         }
 
         weighted_total = sum(s.score * s.weight for s in scores.values())

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from agents.parser import parse_and_repair
 from agents.prompt_utils import assemble_synthesizer_prompt
@@ -125,7 +125,11 @@ Output strictly in raw JSON following the calienneOutput schema layout:
     # truncated live responses mid-JSON, losing final_answer (which models
     # emit last, after their reasoning_steps) — found on the first live
     # capture, 2026-08-22.
-    if runtime_engine is not None and passport is not None and hasattr(runtime_engine, "execute_with_contracts"):
+    if (
+        runtime_engine is not None
+        and passport is not None
+        and hasattr(runtime_engine, "execute_with_contracts")
+    ):
         try:
             raw_judge_output = await runtime_engine.execute_with_contracts(
                 prompt=evaluation_prompt,

@@ -38,7 +38,13 @@ def test_factual_claim_circular_sibling_reasoning_remains_unverified() -> None:
     # Sibling agent output with evidence_type="reasoning"
     status = manager.validate_claim(
         claim,
-        [EvidenceRecord(source_id="logician", evidence_type="reasoning", content="The database is configured with 50 tables.")],
+        [
+            EvidenceRecord(
+                source_id="logician",
+                evidence_type="reasoning",
+                content="The database is configured with 50 tables.",
+            )
+        ],
     )
 
     assert status == ValidationStatus.UNVERIFIED
