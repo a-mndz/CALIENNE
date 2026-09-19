@@ -64,9 +64,7 @@ class FeatureFlags:
     def as_env_map(self) -> dict[str, bool]:
         res: dict[str, bool] = {}
         for env_name, field_name in _FLAG_FIELDS:
-            val = getattr(self, field_name)
-            res[env_name] = val
-            res[env_name.replace("CALIENNE_ENABLE_", "CALIENNE_ENABLE_")] = val
+            res[env_name] = getattr(self, field_name)
         return res
 
 
@@ -121,13 +119,11 @@ def load_flags(
 
     resolved: dict[str, bool] = {}
     for env_name, field_name in _FLAG_FIELDS:
-        legacy_name = env_name.replace("CALIENNE_ENABLE_", "CALIENNE_ENABLE_")
-        default = file_flags.get(env_name, file_flags.get(legacy_name, False))
-        matched_name = env_name if env_name in environment else legacy_name
-        env_val = environment.get(env_name) if env_name in environment else environment.get(legacy_name)
+        default = file_flags.get(env_name, False)
+        env_val = environment.get(env_name)
         value = _coerce_bool(env_val, default=default)
-        if (env_name in _RESERVED_V2_FLAGS or legacy_name in _RESERVED_V2_FLAGS) and value:
-            LOGGER.warning("%s is reserved for v2 and remains disabled in v1", matched_name)
+        if env_name in _RESERVED_V2_FLAGS and value:
+            LOGGER.warning("%s is reserved for v2 and remains disabled in v1", env_name)
             value = False
         resolved[field_name] = value
 

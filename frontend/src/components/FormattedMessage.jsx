@@ -95,7 +95,7 @@ function formatJavaOrCCode(rawCode) {
 
   return out
     .split("\n")
-    .map((l) => l.trimRight())
+    .map((l) => l.trimEnd())
     .filter((l, idx, arr) => l !== "" || idx < arr.length - 1)
     .join("\n")
     .trim();
@@ -152,14 +152,20 @@ function splitEmbeddedCodeBlocks(str) {
       }
     }
 
+    const detectLang = (code) => {
+      if (/public\s+static\s+void\s+main|System\.out\.println/i.test(code)) return "JAVA";
+      if (/console\.log|export\s+default|function\s+\(/i.test(code)) return "JAVASCRIPT";
+      return "CODE";
+    };
+
     if (endIdx === -1) {
       const rawSnippet = currentText.slice(startIdx).trim();
-      segments.push({ type: "code", code: formatJavaOrCCode(rawSnippet), language: "JAVA" });
+      segments.push({ type: "code", code: formatJavaOrCCode(rawSnippet), language: detectLang(rawSnippet) });
       break;
     }
 
     const rawCode = currentText.slice(startIdx, endIdx).trim();
-    segments.push({ type: "code", code: formatJavaOrCCode(rawCode), language: "JAVA" });
+    segments.push({ type: "code", code: formatJavaOrCCode(rawCode), language: detectLang(rawCode) });
     currentText = currentText.slice(endIdx).trim();
   }
 

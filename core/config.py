@@ -242,10 +242,15 @@ class CalienneConfig(BaseSettings):
             )
         return value
 
+    INITIAL_ADMIN_EMAIL: str = Field(
+        default="",
+        validation_alias=AliasChoices("CALIENNE_INITIAL_ADMIN_EMAIL", "INITIAL_ADMIN_EMAIL"),
+        description="Optional email address automatically assigned the admin role on registration.",
+    )
+
     JWT_ALGORITHM: str = Field(
         default="HS256",
         validation_alias=AliasChoices(
-            "CALIENNE_JWT_ALGORITHM",
             "CALIENNE_JWT_ALGORITHM",
             "calienne_JWT_ALGORITHM",
         ),
@@ -255,7 +260,6 @@ class CalienneConfig(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
         default=60,
         validation_alias=AliasChoices(
-            "CALIENNE_JWT_ACCESS_TOKEN_EXPIRE_MINUTES",
             "CALIENNE_JWT_ACCESS_TOKEN_EXPIRE_MINUTES",
             "calienne_JWT_ACCESS_TOKEN_EXPIRE_MINUTES",
         ),

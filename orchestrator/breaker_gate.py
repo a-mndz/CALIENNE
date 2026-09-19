@@ -35,7 +35,7 @@ class BreakerGate:
     calls it would have made without a breaker.
     """
 
-    BREAKER_TIMEOUT_MS: int = 100
+    BREAKER_TIMEOUT_MS: int = 5000
     KNOWLEDGE_ABSENCE_THRESHOLD: float = 0.3
     KNOWLEDGE_ABSENCE_SENTINEL: str = "KNOWLEDGE ABSENCE DETECTED"
 
@@ -49,6 +49,12 @@ class BreakerGate:
         self.streaming_manager = streaming_manager
         if timeout_ms is not None:
             self.BREAKER_TIMEOUT_MS = int(timeout_ms)
+        else:
+            try:
+                from core.config import get_settings
+                self.BREAKER_TIMEOUT_MS = int(get_settings().BREAKER_TIMEOUT_MS)
+            except Exception:
+                pass
 
     async def execute(
         self,

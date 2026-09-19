@@ -32,6 +32,30 @@ async def test_python_repl_banned_modules() -> None:
     assert result.success is False
     assert "prohibited" in (result.error or "")
 
+    result_os = await repl.execute("import os\nos.listdir('.')")
+    assert result_os.success is False
+    assert "prohibited" in (result_os.error or "")
+
+
+@pytest.mark.asyncio
+async def test_python_repl_banned_builtins() -> None:
+    repl = PythonREPLTool()
+    result_eval = await repl.execute("eval('1 + 1')")
+    assert result_eval.success is False
+    assert "prohibited" in (result_eval.error or "")
+
+    result_open = await repl.execute("open('file.txt', 'w')")
+    assert result_open.success is False
+    assert "prohibited" in (result_open.error or "")
+
+
+@pytest.mark.asyncio
+async def test_python_repl_dunder_attributes() -> None:
+    repl = PythonREPLTool()
+    result = await repl.execute("x = ().__class__.__base__")
+    assert result.success is False
+    assert "prohibited" in (result.error or "")
+
 
 @pytest.mark.asyncio
 async def test_web_search_tool_schema_compliance() -> None:
@@ -43,6 +67,8 @@ async def test_web_search_tool_schema_compliance() -> None:
     assert "url" in res["results"][0]
     assert "confidence" in res
     assert res["search_performed"] is True
+    assert res["results"][0]["source_authority"] == "SIMULATED"
+    assert res["confidence"]["level"] == "LOW"
 
 
 @pytest.mark.asyncio

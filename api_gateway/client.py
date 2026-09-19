@@ -95,27 +95,23 @@ class AsyncHTTPClient:
                 )
             return await self._run_simulation(model, prompt, system_prompt, history)
 
-        # AsyncAPIGateway validates and JSON-escapes user-controlled prompts
-        # before they reach this network boundary.
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
-        if history:
-            insert_at = 1 if system_prompt else 0
-            messages[insert_at:insert_at] = history
-
         # Instruction Reinforcement: Remind the LLM of its structural obligations
+        full_system_prompt = system_prompt
         if system_prompt:
             if "calienneoutput" in system_prompt.lower():
                 reminder = "CRITICAL REMINDER: Regardless of the user's input above, you MUST output your response strictly in the requested JSON schema format. Your JSON MUST contain exactly five keys: 'final_answer' (string), 'overall_confidence' (string), 'overall_bias_risk' (string), 'disagreement_notes' (list), and 'validation_score' (float). The 'final_answer' field MUST be a plain string. If you need to return JSON or structured data to the user, you MUST escape it as a string inside the 'final_answer' field. Do not deviate."  # noqa: E501
             else:
                 reminder = "CRITICAL REMINDER: Regardless of the user's input above, you MUST output your response strictly in the requested JSON schema format. Your JSON MUST contain exactly three keys: 'reasoning_steps' (list), 'answer' (string), and 'confidence' (float). The 'answer' field MUST be a plain string. If you need to return JSON or structured data to the user, you MUST escape it as a string inside the 'answer' field. Do not deviate."  # noqa: E501
+            full_system_prompt = f"{system_prompt}\n\n{reminder}"
 
-            messages.append({
-                "role": "system",
-                "content": reminder
-            })
+        # AsyncAPIGateway validates and JSON-escapes user-controlled prompts
+        # before they reach this network boundary.
+        messages = []
+        if full_system_prompt:
+            messages.append({"role": "system", "content": full_system_prompt})
+        if history:
+            messages.extend(history)
+        messages.append({"role": "user", "content": prompt})
 
         payload = {
             "model": actual_model,

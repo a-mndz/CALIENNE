@@ -100,9 +100,23 @@ async def save_conversation(
         session_rec.title = req.title[:255]
         session_rec.state = req.mode[:32]
         session_rec.updated_at = datetime.now(timezone.utc)
-        existing_count = len(session_rec.messages) if session_rec.messages else 0
+        existing_msgs = sorted(session_rec.messages or [], key=lambda m: m.timestamp)
+        existing_count = len(existing_msgs)
+
+        # Detect if any existing turns were modified, replaced, or truncated
+        modified = False
         if len(req.transcript) < existing_count:
-            # Client truncated or reset conversation: wipe and re-insert
+            modified = True
+        else:
+            for idx in range(existing_count):
+                turn = req.transcript[idx]
+                msg = existing_msgs[idx]
+                if (turn.get("text") or "") != msg.content or (turn.get("role") or "user")[:16] != msg.role:
+                    modified = True
+                    break
+
+        if modified:
+            # Replace all messages if prior history was edited or truncated
             await db.execute(
                 delete(ConversationMessageRecord).where(
                     ConversationMessageRecord.session_id == session_rec.id

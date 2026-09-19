@@ -561,7 +561,7 @@ async def handle_query_stream(
             error_event = {
                 "event": "error",
                 "data": {"stage": "unknown", "message": "Streaming failed."},
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
             yield f"data: {json.dumps(error_event)}\n\n"
         finally:
@@ -939,12 +939,10 @@ async def save_vault_secret(
         raise HTTPException(status_code=400, detail="Invalid account identifier.")
     if secret:
         os.environ[f"CALIENNE_{account}"] = secret
-        os.environ[f"CALIENNE_{account}"] = secret
         os.environ[account] = secret
         storage = "memory"
         try:
             import keyring
-            keyring.set_password("Calienne", account, secret)
             keyring.set_password("Calienne", account, secret)
             storage = "keyring"
         except Exception as exc:

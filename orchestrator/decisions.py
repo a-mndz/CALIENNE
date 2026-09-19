@@ -53,7 +53,7 @@ class DecisionEngine:
     """
 
     # ── Timing Constants (kept for API compatibility; owned by the parts) ──
-    BREAKER_TIMEOUT_MS: int = 100
+    BREAKER_TIMEOUT_MS: int = 5000
     KNOWLEDGE_ABSENCE_THRESHOLD: float = 0.3
     KNOWLEDGE_ABSENCE_SENTINEL: str = "KNOWLEDGE ABSENCE DETECTED"
     ABORT_DELAY_MS: int = 10
@@ -210,7 +210,14 @@ class DecisionEngine:
                     )
                     sys_prompt = "You are an expert Judge Arbiter. Analyze and output key claims."
 
+                    judge_chain = strategy.get_model_chain("judge")
+
                     async def _run_judge(idx: int, role_name: str) -> JudgeOutput:
+                        target_model = (
+                            judge_chain[idx % len(judge_chain)]
+                            if judge_chain
+                            else f"judge_{idx}_{role_name}"
+                        )
                         try:
                             raw = await self._dispatch_provider_call(
                                 prompt=eval_prompt,
@@ -235,7 +242,7 @@ class DecisionEngine:
                                     if len(s.strip()) > 8
                                 ][:3]
                             return JudgeOutput(
-                                model_id=f"judge_{idx}_{role_name}",
+                                model_id=target_model,
                                 claims=claims,
                                 confidence=0.85,
                                 answer=raw[:200] if raw else "",
@@ -243,7 +250,7 @@ class DecisionEngine:
                         except Exception as j_err:
                             logger.warning("Judge %d execution failed: %s", idx, j_err)
                             return JudgeOutput(
-                                model_id=f"judge_{idx}_{role_name}",
+                                model_id=target_model,
                                 claims=[],
                                 confidence=0.0,
                                 answer="[Judge execution error]",

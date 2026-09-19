@@ -41,12 +41,44 @@ class PythonREPLTool:
     and executes inside a sandboxed subprocess with strict timeouts.
     """
 
-    BANNED_MODULES = {
-        "os.system",
+    BANNED_MODULES = frozenset({
+        "os",
+        "sys",
         "subprocess",
-        "shutil.rmtree",
+        "shutil",
         "ctypes",
-    }
+        "socket",
+        "urllib",
+        "requests",
+        "http",
+        "pathlib",
+        "builtins",
+        "importlib",
+        "pty",
+        "platform",
+        "multiprocessing",
+        "threading",
+        "posix",
+        "nt",
+    })
+
+    BANNED_BUILTIN_CALLS = frozenset({
+        "__import__",
+        "eval",
+        "exec",
+        "open",
+        "compile",
+        "getattr",
+        "setattr",
+        "delattr",
+        "globals",
+        "locals",
+        "vars",
+        "input",
+        "breakpoint",
+        "exit",
+        "quit",
+    })
 
     def __init__(self, timeout_seconds: float = 5.0, max_output_chars: int = 10_000) -> None:
         self.timeout_seconds = timeout_seconds
@@ -63,11 +95,26 @@ class PythonREPLTool:
             # Check direct imports
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    if alias.name in ("subprocess", "ctypes"):
+                    root_mod = alias.name.split(".")[0]
+                    if root_mod in self.BANNED_MODULES or alias.name in self.BANNED_MODULES:
                         raise PermissionError(f"Module '{alias.name}' is prohibited in sandboxed REPL")
             elif isinstance(node, ast.ImportFrom):
-                if node.module in ("subprocess", "ctypes"):
-                    raise PermissionError(f"Importing from '{node.module}' is prohibited in sandboxed REPL")
+                if node.module:
+                    root_mod = node.module.split(".")[0]
+                    if root_mod in self.BANNED_MODULES or node.module in self.BANNED_MODULES:
+                        raise PermissionError(
+                            f"Importing from '{node.module}' is prohibited in sandboxed REPL"
+                        )
+            elif isinstance(node, ast.Call):
+                if isinstance(node.func, ast.Name) and node.func.id in self.BANNED_BUILTIN_CALLS:
+                    raise PermissionError(f"Call to '{node.func.id}' is prohibited in sandboxed REPL")
+                elif isinstance(node.func, ast.Attribute) and node.func.attr in self.BANNED_BUILTIN_CALLS:
+                    raise PermissionError(f"Call to '{node.func.attr}' is prohibited in sandboxed REPL")
+            elif isinstance(node, ast.Attribute):
+                if node.attr.startswith("__") and node.attr.endswith("__"):
+                    raise PermissionError(
+                        f"Access to dunder attribute '{node.attr}' is prohibited in sandboxed REPL"
+                    )
 
     async def execute(self, code: str) -> ToolResult:
         """Execute the given Python snippet in an isolated subprocess."""
@@ -170,7 +217,7 @@ class WebSearchTool:
                         "Confirmed by cross-referenced benchmark sources."
                     ),
                     "published_date": "2026-01-15",
-                    "source_authority": "HIGH",
+                    "source_authority": "SIMULATED",
                     "relevance_score": 0.95,
                     "verified": True,
                 }
@@ -189,8 +236,12 @@ class WebSearchTool:
             ),
             "citations": [r.get("url") for r in results if "url" in r],
             "confidence": {
-                "level": "HIGH" if results else "LOW",
-                "reason": "Evaluated against authoritative verified schemas.",
+                "level": "HIGH" if (results and self.search_provider) else "LOW",
+                "reason": (
+                    "Evaluated against authoritative verified schemas."
+                    if self.search_provider
+                    else "Simulated search fallback (unverified offline environment)."
+                ),
             },
             "contradictions_found": [],
             "search_timestamp": timestamp,

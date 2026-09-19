@@ -118,9 +118,16 @@ async def register_user(req: AuthRegisterRequest, request: Request, db: AsyncSes
             detail="Email already registered",
         )
 
-    # Check if this is the first user registered using scalar count
-    user_count = (await db.scalar(select(func.count(User.id)))) or 0
-    user_role = "admin" if user_count == 0 else "user"
+    # Safe role determination:
+    # If INITIAL_ADMIN_EMAIL is set, only that address receives the admin role.
+    # Otherwise, assign admin only if no admin currently exists in the database.
+    settings = get_settings()
+    configured_admin = getattr(settings, "INITIAL_ADMIN_EMAIL", "").strip().lower()
+    if configured_admin:
+        user_role = "admin" if req.email == configured_admin else "user"
+    else:
+        admin_count = (await db.scalar(select(func.count(User.id)).where(User.role == "admin"))) or 0
+        user_role = "admin" if admin_count == 0 else "user"
 
     # Hash the password and store the user
     hashed = hash_password(req.password)
