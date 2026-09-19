@@ -99,85 +99,95 @@ class StrategyMode(str, Enum):
 # - Groq accepts ~20KB request bodies but rejects ~30KB (HTTP 413): the
 #   per-call runtime-contract layer was slimmed to the output-shaping
 #   contracts (agents/prompt_manager.py) so Groq stays a viable fallback.
-# - Google endpoints accept the full layered prompt.
+# Re-verified 2026-09-19 (model fleet update):
+# - openrouter/inclusionai/ling-3.0-flash-fin:free added (verified live via
+#   OpenRouter /api/v1/models; free tier).
+# - google/gemini-3.1-flash-lite promoted into the FREE/HYBRID chains (verified
+#   live: 200 OK in 3.1s with JSON mode + temperature accepted). The requested
+#   'gemini-3.8-live-extended-thinking' is Live-API only (bidiGenerateContent
+#   over WebSocket — 400 on generateContent) and cannot serve pipeline roles.
+# - justwoker/claude-opus-4-8 added via the justwoker relay, which speaks the
+#   ANTHROPIC-native /v1/messages API (OpenAI-style /chat/completions is
+#   Cloudflare-blocked there); routed through _post_anthropic_native.
+# - kie (api.kie.ai) removed per operator request.
 FREE_MODELS: Dict[str, List[str]] = {
     "generation": [
-        "google/gemini-3.5-flash-lite",
         "groq/openai/gpt-oss-120b",
-        "groq/openai/gpt-oss-20b",
+        "openrouter/inclusionai/ling-3.0-flash-fin:free",
+        "google/gemini-3.1-flash-lite",
     ],
     "logician": [
         "groq/openai/gpt-oss-120b",
-        "google/gemini-3.5-flash-lite",
+        "google/gemini-3.1-flash-lite",
         "groq/openai/gpt-oss-20b",
     ],
     "creative": [
-        "google/gemini-3.5-flash-lite",
+        "google/gemini-3.1-flash-lite",
         "groq/openai/gpt-oss-120b",
-        "groq/openai/gpt-oss-20b",
+        "openrouter/inclusionai/ling-3.0-flash-fin:free",
     ],
     "breaker": [
-        "google/gemini-3.5-flash-lite",
+        "google/gemini-3.1-flash-lite",
         "groq/openai/gpt-oss-20b",
     ],
     "judge": [
-        "google/gemini-3.5-flash-lite",
         "groq/openai/gpt-oss-120b",
+        "google/gemini-3.1-flash-lite",
     ],
 }
 
 HYBRID_MODELS: Dict[str, List[str]] = {
     "generation": [
-        "google/gemini-3.7-flash",
         "groq/openai/gpt-oss-120b",
+        "google/gemini-3.1-flash-lite",
         "google/gemini-3.5-flash-lite",
     ],
     "logician": [
         "groq/openai/gpt-oss-120b",
-        "google/gemini-3.7-flash",
-        "google/gemini-3.5-flash-lite",
+        "google/gemini-3.1-flash-lite",
+        "openrouter/inclusionai/ling-3.0-flash-fin:free",
     ],
     "creative": [
-        "google/gemini-3.7-flash",
+        "google/gemini-3.1-flash-lite",
         "groq/openai/gpt-oss-120b",
         "google/gemini-3.5-flash-lite",
     ],
     "breaker": [
-        "google/gemini-3.5-flash-lite",
+        "google/gemini-3.1-flash-lite",
         "groq/openai/gpt-oss-20b",
     ],
     "judge": [
         "google/gemini-3.7-flash",
+        "justwoker/claude-opus-4-8",
         "groq/openai/gpt-oss-120b",
-        "google/gemini-3.5-flash-lite",
     ],
 }
 
 PAID_MODELS: Dict[str, List[str]] = {
     "generation": [
+        "justwoker/claude-opus-4-8",
         "openrouter/anthropic/claude-sonnet-5",
         "google/gemini-pro-latest",
-        "google/gemini-3.7-flash",
     ],
     "logician": [
         "google/gemini-pro-latest",
         "openrouter/anthropic/claude-sonnet-5",
-        "google/gemini-3.7-flash",
+        "justwoker/claude-opus-4-8",
     ],
     "creative": [
+        "justwoker/claude-opus-4-8",
         "openrouter/anthropic/claude-sonnet-5",
         "google/gemini-pro-latest",
-        "google/gemini-3.7-flash",
     ],
     "breaker": [
-        "google/gemini-3.5-flash-lite",
+        "google/gemini-3.1-flash-lite",
         "openai/gpt-4o-mini",
-        "openrouter/anthropic/claude-sonnet-5",
+        "justwoker/claude-opus-4-8",
     ],
     "judge": [
+        "justwoker/claude-opus-4-8",
         "openrouter/anthropic/claude-opus-5",
         "google/gemini-pro-latest",
-        "google/gemini-3.7-flash",
     ],
 }
 

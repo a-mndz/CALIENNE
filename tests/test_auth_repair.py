@@ -35,7 +35,6 @@ class TestCRIT007LiveKeyRejection:
                 MISTRAL_API_KEY="",
                 GOOGLE_API_KEY="",
                 OPENAI_API_KEY="",
-                KIE_API_KEY="",
                 UNLI_DEV_API_KEY="",
             )
         assert "OPENROUTER_API_KEY" in str(exc.value)
@@ -56,7 +55,6 @@ class TestCRIT007LiveKeyRejection:
                 MISTRAL_API_KEY="",
                 GOOGLE_API_KEY="",
                 OPENAI_API_KEY="",
-                KIE_API_KEY="",
                 UNLI_DEV_API_KEY="",
             )
 
@@ -72,7 +70,6 @@ class TestCRIT007LiveKeyRejection:
             MISTRAL_API_KEY="",
             GOOGLE_API_KEY="",
             OPENAI_API_KEY="",
-            KIE_API_KEY="",
             UNLI_DEV_API_KEY="",
         )
         assert s.OPENROUTER_API_KEY == ""
@@ -103,7 +100,6 @@ class TestCRIT005JWTSecretHardening:
                 MISTRAL_API_KEY="",
                 GOOGLE_API_KEY="",
                 OPENAI_API_KEY="",
-                KIE_API_KEY="",
                 UNLI_DEV_API_KEY="",
             )
         assert "JWT_SECRET_KEY" in str(exc.value)
@@ -120,7 +116,6 @@ class TestCRIT005JWTSecretHardening:
                 MISTRAL_API_KEY="",
                 GOOGLE_API_KEY="",
                 OPENAI_API_KEY="",
-                KIE_API_KEY="",
                 UNLI_DEV_API_KEY="",
             )
 
@@ -136,7 +131,6 @@ class TestCRIT005JWTSecretHardening:
                 MISTRAL_API_KEY="",
                 GOOGLE_API_KEY="",
                 OPENAI_API_KEY="",
-                KIE_API_KEY="",
                 UNLI_DEV_API_KEY="",
             )
 
@@ -153,7 +147,6 @@ class TestCRIT005JWTSecretHardening:
                 MISTRAL_API_KEY="",
                 GOOGLE_API_KEY="",
                 OPENAI_API_KEY="",
-                KIE_API_KEY="",
                 UNLI_DEV_API_KEY="",
             )
         finally:

@@ -24,7 +24,9 @@ class _Plan:
 def test_get_model_chain_unchanged_for_base_roles() -> None:
     strat = ProviderStrategy("PAID")
     chain = strat.get_model_chain("generation")
-    assert chain[0] == "openrouter/anthropic/claude-sonnet-5"
+    # 2026-09-19 fleet update: justwoker Anthropic-native Opus 4.8 relay is the
+    # PAID generation primary.
+    assert chain[0] == "justwoker/claude-opus-4-8"
     assert len(chain) >= 2  # primary + fallback guarantee
 
 

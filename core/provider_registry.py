@@ -145,6 +145,9 @@ class CustomProviderSpec(CalienneBaseModel):
     name: str
     base_url: str
     has_api_key: bool = False
+    # Wire protocol: "openai" (POST {base}/chat/completions) or "anthropic"
+    # (POST {base}/v1/messages). See api_gateway/client.py.
+    api_format: str = "openai"
     models: list[CustomModelSpec] = []
     created_at: str = ""
     updated_at: str = ""
@@ -182,6 +185,7 @@ class ProviderRegistry:
                     name=pdata.get("name", pid),
                     base_url=pdata.get("base_url", ""),
                     has_api_key=pdata.get("has_api_key", False),
+                    api_format=pdata.get("api_format", "openai"),
                     models=models,
                     created_at=pdata.get("created_at", _utcnow_iso()),
                     updated_at=pdata.get("updated_at", _utcnow_iso()),
@@ -214,6 +218,7 @@ class ProviderRegistry:
                     "name": spec.name,
                     "base_url": spec.base_url,
                     "has_api_key": spec.has_api_key,
+                    "api_format": spec.api_format,
                     "models": [m.model_dump() for m in spec.models],
                     "created_at": spec.created_at,
                     "updated_at": spec.updated_at,
@@ -352,6 +357,7 @@ class ProviderRegistry:
         provider_id: Optional[str] = None,
         strategy: Optional[Any] = None,
         pool: Optional[Any] = None,
+        api_format: str = "openai",
     ) -> CustomProviderSpec:
         """Register a new provider or update an existing one, saving secret to Keyring."""
         pid = _sanitize_slug(provider_id or name)
@@ -400,6 +406,7 @@ class ProviderRegistry:
             name=name.strip(),
             base_url=base,
             has_api_key=has_key,
+            api_format=api_format,
             models=model_specs,
             created_at=existing.created_at if existing else now,
             updated_at=now,

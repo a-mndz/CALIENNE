@@ -94,11 +94,6 @@ class CalienneConfig(BaseSettings):
         validation_alias=AliasChoices("CALIENNE_OPENAI_API_KEY", "CALIENNE_OPENAI_API_KEY", "OPENAI_API_KEY"),
         description="API key for OpenAI.",
     )
-    KIE_API_KEY: str = Field(
-        default="",
-        validation_alias=AliasChoices("CALIENNE_KIE_API_KEY", "CALIENNE_KIE_API_KEY", "KIE_API_KEY"),
-        description="API key for Kie.ai.",
-    )
     UNLI_DEV_API_KEY: str = Field(
         default="",
         validation_alias=AliasChoices("CALIENNE_UNLI_DEV_API_KEY", "UNLI_DEV_API_KEY"),
@@ -113,7 +108,6 @@ class CalienneConfig(BaseSettings):
         "MISTRAL_API_KEY",
         "GOOGLE_API_KEY",
         "OPENAI_API_KEY",
-        "KIE_API_KEY",
         "UNLI_DEV_API_KEY",
         mode="after",
     )
@@ -374,10 +368,6 @@ class CalienneConfig(BaseSettings):
     @property
     def openai_api_key(self) -> str:
         return self.OPENAI_API_KEY
-
-    @property
-    def kie_api_key(self) -> str:
-        return self.KIE_API_KEY
 
     @property
     def unli_dev_api_key(self) -> str:

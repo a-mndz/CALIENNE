@@ -281,7 +281,6 @@ pip install keyring
 "..."          | keyring set Calienne MISTRAL_API_KEY
 "..."          | keyring set Calienne GOOGLE_API_KEY
 "sk-..."       | keyring set Calienne OPENAI_API_KEY
-"..."          | keyring set Calienne KIE_API_KEY
 "..."          | keyring set Calienne UNLI_DEV_API_KEY
 ```
 
@@ -449,15 +448,27 @@ Fallback chains verified live 2026-08 (`api_gateway/strategy.py`); per-million-t
 
 | Mode | Fallback chain (generation role) | Cost | Best For |
 |------|----------------------------------|------|----------|
-| `FREE` | Gemini 3.5 Flash-Lite → GPT-OSS-120B → GPT-OSS-20B | Lowest | Testing, development, low-stakes queries |
-| `HYBRID` | Gemini 3.7 Flash → GPT-OSS-120B → Gemini 3.5 Flash-Lite | Low | Balanced quality and cost |
-| `PAID` | Claude Sonnet 5 → Gemini Pro (latest) → Gemini 3.7 Flash | Higher | Maximum accuracy, production use |
+| `FREE` | GPT-OSS-120B → Ling 3.0 Flash-Fin (free) → Gemini 3.1 Flash-Lite | Lowest | Testing, development, low-stakes queries |
+| `HYBRID` | GPT-OSS-120B → Gemini 3.1 Flash-Lite → Gemini 3.5 Flash-Lite | Low | Balanced quality and cost |
+| `PAID` | Claude Opus 4.8 (justwoker relay) → Claude Sonnet 5 → Gemini Pro (latest) | Higher | Maximum accuracy, production use |
 
 Routes re-verified live on the first live capture (2026-08-22): the Gemini 2.5
 line is unavailable to new API keys and `unli/*` returns 401 — both removed
 from every map. Groq accepts ~20KB request bodies but rejects ~30KB (HTTP
 413); the per-call runtime-contract layer was slimmed to the output-shaping
 contracts so Groq stays a viable fallback.
+
+Fleet updated 2026-09-19: added `openrouter/inclusionai/ling-3.0-flash-fin:free`
+(verified via the OpenRouter model list), promoted `google/gemini-3.1-flash-lite`
+into the HYBRID creative/logician chains (verified live: 200 OK in 3.1s with
+JSON mode), added the `justwoker` Claude Opus 4.8 relay — which speaks the
+**Anthropic-native `/v1/messages` API** (its OpenAI-style `/chat/completions`
+path is Cloudflare-blocked), routed via `AsyncHTTPClient._post_anthropic_native`
+with the key stored in the OS keyring as `PROVIDER_KEY_justwoker` — and removed
+`kie` (api.kie.ai) per operator request. Note: `gemini-3.8-live-extended-thinking`
+exists on the Google key but only supports the bidirectional Live API
+(WebSocket `bidiGenerateContent`), not request/response chat, so it cannot
+serve pipeline roles.
 
 ---
 

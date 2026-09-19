@@ -61,7 +61,6 @@ class AsyncHTTPClient:
             "mistral": settings.mistral_api_key,
             "google": settings.google_api_key,
             "openai": settings.openai_api_key,
-            "kie": settings.kie_api_key,
             "unli": settings.unli_dev_api_key,
             "unli-dev": settings.unli_dev_api_key,
         }
@@ -94,6 +93,14 @@ class AsyncHTTPClient:
                     "refusing to return a simulated answer."
                 )
             return await self._run_simulation(model, prompt, system_prompt, history)
+
+        # Anthropic-native relay path (e.g. custom providers like justwoker that
+        # expose /v1/messages rather than OpenAI-style /chat/completions).
+        custom_prov = get_provider_registry().get_provider(provider)
+        if custom_prov is not None and getattr(custom_prov, "api_format", "openai") == "anthropic":
+            return await self._post_anthropic_native(
+                custom_prov, actual_model, prompt, system_prompt, history, max_tokens
+            )
 
         # Instruction Reinforcement: Remind the LLM of its structural obligations
         full_system_prompt = system_prompt
@@ -152,8 +159,6 @@ class AsyncHTTPClient:
             url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
         elif provider == "openai":
             url = "https://api.openai.com/v1/chat/completions"
-        elif provider == "kie":
-            url = "https://api.kie.ai/v1/chat/completions"
         elif provider in {"unli", "unli-dev"}:
             url = "https://api.unli.dev/v1/chat/completions"
         elif provider == "local":
@@ -281,6 +286,98 @@ class AsyncHTTPClient:
 
         # Standard synthesis judge output
         return '{"final_answer": "Successfully synthesized simulated reasoning solutions. Systems functional.", "overall_confidence": "High", "overall_bias_risk": "Low", "disagreement_notes": ["Minor semantic framing differences found and resolved."], "validation_score": 9.2}'  # noqa: E501
+
+    async def _post_anthropic_native(
+        self,
+        custom_prov: Any,
+        model: str,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        history: list[dict[str, str]] | None = None,
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        """Call an Anthropic-native relay (POST /v1/messages).
+
+        Some custom providers (e.g. justwoker) expose the Anthropic Messages
+        API rather than the OpenAI chat-completions API. This translates the
+        OpenAI-style payload into Anthropic's schema and back:
+
+        * system prompt -> top-level ``system`` field (not a message)
+        * messages list  -> Anthropic ``messages`` (user/assistant only)
+        * response       -> concatenated ``content[].text`` blocks
+
+        Note: Anthropic rejects ``response_format`` and requires ``max_tokens``;
+        the low-variance temperature is applied (the justwoker relay accepts it,
+        unlike api.anthropic.com's Claude 5 family which 400s on it).
+        """
+        base = (custom_prov.base_url or "").strip().rstrip("/")
+        url = f"{base}/messages" if base.endswith("/v1") else f"{base}/v1/messages"
+
+        messages: list[dict[str, str]] = []
+        if history:
+            # Anthropic only accepts user/assistant roles in the messages array.
+            messages.extend(m for m in history if m.get("role") in {"user", "assistant"})
+        messages.append({"role": "user", "content": prompt})
+
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            # Anthropic requires an explicit max_tokens ceiling.
+            "max_tokens": int(max_tokens) if max_tokens is not None else 4096,
+            "temperature": 0.1,
+        }
+        if system_prompt:
+            payload["system"] = system_prompt
+
+        api_key = get_provider_registry().get_api_key(custom_prov.id)
+        headers = {
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01",
+        }
+        if api_key:
+            headers["x-api-key"] = api_key.strip()
+
+        request_start = time.monotonic()
+        response = await self.client.post(url, json=payload, headers=headers)
+        latency_s = time.monotonic() - request_start
+        if response.status_code != 200:
+            observer.track_usage(model, 0, 0, latency_s=latency_s, success=False)
+            _last_provider_usage.set({
+                "model": model,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "latency_s": latency_s,
+                "success": False,
+                "estimated": False,
+            })
+            raise httpx.HTTPStatusError(
+                f"Provider request failed with HTTP {response.status_code}",
+                request=response.request,
+                response=response,
+            )
+
+        data = response.json()
+        raw_usage = data.get("usage") or {}
+        prompt_tokens = int(raw_usage.get("input_tokens", 0) or 0)
+        completion_tokens = int(raw_usage.get("output_tokens", 0) or 0)
+        content_blocks = data.get("content") or []
+        output_content = "".join(
+            block.get("text", "") for block in content_blocks if block.get("type") == "text"
+        )
+        estimated = not (prompt_tokens or completion_tokens)
+        if estimated:
+            prompt_tokens = max(1, len(prompt) // 4)
+            completion_tokens = max(1, len(output_content) // 4)
+        observer.track_usage(model, prompt_tokens, completion_tokens, latency_s=latency_s, success=True)
+        _last_provider_usage.set({
+            "model": model,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "latency_s": latency_s,
+            "success": True,
+            "estimated": estimated,
+        })
+        return output_content
 
     async def close(self):
         await self.client.aclose()

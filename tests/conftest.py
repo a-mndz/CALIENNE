@@ -40,7 +40,6 @@ for _key in (
     "MISTRAL_API_KEY",
     "GOOGLE_API_KEY",
     "OPENAI_API_KEY",
-    "KIE_API_KEY",
     "UNLI_DEV_API_KEY",
 ):
     os.environ.setdefault(f"CALIENNE_{_key}", "")

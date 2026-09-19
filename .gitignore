@@ -92,6 +92,11 @@ aetheris-ui
 # test_database_repair.py plus the slow Alembic round-trip both require
 # alembic.ini to exist in the checkout.
 
+# Per-machine provider registry written by the Model & Provider Studio
+# (base URLs, model lists, role preferences — no secrets; keys live in the
+# OS keyring). Machine-local by design, like .env.
+config/custom_providers.json
+
 # Reference documentation & repair reports
 # NOTE: docs/api.md must stay tracked — CI runs
 # `generate_api_reference.py --check`, which fails when the file is absent.
