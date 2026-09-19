@@ -97,6 +97,20 @@ class ExecutionState:
         validate_string_list(self.checkpoints, "checkpoints")
 
 
+def _jsonable(value: Any) -> Any:
+    """Recursively convert Pydantic models to plain dicts (JSON-safe snapshot)."""
+    if hasattr(value, "model_dump"):
+        try:
+            return value.model_dump(mode="json")
+        except Exception:  # pragma: no cover - defensive
+            return str(value)
+    if isinstance(value, dict):
+        return {key: _jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(item) for item in value]
+    return value
+
+
 @dataclass
 class ExecutionPassport:
     """
@@ -309,7 +323,13 @@ class ExecutionPassport:
                 },
                 "execution_state": {
                     "current_stage": self.execution_state.current_stage,
-                    "agent_outputs": deepcopy(self.execution_state.agent_outputs),
+                    # model_dump Pydantic agent outputs so the snapshot is
+                    # JSON-serialisable end to end — raw AgentOutput objects
+                    # made json.dumps raise TypeError downstream (live 500,
+                    # 2026-09-19).
+                    "agent_outputs": _jsonable(
+                        deepcopy(self.execution_state.agent_outputs)
+                    ),
                     "errors": deepcopy(self.execution_state.errors),
                     "warnings": list(self.execution_state.warnings),
                     "checkpoints": list(self.execution_state.checkpoints),

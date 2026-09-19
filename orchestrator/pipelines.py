@@ -168,6 +168,22 @@ async def run_micro_mode(
     )
 
 
+def _json_safe(value: Any) -> Any:
+    """Recursively make a payload JSON-serialisable (Pydantic -> dict).
+
+    Belt-and-braces over the passport-level fix: ``metrics`` embeds
+    ``passport.to_dict()``, whose nested containers may still carry
+    non-serialisable objects from future callers.
+    """
+    if hasattr(value, "model_dump"):
+        return value.model_dump(mode="json")
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return value
+
+
 def _build_frontend_payload(result: MicroModeResult) -> dict[str, Any]:
     """Convert a MicroModeResult into the shape the frontend expects.
 
@@ -199,7 +215,7 @@ def _build_frontend_payload(result: MicroModeResult) -> dict[str, Any]:
     validation_score = serialized.get("validation_score")
     confidence_score = (validation_score / 10.0) if validation_score is not None else 0.0
 
-    return {
+    return _json_safe({
         "status": serialized.get("status"),
         "answer": serialized.get("winning_answer"),
         "confidence_score": confidence_score,
@@ -210,7 +226,7 @@ def _build_frontend_payload(result: MicroModeResult) -> dict[str, Any]:
             "creative": serialized.get("creative_output"),
         },
         "metrics": serialized.get("passport"),
-    }
+    })
 
 
 # ── Private Helpers ──────────────────────────────────────────────────────

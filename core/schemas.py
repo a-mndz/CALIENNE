@@ -153,6 +153,35 @@ class calienneOutput(CalienneBaseModel):
     def map_contract_fields(cls, data: Any) -> Any:
         """Map alternative XML response contract fields to synthesizer schema fields."""
         if isinstance(data, dict):
+            # Models occasionally emit the AgentOutput contract (``answer``)
+            # instead of ``final_answer``, and sometimes double-encode the
+            # synthesis as a JSON string inside that field (live 2026-09-19:
+            # gemini-3.7-flash judge returned
+            # ``answer: "{\"final_answer\": \"...\"}"``). Unwrap both so a
+            # good synthesis is never discarded to the parse-failure wrapper.
+            if "final_answer" not in data:
+                candidate = data.get("answer")
+                if candidate is None:
+                    candidate = data.get("summary")
+                resolved: Any = None
+                if isinstance(candidate, str) and candidate.strip():
+                    resolved = candidate
+                    stripped = candidate.strip()
+                    if stripped.startswith("{") and stripped.endswith("}"):
+                        try:
+                            parsed = json.loads(stripped)
+                        except (ValueError, TypeError):
+                            parsed = None
+                        if isinstance(parsed, dict):
+                            inner = parsed.get("final_answer") or parsed.get("answer")
+                            if isinstance(inner, str) and inner.strip():
+                                resolved = inner
+                elif isinstance(candidate, dict):
+                    inner = candidate.get("final_answer") or candidate.get("answer")
+                    if isinstance(inner, str) and inner.strip():
+                        resolved = inner
+                if resolved:
+                    data["final_answer"] = resolved
             if "final_answer" not in data and "summary" in data:
                 data["final_answer"] = data["summary"]
             if "overall_confidence" not in data and "confidence" in data:

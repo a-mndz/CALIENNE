@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import Any, Optional
 
 from agents.parser import parse_and_repair
@@ -46,6 +47,13 @@ class GenerationRunner:
         self.strategy = strategy
         self.runtime_engine = runtime_engine
         self.streaming_manager = streaming_manager
+        # CALIENNE_GENERATION_TIMEOUT_SEC: per-agent generation budget override.
+        # Free-tier models can have long generation tails; the previous shared
+        # 30s wall cancelled a FINISHED agent because its sibling was slow
+        # (live-fired 2026-09-19).
+        env_timeout = os.environ.get("CALIENNE_GENERATION_TIMEOUT_SEC", "").strip()
+        if env_timeout.isdigit() and int(env_timeout) > 0:
+            self.PARALLEL_AGENT_TIMEOUT_SEC = int(env_timeout)
 
     async def execute(
         self,
@@ -142,24 +150,35 @@ class GenerationRunner:
         passport: ExecutionPassport,
         history: list[dict[str, str]] | None = None,
     ) -> tuple[Optional[AgentOutput], Optional[AgentOutput]]:
-        """Execute Logician and Creative in parallel with 30-second timeout."""
-        logician_task = self._execute_logician(query, gateway, strategy, pool, passport, history)
-        creative_task = self._execute_creative(query, gateway, strategy, pool, passport, history)
+        """Execute Logician and Creative in parallel, each with its own timeout.
 
-        try:
-            results = await asyncio.wait_for(
-                asyncio.gather(logician_task, creative_task, return_exceptions=True),
-                timeout=self.PARALLEL_AGENT_TIMEOUT_SEC,
-            )
-        except asyncio.TimeoutError:
-            passport.record_error(
-                "generation",
-                f"Parallel agent execution timeout exceeded {self.PARALLEL_AGENT_TIMEOUT_SEC}s",
-            )
-            logger.error(
-                "Parallel execution timed out after %ds", self.PARALLEL_AGENT_TIMEOUT_SEC
-            )
-            return None, None
+        A slow agent is abandoned individually while the sibling's finished
+        output survives: the previous shared ``wait_for(gather(...))``
+        cancelled BOTH tasks on one wall clock, discarding a completed result
+        because the other agent was slow (live-fired 2026-09-19 — a finished
+        Logician was thrown away when Creative hung).
+        """
+        timeout = self.PARALLEL_AGENT_TIMEOUT_SEC
+
+        async def _guarded(coro: Any, name: str) -> Optional[AgentOutput]:
+            try:
+                return await asyncio.wait_for(coro, timeout=timeout)
+            except asyncio.TimeoutError:
+                passport.record_error("generation", f"{name} timed out after {timeout}s")
+                logger.error("%s timed out after %ds", name, timeout)
+                return None
+
+        results = await asyncio.gather(
+            _guarded(
+                self._execute_logician(query, gateway, strategy, pool, passport, history),
+                "Logician",
+            ),
+            _guarded(
+                self._execute_creative(query, gateway, strategy, pool, passport, history),
+                "Creative",
+            ),
+            return_exceptions=True,
+        )
 
         logician_output: Optional[AgentOutput] = None
         creative_output: Optional[AgentOutput] = None

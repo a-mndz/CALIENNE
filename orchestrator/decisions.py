@@ -97,6 +97,10 @@ class DecisionEngine:
             runtime_engine=runtime_engine,
             streaming_manager=streaming_manager,
         )
+        # Keep the engine-level constant truthful when the runner's env
+        # override (CALIENNE_GENERATION_TIMEOUT_SEC) is active — pipelines.py
+        # logs this value and tests may assert on it.
+        self.PARALLEL_AGENT_TIMEOUT_SEC = self._generation.PARALLEL_AGENT_TIMEOUT_SEC
 
     # Rolling-window history attributes, backed by the collector so external
     # readers (and any stragglers appending directly) keep working.
