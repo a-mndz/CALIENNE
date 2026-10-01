@@ -128,6 +128,7 @@ class ExecutionPassport:
     security_metadata: SecurityMetadata = field(default_factory=SecurityMetadata)
     execution_state: ExecutionState = field(default_factory=ExecutionState)
     execution_manifest: Any | None = None
+    provider_usage: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     _lock: threading.Lock = field(
         default_factory=threading.Lock,
@@ -251,6 +252,24 @@ class ExecutionPassport:
         validate_non_negative_int(count, "count")
         with self._lock:
             self.security_metadata.scrubbed_secrets += count
+
+    def record_provider_usage(self, role: str, usage: dict[str, Any] | None) -> None:
+        """Attach the provider-reported usage block for a role's last call.
+
+        ``usage`` is the dict produced by ``api_gateway.client`` (measured
+        token counts or a labelled estimate). Telemetry must never break
+        execution, so malformed input is ignored.
+        """
+        if not role or not isinstance(usage, dict):
+            return
+        with self._lock:
+            self.provider_usage[str(role)] = dict(usage)
+
+    def get_provider_usage(self, role: str) -> dict[str, Any] | None:
+        """Return the recorded provider usage for a role, if any."""
+        with self._lock:
+            usage = self.provider_usage.get(str(role))
+            return dict(usage) if usage else None
 
     def elapsed_seconds(self, now: datetime | None = None) -> float:
         """Return elapsed execution time in seconds."""

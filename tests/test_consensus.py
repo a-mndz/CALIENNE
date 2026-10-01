@@ -154,9 +154,14 @@ async def test_execution_manager_consensus_off_leaves_result_none(
 
 @pytest.mark.asyncio
 async def test_decision_engine_execute_judge_synthesis_high_complexity_consensus(
-    stub_gateway, stub_strategy, stub_pool
+    stub_gateway, stub_strategy, stub_pool, monkeypatch
 ) -> None:
     from unittest.mock import AsyncMock, MagicMock
+
+    # Consensus is flag-gated (default off): the current panel dispatches every
+    # judge to the same model chain, so it costs N× without diversity. The
+    # machinery is still exercised here via the explicit flag.
+    monkeypatch.setenv("CALIENNE_ENABLE_CONSENSUS", "1")
 
     from core.passport import ExecutionPassport
     from core.schemas import AgentOutput

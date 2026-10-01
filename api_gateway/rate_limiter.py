@@ -18,6 +18,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, Optional
 
+import httpx
+
 from api_gateway.client import AsyncHTTPClient, get_last_provider_usage
 from api_gateway.strategy import ProviderStrategy
 from core.passport import ExecutionPassport
@@ -902,9 +904,18 @@ class AsyncAPIGateway:
 
             try:
                 response = await self._guarded_call(
-                    model, prompt, system_prompt, history, max_tokens=max_tokens
+                    model, prompt, system_prompt, history, max_tokens=max_tokens, role=role
                 )
                 usage = get_last_provider_usage()
+                if usage:
+                    # Record measured (or labelled-estimate) token usage on the
+                    # passport while still inside the request's task context —
+                    # the ContextVar does not propagate back across wait_for.
+                    try:
+                        if passport is not None:
+                            passport.record_provider_usage(role, usage)
+                    except Exception:  # noqa: BLE001 — telemetry must not break execution
+                        logger.debug("provider usage recording failed", exc_info=True)
                 latency_ms = (
                     float(usage.get("latency_s", 0.0)) * 1000.0
                     if usage and usage.get("latency_s")
@@ -939,7 +950,15 @@ class AsyncAPIGateway:
 
         raise AllModelsExhaustedError(role=role, chain=chain, errors=errors)
 
-    async def _guarded_call(self, model: str, prompt: str, system_prompt: Optional[str] = None, history: list[dict[str, str]] | None = None, max_tokens: Optional[int] = None) -> str:  # noqa: E501
+    async def _guarded_call(
+        self,
+        model: str,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        history: list[dict[str, str]] | None = None,
+        max_tokens: Optional[int] = None,
+        role: Optional[str] = None,
+    ) -> str:  # noqa: E501
         """
         Execute a single call using retry-with-backoff, semaphore, and jitter.
         """
@@ -947,14 +966,12 @@ class AsyncAPIGateway:
         backoff_base = 1.5
 
         for attempt in range(max_retries):
-            # Dynamic Jitter (crypto-grade generator; random.uniform is
-            # predictable within a process)
-            jitter = secrets.randbelow(1000) / 1000.0
-            span = self._jitter_max - self._jitter_min
-            jitter = self._jitter_min + jitter * span
             if attempt > 0:
-                # Exponential backoff + jitter
-                delay = (backoff_base ** attempt) + jitter
+                # Exponential backoff + jitter. Only between attempts —
+                # sleeping before the first try is pure added latency.
+                jitter = secrets.randbelow(1000) / 1000.0
+                span = self._jitter_max - self._jitter_min
+                delay = (backoff_base ** attempt) + self._jitter_min + jitter * span
                 logger.warning(
                     "Attempt %d failed for model %s. Retrying in %.2fs...",
                     attempt,
@@ -962,8 +979,6 @@ class AsyncAPIGateway:
                     delay,
                 )
                 await asyncio.sleep(delay)
-            elif jitter > 0:
-                await asyncio.sleep(jitter)
 
             async with self._semaphore:
                 try:
@@ -978,7 +993,7 @@ class AsyncAPIGateway:
                         response = await self._call_fn(model, prompt, system_prompt, history)
                     else:
                         response = await self._client.post_request(
-                            model, prompt, system_prompt, history, max_tokens=max_tokens
+                            model, prompt, system_prompt, history, max_tokens=max_tokens, role=role
                         )
 
                     elapsed = time.monotonic() - start
@@ -987,8 +1002,17 @@ class AsyncAPIGateway:
                 except Exception as exc:
                     if attempt == max_retries - 1:
                         raise
+                    if not _is_retryable(exc):
+                        logger.error(
+                            "Non-retryable failure on model '%s' (attempt %d): %s: %s",
+                            model,
+                            attempt + 1,
+                            type(exc).__name__,
+                            exc,
+                        )
+                        raise
                     logger.warning(
-                        "Exception on model '%s' attempt %d: %s",
+                        "Retryable exception on model '%s' attempt %d: %s",
                         model,
                         attempt + 1,
                         exc,
@@ -998,6 +1022,28 @@ class AsyncAPIGateway:
 
 
 # ── Exceptions ───────────────────────────────────────────────────────────
+
+_RETRYABLE_HTTP_STATUS = frozenset({408, 429, 500, 502, 503, 504})
+
+
+def _is_retryable(exc: Exception) -> bool:
+    """Classify whether a failed call may be retried.
+
+    Permanent failures — auth, bad request, payload too large, unsupported
+    parameter — are deterministic: retrying them multiplies the cost of the
+    failure without changing the outcome. Only timeouts, transport errors,
+    and transient server-side statuses are retried.
+    """
+    if isinstance(exc, (httpx.TimeoutException, httpx.TransportError)):
+        return True
+    status = getattr(exc, "status_code", None)
+    if status is None:
+        response = getattr(exc, "response", None)
+        status = getattr(response, "status_code", None)
+    if isinstance(status, int):
+        return status in _RETRYABLE_HTTP_STATUS
+    return False
+
 
 class AllModelsExhaustedError(Exception):
     """Raised when every model in a fallback chain has failed."""

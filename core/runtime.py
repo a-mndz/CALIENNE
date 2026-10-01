@@ -245,6 +245,7 @@ class RuntimeEngine:
         history: Optional[list[dict[str, str]]] = None,
         contract_name: Optional[str] = None,
         user_id: Optional[str] = None,
+        max_tokens: Optional[int] = None,
     ) -> str:
         """Execute a prompt with full contract enforcement.
 
@@ -391,18 +392,30 @@ class RuntimeEngine:
                     system_prompt=system_prompt,
                     history=history,
                     passport=passport,
+                    max_tokens=max_tokens,
                 ),
                 timeout=contract.max_timeout_sec,
             )
 
             elapsed_ms = (time.monotonic() - start_time) * 1000
 
+            # Token accounting: prefer the provider-reported usage recorded on
+            # the passport during the call; fall back to a rough estimate.
+            usage = passport.get_provider_usage(role) if passport is not None else None
+            if usage:
+                measured = int(usage.get("prompt_tokens", 0) or 0) + int(
+                    usage.get("completion_tokens", 0) or 0
+                )
+                tokens = measured if measured > 0 else (len(prompt) + len(response or "")) // 4
+            else:
+                tokens = (len(prompt) + len(response or "")) // 4
+
             # Track successful execution
             self.track_execution_metrics(
                 agent=role,
                 provider=provider_name,
                 latency_ms=elapsed_ms,
-                tokens=0,  # Token count tracked elsewhere
+                tokens=tokens,
                 success=True,
             )
 

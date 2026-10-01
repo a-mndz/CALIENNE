@@ -140,6 +140,7 @@ Output strictly in raw JSON following the calienneOutput schema layout:
                 strategy=strategy,
                 pool=pool,
                 history=history,
+                max_tokens=8192,
             )
         except Exception as exc:
             logger.warning("runtime_engine.execute_with_contracts degraded for judge; falling back: %s", exc)

@@ -43,6 +43,17 @@ from orchestrator.streaming import EventType, StreamEvent
 logger = logging.getLogger(__name__)
 
 
+def _consensus_enabled() -> bool:
+    """Read the consensus feature flag fresh at decision time."""
+    try:
+        from orchestrator.feature_flags import load_flags
+
+        return bool(load_flags().consensus)
+    except Exception:  # noqa: BLE001 — a broken flag source must not kill the pipeline
+        logger.debug("feature flag lookup failed; consensus stays disabled", exc_info=True)
+        return False
+
+
 class DecisionEngine:
     """Orchestrating facade over BreakerGate + GenerationRunner + judge call.
 
@@ -189,7 +200,11 @@ class DecisionEngine:
             )
 
         # Wire multi-judge consensus engine for high/critical complexity queries (GAP-PIPE-02 / P1-01)
-        if complexity in ("high", "critical"):
+        # Gated behind the consensus feature flag: as implemented, every judge
+        # dispatches to the same model chain with an identical prompt, so the
+        # "panel" adds N× cost without model diversity. Enable only after the
+        # dispatch carries a per-judge model (see attic/README revival notes).
+        if _consensus_enabled() and complexity in ("high", "critical"):
             try:
                 from orchestrator.consensus import JudgeOutput, allocate_judges, compute_consensus
 

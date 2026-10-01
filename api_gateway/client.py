@@ -31,6 +31,27 @@ def get_last_provider_usage() -> dict[str, Any] | None:
     return _last_provider_usage.get()
 
 
+# Per-role sampling temperatures. Breaker/judge want near-determinism; the
+# Creative agent needs genuine sampling diversity — running every role at the
+# same temperature made the Logician/Creative diversity signal meaningless.
+# Callers may override per request; the Claude-family 400-guard still applies.
+ROLE_TEMPERATURES: dict[str, float] = {
+    "breaker": 0.0,
+    "logician": 0.2,
+    "creative": 0.8,
+    "generation": 0.4,
+    "judge": 0.1,
+    "arbiter": 0.1,
+}
+DEFAULT_TEMPERATURE = 0.1
+
+
+def _resolve_temperature(role: Optional[str]) -> float:
+    if role and role in ROLE_TEMPERATURES:
+        return ROLE_TEMPERATURES[role]
+    return DEFAULT_TEMPERATURE
+
+
 class AsyncHTTPClient:
     """
     Manages raw HTTP requests and reuse of connection pools.
@@ -75,7 +96,7 @@ class AsyncHTTPClient:
         )
         return env_val.strip()
 
-    async def post_request(self, model: str, prompt: str, system_prompt: Optional[str] = None, history: list[dict[str, str]] | None = None, max_tokens: Optional[int] = None) -> str:  # noqa: E501
+    async def post_request(self, model: str, prompt: str, system_prompt: Optional[str] = None, history: list[dict[str, str]] | None = None, max_tokens: Optional[int] = None, role: Optional[str] = None) -> str:  # noqa: E501
         """Dispatches an asynchronous post request to target providers."""
         parts = model.split('/')
         provider = parts[0]
@@ -99,7 +120,7 @@ class AsyncHTTPClient:
         custom_prov = get_provider_registry().get_provider(provider)
         if custom_prov is not None and getattr(custom_prov, "api_format", "openai") == "anthropic":
             return await self._post_anthropic_native(
-                custom_prov, actual_model, prompt, system_prompt, history, max_tokens
+                custom_prov, actual_model, prompt, system_prompt, history, max_tokens, role
             )
 
         # Instruction Reinforcement: Remind the LLM of its structural obligations
@@ -133,7 +154,7 @@ class AsyncHTTPClient:
         # than the default with a 400, so the low-variance value is applied
         # only to providers that accept it.
         if not (provider == "openrouter" and "/claude-" in actual_model):
-            payload["temperature"] = 0.1
+            payload["temperature"] = _resolve_temperature(role)
 
         if provider not in {"nvidia", "nvidia-nim"}:
             payload["response_format"] = {"type": "json_object"}
@@ -295,6 +316,7 @@ class AsyncHTTPClient:
         system_prompt: Optional[str] = None,
         history: list[dict[str, str]] | None = None,
         max_tokens: Optional[int] = None,
+        role: Optional[str] = None,
     ) -> str:
         """Call an Anthropic-native relay (POST /v1/messages).
 
@@ -307,7 +329,7 @@ class AsyncHTTPClient:
         * response       -> concatenated ``content[].text`` blocks
 
         Note: Anthropic rejects ``response_format`` and requires ``max_tokens``;
-        the low-variance temperature is applied (the justwoker relay accepts it,
+        the role temperature is applied (the justwoker relay accepts it,
         unlike api.anthropic.com's Claude 5 family which 400s on it).
         """
         base = (custom_prov.base_url or "").strip().rstrip("/")
@@ -324,7 +346,7 @@ class AsyncHTTPClient:
             "messages": messages,
             # Anthropic requires an explicit max_tokens ceiling.
             "max_tokens": int(max_tokens) if max_tokens is not None else 4096,
-            "temperature": 0.1,
+            "temperature": _resolve_temperature(role),
         }
         if system_prompt:
             payload["system"] = system_prompt
