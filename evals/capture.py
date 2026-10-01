@@ -1,5 +1,5 @@
-"""Live capture runner for the golden set — feeds gates G6 (paired regression)
-and G7 (judge noise floor), and the β (co-failure) measurement.
+"""Live capture runner — feeds G6 (paired regression), G7 (noise floor),
+β (co-failure), and the reference-check gate introduced with golden v2.
 
 NON-BLOCKING by design: needs provider API keys, so it never runs as a
 required check (fork PRs get no secrets). Intended for the scheduled evals
@@ -7,20 +7,30 @@ workflow and local runs with keys present.
 
 What it writes — one JSONL row per item, already redacted:
 
-    {"id", "cluster_id", "pass", "logician_pass", "creative_pass",
-     "validation_score", "captured_at", "label"}
+    {"id", "rep", "cluster_id", "pass", "aborted", "logician_pass",
+     "creative_pass", "validation_score", "checks_passed", "checks_total",
+     "arm", "golden", "git_commit", "model_ids", "role_temperatures",
+     "simulated", "captured_at", "label"}
 
-Rubric v1 (deterministic, zero judgement — the graded surface is structural
-correctness, not answer quality):
-  pass           — pipeline completed, winning answer non-empty, no
-                   parse-failure markers in it.
+Grading:
+  liveness          — pipeline completed, winning answer non-empty, no
+                      parse-failure markers.
+  reference checks  — golden v2+ items carry expect.checks (deterministic,
+                      see evals/checks.py). pass = liveness AND checks.
+                      v1 items have no checks, so pass == liveness.
   logician_pass /
-  creative_pass  — agent output present, non-empty, no parse-failure markers.
-                   These two feed evals.beta (the dual-agent decision).
+  creative_pass     — triad arm only; feed evals.beta (dual-agent decision).
+
+Arms:
+  triad   — the full breaker -> logician ∥ creative -> judge pipeline
+            (4 provider calls per item).
+  single  — one direct call on the generation chain, no pipeline. This is the
+            baseline the triad must beat for the architecture to be justified.
 
 Usage:
   python -m evals.capture --label baseline
-  python -m evals.capture --label candidate --limit 20
+  python -m evals.capture --label triad-v2 --golden v2
+  python -m evals.capture --label single-v2 --golden v2 --arm single
   python -m evals.capture --label noise --reruns 3 --limit 20   # G7
 """
 
@@ -30,6 +40,7 @@ import argparse
 import asyncio
 import json
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,8 +51,10 @@ from pathlib import Path
 # (found the hard way 2026-08-22: the first "baseline" was byte-identical
 # across different prompts).
 import secrets_bootstrap  # noqa: F401  (side-effecting import)
+from api_gateway.client import ROLE_TEMPERATURES
 from api_gateway.rate_limiter import AsyncAPIGateway, ProviderPool
 from api_gateway.strategy import ProviderStrategy
+from evals.checks import checks_failed, evaluate_checks
 from orchestrator.calienne_orchestrator import (
     create_request_passport,
     initialize_calienne_components,
@@ -51,6 +64,9 @@ from orchestrator.execution_replay import redact_pii
 EVALS_DIR = Path(__file__).resolve().parent
 RUNS_DIR = EVALS_DIR / "runs"
 FAILURE_MARKERS = ("PARSE FAILURE", "ERROR:", "unparsable", "KNOWLEDGE ABSENCE")
+
+# Provider calls per item, per arm (cost-ceiling arithmetic).
+CALLS_PER_ITEM = {"triad": 4, "single": 1}
 
 # Hard cost ceiling: raises rather than continuing past this many provider
 # calls in one capture (research Q5 cost control #4).
@@ -64,9 +80,14 @@ def _looks_failed(text: str | None) -> bool:
     return any(marker in upper for marker in FAILURE_MARKERS)
 
 
-def grade_item(result: dict) -> dict:
-    """Deterministic rubric v1 — see module docstring."""
-    answer = result.get("answer") or result.get("winning_answer")
+def grade_item(
+    result: dict,
+    expect: dict | None = None,
+    answer_override: str | None = None,
+) -> dict:
+    """Deterministic grading — liveness always; reference checks when the
+    golden item carries ``expect.checks`` (golden v2+)."""
+    answer = answer_override or result.get("answer") or result.get("winning_answer")
 
     def _agent_text(agent: object) -> str | None:
         if agent is None:
@@ -88,40 +109,111 @@ def grade_item(result: dict) -> dict:
     creative = creative if creative is not None else result.get("creative_output")
 
     aborted = result.get("status") == "aborted"
+    liveness = not aborted and result.get("status") != "failed" and not _looks_failed(answer)
+
+    checks = (expect or {}).get("checks") if isinstance(expect, dict) else None
+    check_results = evaluate_checks(answer or "", checks) if checks else []
+    failed_checks = checks_failed(check_results)
+    graded_pass = liveness and not failed_checks
+
     return {
-        "pass": not aborted and result.get("status") != "failed" and not _looks_failed(answer),
+        "pass": graded_pass,
         # Aborted rows keep their L/C grades (usually both False — the agents
         # never ran). β must exclude them: "agents never ran" is not
         # "both agents failed".
         "aborted": aborted,
         "logician_pass": not aborted and not _looks_failed(_agent_text(logician)),
         "creative_pass": not aborted and not _looks_failed(_agent_text(creative)),
+        "liveness_pass": liveness,
+        "checks_passed": sum(1 for r in check_results if r["passed"]),
+        "checks_total": len(check_results),
+        "failed_check_details": [r["detail"] for r in failed_checks][:5],
     }
+
+
+def _git_commit() -> str:
+    """Best-effort HEAD sha for run provenance."""
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=True,
+        ).stdout.strip()[:12]
+    except Exception:  # noqa: BLE001 — provenance must never break a run
+        return "unknown"
+
+
+async def _run_single_arm(
+    item: dict,
+    *,
+    gateway: AsyncAPIGateway,
+    strategy: ProviderStrategy,
+    pool: ProviderPool,
+    passport: object,
+    timeout: float = 300.0,
+) -> dict:
+    """Single-model baseline: one direct call, no triad, no judge."""
+    response = await asyncio.wait_for(
+        gateway.execute_with_fallback(
+            prompt=redact_pii(item["query"]),
+            role="generation",
+            strategy=strategy,
+            pool=pool,
+            system_prompt=None,
+            history=None,
+            passport=passport,
+        ),
+        timeout=timeout,
+    )
+    # Mirror the pipeline result shape so grade_item works unchanged: a
+    # single-arm run "completes" iff the call returned non-empty text.
+    return {"status": "completed", "answer": response}
 
 
 async def capture(
     items: list[dict],
     *,
     label: str,
+    arm: str = "triad",
+    golden_version: str = "v1",
     reruns: int = 1,
     limit: int | None = None,
     max_calls: int = DEFAULT_MAX_CALLS,
     mode: str = "HYBRID",
     pause_sec: float = 2.0,
+    simulated: bool = False,
 ) -> Path:
     """Run the live pipeline over golden items and write a redacted run file."""
     strategy = ProviderStrategy(mode=mode)
     pool = ProviderPool()
     gateway = AsyncAPIGateway()
-    components = initialize_calienne_components()
+    components = initialize_calienne_components() if arm == "triad" else {}
 
     selected = items[: limit] if limit else items
-    budget = len(selected) * reruns * 4  # breaker + 2 agents + judge per item
+    calls_per_item = CALLS_PER_ITEM.get(arm)
+    if calls_per_item is None:
+        raise ValueError(f"unknown arm {arm!r}")
+    budget = len(selected) * reruns * calls_per_item
     if budget > max_calls:
         raise RuntimeError(
             f"capture budget {budget} provider calls exceeds --max-calls "
             f"{max_calls}; refusing to run (cost ceiling, research Q5)"
         )
+
+    provenance = {
+        "arm": arm,
+        "golden": golden_version,
+        "git_commit": _git_commit(),
+        "model_ids": {
+            role: strategy.get_model_chain(role)
+            for role in ("breaker", "logician", "creative", "judge", "generation")
+        },
+        "role_temperatures": dict(ROLE_TEMPERATURES),
+        "simulated": simulated,
+        "mode": mode,
+    }
 
     try:
         rows: list[dict] = []
@@ -129,34 +221,54 @@ async def capture(
             for item in selected:
                 passport = create_request_passport()
                 try:
-                    result = await asyncio.wait_for(
-                        components["execution_manager"].execute(
-                            user_query=redact_pii(item["query"]),
+                    if arm == "triad":
+                        result = await asyncio.wait_for(
+                            components["execution_manager"].execute(
+                                user_query=redact_pii(item["query"]),
+                                gateway=gateway,
+                                strategy=strategy,
+                                pool=pool,
+                                passport=passport,
+                                decision_engine=components.get("decision_engine"),
+                                reasoning_graph=components.get("reasoning_graph"),
+                                claim_manager=components.get("claim_manager"),
+                                streaming_manager=None,
+                                conversation_director=components.get("conversation_director"),
+                                session_id=f"eval-{item['id']}-r{rep}",
+                                user_id="eval-capture",
+                            ),
+                            timeout=900,
+                        )
+                        payload = dict(result) if isinstance(result, dict) else {}
+                        graded = grade_item(payload, expect=item.get("expect"))
+                    else:
+                        result = await _run_single_arm(
+                            item,
                             gateway=gateway,
                             strategy=strategy,
                             pool=pool,
                             passport=passport,
-                            decision_engine=components.get("decision_engine"),
-                            reasoning_graph=components.get("reasoning_graph"),
-                            claim_manager=components.get("claim_manager"),
-                            streaming_manager=None,
-                            conversation_director=components.get("conversation_director"),
-                            session_id=f"eval-{item['id']}-r{rep}",
-                            user_id="eval-capture",
-                        ),
-                        timeout=900,
-                    )
-                    payload = dict(result) if isinstance(result, dict) else {}
-                    graded = grade_item(payload)
+                        )
+                        payload = dict(result) if isinstance(result, dict) else {}
+                        graded = grade_item(
+                            payload, expect=item.get("expect"), answer_override=result.get("answer")
+                        )
+                        graded.pop("logician_pass", None)
+                        graded.pop("creative_pass", None)
                 except Exception as exc:
                     # One exhausted provider chain must not kill the run —
                     # record the item as failed and keep capturing.
                     graded = {
                         "pass": False,
                         "aborted": False,
-                        "logician_pass": False,
-                        "creative_pass": False,
+                        "liveness_pass": False,
+                        "checks_passed": 0,
+                        "checks_total": len((item.get("expect") or {}).get("checks") or []),
+                        "failed_check_details": [],
                     }
+                    if arm == "triad":
+                        graded["logician_pass"] = False
+                        graded["creative_pass"] = False
                     payload = {"error": f"{type(exc).__name__}: {exc}"[:200]}
                     print(f"[{label}] {item['id']} rep{rep}: FAILED — {payload['error']}", file=sys.stderr)
                 rows.append(
@@ -165,15 +277,22 @@ async def capture(
                         "rep": rep,
                         "cluster_id": item.get("cluster_id"),
                         "label": label,
+                        **provenance,
                         **graded,
                         "validation_score": payload.get("validation_score"),
                         "captured_at": datetime.now(timezone.utc).isoformat(),
                     }
                 )
+                lc = (
+                    f" L={graded.get('logician_pass')} C={graded.get('creative_pass')}"
+                    if arm == "triad"
+                    else ""
+                )
                 print(
                     f"[{label}] {item['id']} rep{rep}: "
-                    f"pass={graded['pass']} "
-                    f"L={graded['logician_pass']} C={graded['creative_pass']}",
+                    f"pass={graded['pass']}"
+                    f" ({graded.get('checks_passed', 0)}/{graded.get('checks_total', 0)} checks)"
+                    f"{lc}",
                     file=sys.stderr,
                 )
                 if pause_sec > 0:
@@ -205,7 +324,13 @@ def noise_floor(rows: list[dict]) -> float:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--label", required=True, help="run label / output filename stem")
-    parser.add_argument("--golden", default="v1", help="golden set version")
+    parser.add_argument("--golden", default="v1", help="golden set version (v1, v2, gsm8k_v1)")
+    parser.add_argument(
+        "--arm",
+        default="triad",
+        choices=sorted(CALLS_PER_ITEM),
+        help="triad = full pipeline (4 calls/item); single = one direct call (baseline)",
+    )
     parser.add_argument("--limit", type=int, default=None, help="first N items only")
     parser.add_argument("--reruns", type=int, default=1, help="repetitions per item (G7: >=2)")
     parser.add_argument("--max-calls", type=int, default=DEFAULT_MAX_CALLS)
@@ -261,15 +386,20 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  - {error}", file=sys.stderr)
         return 2
 
+    row_label = args.label if live_keys else f"{args.label}*sim"
+
     out_path = asyncio.run(
         capture(
             items,
-            label=args.label,
+            label=row_label,
+            arm=args.arm,
+            golden_version=args.golden,
             reruns=args.reruns,
             limit=args.limit,
             max_calls=args.max_calls,
             mode=args.mode,
             pause_sec=args.pause_sec,
+            simulated=not live_keys,
         )
     )
     rows = [json.loads(line) for line in out_path.read_text(encoding="utf-8").splitlines() if line.strip()]

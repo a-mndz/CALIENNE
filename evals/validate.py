@@ -49,13 +49,21 @@ def load_golden(version: str = "v1") -> tuple[list[dict], dict]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     errors: list[str] = []
 
-    if manifest.get("version") != version:
-        errors.append(f"manifest version {manifest.get('version')!r} != {version!r}")
+    # Multi-set manifest ({"sets": {"v1": {...}, "v2": {...}}}) with fallback
+    # to the legacy single-version layout for v1 compatibility.
+    entry: dict = manifest
+    if "sets" in manifest:
+        entry = manifest["sets"].get(version) or {}
+        if not entry:
+            errors.append(f"manifest sets have no entry for version {version!r}")
+
+    if entry.get("version") != version:
+        errors.append(f"manifest version {entry.get('version')!r} != {version!r}")
 
     actual_hash = sha256_file(data_path)
-    if manifest.get("sha256") != actual_hash:
+    if entry.get("sha256") != actual_hash:
         errors.append(
-            f"golden set hash mismatch: manifest {manifest.get('sha256')!r} != "
+            f"golden set hash mismatch: manifest {entry.get('sha256')!r} != "
             f"actual {actual_hash!r} — regenerate the manifest or bump the version"
         )
 
@@ -92,8 +100,8 @@ def load_golden(version: str = "v1") -> tuple[list[dict], dict]:
                 errors.append(f"{version}.jsonl:{line_no}: empty cluster_id")
             items.append(item)
 
-    if manifest.get("n") != len(items):
-        errors.append(f"manifest n={manifest.get('n')} != {len(items)} items in file")
+    if entry.get("n") != len(items):
+        errors.append(f"manifest n={entry.get('n')} != {len(items)} items in file")
 
     return items, {"errors": errors, "manifest": manifest}
 

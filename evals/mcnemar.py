@@ -138,14 +138,56 @@ def compare_runs(
     )
 
 
+def _load_raw_rows(path: str | Path) -> list[dict]:
+    """Load run rows without the unique-id constraint (for --aggregate)."""
+    resolved = Path(path).resolve()
+    if not resolved.is_relative_to(Path.cwd().resolve()):
+        raise ValueError(f"run file must live under the working directory: {path}")
+    rows: list[dict] = []
+    for line_no, line in enumerate(resolved.read_text(encoding="utf-8").splitlines(), 1):
+        line = line.strip()
+        if not line:
+            continue
+        row = json.loads(line)
+        if "id" not in row or "pass" not in row:
+            raise ValueError(f"{resolved}:{line_no}: row needs 'id' and 'pass'")
+        rows.append(row)
+    if not rows:
+        raise ValueError(f"{resolved}: no outcome rows found")
+    return rows
+
+
+def _aggregate_outcomes(rows: list[dict]) -> dict[str, bool]:
+    """Collapse reruns (multiple rows per id) by majority verdict.
+
+    With 2 reps a strict majority means both reps must pass; document this
+    when comparing noise-floor runs against single-rep runs.
+    """
+    passes: dict[str, list[bool]] = {}
+    for row in rows:
+        passes.setdefault(str(row["id"]), []).append(bool(row["pass"]))
+    return {item_id: (sum(verdicts) / len(verdicts) > 0.5) for item_id, verdicts in passes.items()}
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
-    if len(argv) != 2:
-        print("usage: python -m evals.mcnemar <baseline_run.jsonl> <candidate_run.jsonl>")
+    args = [a for a in argv if a != "--aggregate"]
+    aggregate = "--aggregate" in argv
+    if len(args) != 2:
+        print(
+            "usage: python -m evals.mcnemar <baseline_run.jsonl> <candidate_run.jsonl> "
+            "[--aggregate]"
+        )
         return 2
-    baseline = _load_outcomes(_validated_run_path(argv[0]))
-    candidate = _load_outcomes(_validated_run_path(argv[1]))
-    result = compare_runs(baseline, candidate)
+    if aggregate:
+        # Aggregate first, so reruns files (one row per rep) compare cleanly.
+        baseline_rows = _load_raw_rows(_validated_run_path(args[0]))
+        candidate_rows = _load_raw_rows(_validated_run_path(args[1]))
+        result = compare_runs(_aggregate_outcomes(baseline_rows), _aggregate_outcomes(candidate_rows))
+    else:
+        baseline = _load_outcomes(_validated_run_path(args[0]))
+        candidate = _load_outcomes(_validated_run_path(args[1]))
+        result = compare_runs(baseline, candidate)
     print(result.summary())
     return 1 if result.is_regression else 0
 
