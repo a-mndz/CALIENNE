@@ -41,6 +41,7 @@ AUDIT_REPORT.md
 .claude/
 .agents/
 .mimosa/
+.zcode/
 skills/
 skills-lock.json
 session-*.md
@@ -61,7 +62,6 @@ scratch_*.py
 # Node
 node_modules/
 **/node_modules/
-dist/
 **/dist/
 **/.vite/
 **/coverage/

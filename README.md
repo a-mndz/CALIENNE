@@ -133,11 +133,12 @@ calienne now incorporates the Adaptive Multi-Model Reasoning Orchestrator (CALIE
 
 ## What is NOT implemented (honesty section)
 
-Several previously advertised subsystems were **quarantined to `attic/`** on
-2026-10-01 because nothing in the live execution path could reach them — they
-were imported only by their own tests. They are recoverable from git history;
-`attic/README.md` documents the revival checklist (wire it in, fix the known
-defects, prove it earns its cost on the golden eval):
+Several previously advertised subsystems were **quarantined on 2026-10-01**
+because nothing in the live execution path could reach them — they were
+imported only by their own tests. The search and embedding modules live in
+`attic/` with a revival checklist (`attic/README.md`: wire it in, fix the
+known defects, prove it earns its cost on the golden eval); the rest were
+deleted outright and are recoverable from git history:
 
 | Claimed feature | Reality |
 |---|---|
@@ -372,7 +373,7 @@ calienne/
 │   ├── models.py              # ORM models (User, ConversationSessionRecord, DocumentChunkRecord, etc.)
 │   ├── security.py            # JWT auth, password hashing & role enforcement
 │   ├── schemas.py             # Pydantic V2 data contracts
-│   └── (chunking.py, tools.py were quarantined to attic/ 2026-10-01)
+│   └── (chunking.py, tools.py removed 2026-10-01 — recoverable from git history)
 │
 ├── api_gateway/
 │   ├── client.py              # HTTPX AsyncClient + non-blocking async file I/O
@@ -450,7 +451,11 @@ calienne/
 │   ├── capture.py             #   Live capture runner, --arm {triad,single}
 │   ├── report.py              #   Run summary + SUSPECT judge-metric invariant
 │   ├── run_experiment.py      #   One-command triad-vs-single comparison
+│   ├── EXPERIMENT.md          #   Live-run runbook (arms, labels, cost)
 │   └── validate.py            #   Integrity validator (`python -m evals.validate`)
+│
+├── attic/                     # Quarantined modules (mcts.py, embeddings.py)
+│                              #   + revival checklist — imported by nothing
 │
 └── docs/
     ├── images/                # Visual UI screenshots & previews
@@ -505,7 +510,7 @@ serve pipeline roles.
 | `ImportError: No module named 'json_repair'` | Run `pip install -r requirements.lock --require-hashes` |
 | All queries return `"KNOWLEDGE ABSENCE DETECTED"` | The Breaker agent is conservative. Try queries with more factual grounding. |
 | Provider shows `DEAD` in status | The provider hit 3 failures. It will auto-recover after 60 seconds. Check your API key. |
-| Server exits: "PostgreSQL is unreachable or not at the required Alembic revision" | Run `alembic upgrade head` (chain 001→005), then restart. Startup verifies the schema on purpose — it fails loudly instead of serving against drift. |
+| Server exits: "PostgreSQL is unreachable or not at the required Alembic revision" | Run `alembic upgrade head` (chain 001→007), then restart. Startup verifies the schema on purpose — it fails loudly instead of serving against drift. |
 | Web UI shows 404 | The dashboard is served from `frontend/dist/` — build it: `cd frontend && npm install && npm run build`. In development you can also run the Vite dev server against the API. |
 
 ---
