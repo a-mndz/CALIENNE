@@ -17,9 +17,8 @@ evidence that it earns its cost.
 | `mcts.py` | `orchestrator/mcts.py` | Tree-of-Thoughts/MCTS "guided by PRMs". Never called by any pipeline path. The "PRM" is keyword matching (+0.20 for containing "therefore"); expansion always simulates only the first child — not a real search. |
 | `embeddings.py` | `orchestrator/embeddings.py` | "Dense semantic embeddings". `fastembed` was never in requirements, so every real environment silently fell back to an MD5/SHA-1 feature hash — lexical, not semantic. |
 
-Paired tests for these two live in `attic/tests/` (not collected by pytest:
-`pytest.ini` pins `testpaths = tests`). Their imports reference the original
-module paths and will need adjustment if revived.
+Their paired test files were removed with them (not relocated); recover both
+sides from git history if reviving.
 
 ## What is in git history only
 

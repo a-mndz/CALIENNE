@@ -80,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     print("pre-flight: validating golden sets...")
     from evals.validate import main as validate_main
 
-    validate_rc = validate_main([])
+    validate_rc = validate_main()
     if validate_rc != 0:
         return validate_rc
 
@@ -98,6 +98,8 @@ def main(argv: list[str] | None = None) -> int:
         ]
         if args.limit:
             step_argv += ["--limit", str(args.limit)]
+        if args.allow_simulation:
+            step_argv += ["--allow-simulation"]
         print(f"\n=== step: {label} (golden={golden}, arm={arm}, reruns={reruns}) ===")
         if args.dry_run:
             continue

@@ -184,12 +184,19 @@ async def capture(
     mode: str = "HYBRID",
     pause_sec: float = 2.0,
     simulated: bool = False,
+    row_label: str | None = None,
 ) -> Path:
-    """Run the live pipeline over golden items and write a redacted run file."""
+    """Run the live pipeline over golden items and write a redacted run file.
+
+    ``label`` is the output filename stem; ``row_label`` (defaulting to
+    ``label``) is what each row records — simulation runs append ``-sim``
+    there, since ``*`` is not a legal filename character on Windows.
+    """
     strategy = ProviderStrategy(mode=mode)
     pool = ProviderPool()
     gateway = AsyncAPIGateway()
     components = initialize_calienne_components() if arm == "triad" else {}
+    row_label = row_label or label
 
     selected = items[: limit] if limit else items
     calls_per_item = CALLS_PER_ITEM.get(arm)
@@ -276,7 +283,7 @@ async def capture(
                         "id": item["id"],
                         "rep": rep,
                         "cluster_id": item.get("cluster_id"),
-                        "label": label,
+                        "label": row_label,
                         **provenance,
                         **graded,
                         "validation_score": payload.get("validation_score"),
@@ -344,7 +351,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--allow-simulation",
         action="store_true",
-        help="permit a keyless (simulation-mode) run; rows are tagged label*=sim",
+        help="permit a keyless (simulation-mode) run; row labels get a -sim suffix",
     )
     args = parser.parse_args(argv)
 
@@ -386,12 +393,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  - {error}", file=sys.stderr)
         return 2
 
-    row_label = args.label if live_keys else f"{args.label}*sim"
+    row_label = args.label if live_keys else f"{args.label}-sim"
 
     out_path = asyncio.run(
         capture(
             items,
-            label=row_label,
+            label=args.label,
             arm=args.arm,
             golden_version=args.golden,
             reruns=args.reruns,
@@ -400,6 +407,7 @@ def main(argv: list[str] | None = None) -> int:
             mode=args.mode,
             pause_sec=args.pause_sec,
             simulated=not live_keys,
+            row_label=row_label,
         )
     )
     rows = [json.loads(line) for line in out_path.read_text(encoding="utf-8").splitlines() if line.strip()]

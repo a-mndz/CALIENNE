@@ -127,7 +127,7 @@ def test_mcnemar_aggregate_majority() -> None:
     assert outcomes == {"a": True, "b": False, "c": False}
 
 
-def test_mcnemar_cli_aggregate_flag(tmp_path: Path) -> None:
+def test_mcnemar_cli_aggregate_flag(tmp_path: Path, monkeypatch) -> None:
     from evals.mcnemar import main
 
     base = tmp_path / "base.jsonl"
@@ -143,16 +143,17 @@ def test_mcnemar_cli_aggregate_flag(tmp_path: Path) -> None:
         '{"id": "b", "pass": false}\n{"id": "b", "pass": false}\n',
         encoding="utf-8",
     )
-    # tmp_path is outside CWD containment? run files must be under CWD —
-    # chroot the check by monkeypatching cwd via monkeypatch.chdir
-    import os
-
-    os.chdir(tmp_path)
-    try:
-        rc = main([str(base), str(cand), "--aggregate"])
-    finally:
-        os.chdir(Path(__file__).resolve().parents[1])
+    monkeypatch.chdir(tmp_path)
+    rc = main([str(base), str(cand), "--aggregate"])
     assert rc == 0  # no regression: improvement only
+
+
+def test_validate_main_covers_all_sets() -> None:
+    """The G5 CLI gate must check every registered set, not just v1 —
+    otherwise v2/gsm8k hash drift sails through CI."""
+    from evals.validate import main as validate_main
+
+    assert validate_main() == 0
 
 
 # ── Report SUSPECT invariant ────────────────────────────────────────────

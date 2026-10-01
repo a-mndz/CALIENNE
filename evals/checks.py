@@ -28,6 +28,11 @@ from typing import Any
 
 _NUMBER_RE = re.compile(r"-?\d[\d,]*(?:\.\d+)?")
 _SENTENCE_RE = re.compile(r"[.!?]+(?:\s|$)")
+# Common abbreviations whose periods must not count as sentence boundaries.
+_ABBREVIATIONS = (
+    "e.g.", "i.e.", "etc.", "vs.", "Dr.", "Mr.", "Mrs.", "Ms.", "St.",
+    "U.S.", "U.K.", "e.g", "i.e", "Fig.", "approx.", "cf.",
+)
 
 
 def _extract_numbers(text: str) -> list[float]:
@@ -42,8 +47,14 @@ def _extract_numbers(text: str) -> list[float]:
 
 
 def _count_sentences(text: str) -> int:
-    """Count sentences; a text ending without terminal punctuation still counts."""
-    parts = [p for p in _SENTENCE_RE.split(text) if p and p.strip()]
+    """Count sentences, ignoring abbreviation periods.
+
+    A text ending without terminal punctuation still counts as one sentence.
+    """
+    masked = text or ""
+    for abbreviation in _ABBREVIATIONS:
+        masked = masked.replace(abbreviation, abbreviation.replace(".", "§"))
+    parts = [p for p in _SENTENCE_RE.split(masked) if p and p.strip()]
     return len(parts)
 
 

@@ -101,6 +101,78 @@ async def test_guarded_call_no_sleep_before_first_attempt(monkeypatch) -> None:
     assert sleeps == []
 
 
+@pytest.mark.asyncio
+async def test_guarded_call_retries_retryable_failure(monkeypatch) -> None:
+    """A 429 must be retried with backoff — disabling all retries silently
+    would otherwise pass the suite (only the no-retry direction was covered)."""
+    from api_gateway.rate_limiter import AsyncAPIGateway
+
+    sleeps: list[float] = []
+
+    async def _fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    monkeypatch.setattr("api_gateway.rate_limiter.asyncio.sleep", _fake_sleep)
+
+    gateway = AsyncAPIGateway(client=MagicMock())
+    gateway._client.post_request = AsyncMock(
+        side_effect=[_http_status_error(429), _http_status_error(503), "recovered"]
+    )
+
+    result = await gateway._guarded_call("prov/model", "prompt")
+    assert result == "recovered"
+    assert gateway._client.post_request.await_count == 3
+    assert len(sleeps) == 2  # backoff between attempts 1->2 and 2->3
+
+
+@pytest.mark.asyncio
+async def test_provider_usage_flows_to_passport_and_metrics() -> None:
+    """Integration: post_request sets the usage ContextVar; execute_with_fallback
+    records it on the passport; execute_with_contracts surfaces measured tokens."""
+    from api_gateway.client import _last_provider_usage
+    from api_gateway.rate_limiter import AsyncAPIGateway
+    from api_gateway.strategy import ProviderStrategy
+    from core.runtime import RuntimeEngine
+
+    usage_block = {
+        "model": "prov/model",
+        "prompt_tokens": 100,
+        "completion_tokens": 50,
+        "latency_s": 0.2,
+        "success": True,
+        "estimated": False,
+    }
+
+    async def _post_with_usage(*args, **kwargs):
+        _last_provider_usage.set(usage_block)
+        return "answer"
+
+    gateway = AsyncAPIGateway(client=MagicMock())
+    gateway._client.post_request = AsyncMock(side_effect=_post_with_usage)
+
+    strategy = ProviderStrategy(mode="FREE")
+    strategy.get_model_chain = lambda role: ["prov/model"]  # single-model chain
+    pool = MagicMock()
+    pool.is_provider_healthy.return_value = True
+    pool.report_success.return_value = None
+
+    engine = RuntimeEngine()
+    passport = ExecutionPassport()
+    await engine.execute_with_contracts(
+        prompt="hello world",
+        system_prompt="system",
+        role="judge",
+        passport=passport,
+        gateway=gateway,
+        strategy=strategy,
+        pool=pool,
+    )
+
+    assert passport.get_provider_usage("judge")["prompt_tokens"] == 100
+    metrics = engine._metrics[("judge", "prov")]
+    assert metrics.total_tokens == 150  # measured, not the len//4 estimate
+
+
 # ── max_tokens pass-through ─────────────────────────────────────────────
 
 

@@ -76,8 +76,8 @@ def render(path: Path, rows: list[dict]) -> str:
         f"- arm: `{arm}` | golden: `{rows[0].get('golden', '?')}` | "
         f"commit: `{rows[0].get('git_commit', '?')}` | simulated: {simulated} | rows: {n}",
         f"- **pass: {passed}/{n} ({_fmt_pct(passed, n)})** | aborted: {aborted} | "
-        f"liveness-only passes (checks failed): "
-        f"{sum(1 for r in rows if r.get('pass') and (r.get('checks_total', 0) or 0) > 0 and not r.get('aborted') and r.get('checks_passed', 0) == r.get('checks_total', 0))}",  # noqa: E501
+        f"alive-but-wrong (liveness passed, checks failed): "
+        f"{sum(1 for r in rows if r.get('liveness_pass') and not r.get('pass'))}",
         f"- reference checks: {checks_passed}/{checks_total} passed"
         if checks_total
         else "- reference checks: none in this run (v1 set — liveness grading only)",

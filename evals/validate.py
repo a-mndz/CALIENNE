@@ -173,9 +173,14 @@ def check_firewall_corpus() -> list[str]:
 def main() -> int:
     errors: list[str] = []
     try:
-        items, result = load_golden()
-        errors.extend(result["errors"])
-        errors.extend(check_leakage(items))
+        # Validate every registered set in the manifest, not just v1: a hash
+        # or schema drift in v2/gsm8k_v1 must block the gate too.
+        manifest = json.loads((GOLDEN_DIR / "MANIFEST.json").read_text(encoding="utf-8"))
+        versions = list(manifest.get("sets", {"v1": {}}).keys())
+        for version in versions:
+            items, result = load_golden(version)
+            errors.extend(result["errors"])
+            errors.extend(check_leakage(items))
     except FileNotFoundError as exc:
         errors.append(str(exc))
     errors.extend(check_firewall_corpus())
@@ -185,7 +190,7 @@ def main() -> int:
         for error in errors:
             print(f"  - {error}")
         return 1
-    print("G5 validation passed (golden + firewall corpus integrity)")
+    print(f"G5 validation passed ({len(versions)} golden sets + firewall corpus integrity)")
     return 0
 
 

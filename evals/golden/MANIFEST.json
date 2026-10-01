@@ -1,6 +1,14 @@
 {
-  "notes": "Inputs only; outcomes are never stored in the golden set. Edit policy: never edit a set in place — create a new version. Multi-set manifest; load_golden falls back to legacy single-set layout for old checkouts.",
+  "notes": "Inputs only; outcomes are never stored in the golden set. Edit policy: never edit a set in place \u2014 create a new version. Multi-set manifest; load_golden falls back to legacy single-set layout for old checkouts.",
   "sets": {
+    "gsm8k_v1": {
+      "clusters": 1,
+      "created": "2026-10-01T00:00:00+00:00",
+      "n": 50,
+      "notes": "External arm: 50 GSM8K test-split items (openai/gsm8k, deterministic stride-20 slice), numeric-answer checks. Wrong answers fail unless the gold coincides with a number already in the question (echo collision) \u2014 treat as near-exact, not absolute. Regenerate with evals/tools/fetch_gsm8k.py.",
+      "sha256": "30491a799e1adb4395486a9c2c85112a83d46d17f3c58ba684da34fbfeed565d",
+      "version": "gsm8k_v1"
+    },
     "v1": {
       "clusters": 10,
       "created": "2026-08-21T20:28:40.679061+00:00",
@@ -14,16 +22,8 @@
       "created": "2026-10-01T00:00:00+00:00",
       "n": 50,
       "notes": "Same 50 v1 queries (identical prompt_fingerprints) plus expect.checks: deterministic reference checks (numeric/contains/not_contains/sentence limits) authored per item. Checks table lives in evals/tools/build_v2.py.",
-      "sha256": "b6da6cc27d492bf62f220f7b17a10236f278f7f51f1cf2eea68d2f496007dcb7",
+      "sha256": "99ad36e1f9df42e53ccd0e046bcc72cc565e02c83b82542f3ef5b2834c41b24d",
       "version": "v2"
-    },
-    "gsm8k_v1": {
-      "clusters": 1,
-      "created": "2026-10-01T00:00:00+00:00",
-      "n": 50,
-      "notes": "External arm: 50 GSM8K test-split items (openai/gsm8k, deterministic stride-20 slice), numeric-answer checks. Wrong answers cannot pass. Regenerate with evals/tools/fetch_gsm8k.py.",
-      "sha256": "30491a799e1adb4395486a9c2c85112a83d46d17f3c58ba684da34fbfeed565d",
-      "version": "gsm8k_v1"
     }
   }
 }

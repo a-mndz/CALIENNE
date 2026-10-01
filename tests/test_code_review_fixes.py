@@ -7,8 +7,8 @@ Verifies:
 - Conversation edit preservation logic in api/routes_conversations.py.
 - Auth initial admin email and registration role assignment.
 
-PythonREPLTool / WebSearchTool coverage lives in attic/tests/ since the tool
-modules were quarantined as unreachable from the live pipeline.
+PythonREPLTool / WebSearchTool tests were removed with their modules
+(quarantined 2026-10-01) — see attic/README.md for the revival checklist.
 """
 
 from __future__ import annotations

@@ -156,8 +156,12 @@ CHECKS: dict[str, list[dict]] = {
     ],
     # ── long-context ──────────────────────────────────────────────────
     "g036": [
-        {"type": "contains_all", "values": ["no"]},
-        {"type": "contains_any", "values": ["on site", "on-site", "must be on"]},
+        # A correct answer must decline: contractors are on-site only.
+        {
+            "type": "contains_any",
+            "values": ["cannot", "may not", "not permitted", "not allowed",
+                       "no, ", "no —", "must be on site", "must be on-site", "onsite"],
+        },
     ],
     "g037": [
         {"type": "contains_any", "values": ["1937"]},
@@ -209,7 +213,7 @@ CHECKS: dict[str, list[dict]] = {
     ],
     "g047": [
         {"type": "max_sentences", "value": 2},
-        {"type": "contains_any", "values": ["24 month", "two year", "2 year"]},
+        {"type": "contains_any", "values": ["24 month", "24-month", "two year", "2 year", "two-year"]},
         {"type": "contains_any", "values": ["water"]},
         {"type": "contains_any", "values": ["receipt"]},
     ],
