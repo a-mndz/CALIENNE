@@ -24,7 +24,7 @@ from pathlib import Path
 
 def _load(path: Path) -> list[dict]:
     rows = []
-    for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue

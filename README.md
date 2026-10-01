@@ -21,6 +21,8 @@ Instead of relying on a single raw model call, Calienne executes a robust **four
 
 The entire pipeline is **async-native**, runs with **bounded concurrency**, and **automatically falls back** across multiple LLM providers if a model is down, rate-limited, or returns garbage.
 
+**Honest framing:** whether this four-stage architecture actually beats a single strong model is an empirical question, not a marketing claim. The repo ships the machinery to answer it — `evals/run_experiment.py` runs the pipeline against a single-model baseline on reference-checked golden sets, including an external GSM8K arm, with exact McNemar for significance. The one live baseline captured so far (2026-08-22, n=50, β=0.54) argued *against* the architecture by the repo's own decision rule and has not yet been replicated. Run the experiment before quoting quality claims.
+
 ---
 
 ## Interface & Visual Preview
@@ -41,16 +43,13 @@ Dedicated dark-mode glassmorphism login and registration page (`/login`) with JW
 
 * **Core Backend:** Python 3.11+ (`asyncio`, `httpx.AsyncClient`)
 * **API Framework:** FastAPI & Uvicorn for asynchronous server endpoints with strict CORS allowlists and CSRF origin checks
-* **Database & Persistence:** Async PostgreSQL via SQLAlchemy 2.0 (`asyncpg`) with an Alembic-managed schema (001→007) and `pgvector` dense embeddings — startup verifies the database is at the required revision and refuses to boot on drift
-* **Dense Vector & Semantic RAG:** `pgvector` 1024-dim dense embeddings (`orchestrator/embeddings.py`), HNSW index search, syntax-aware recursive document chunking (`core/chunking.py`), and Reciprocal Rank Fusion (`orchestrator/retrieval.py`)
-* **Agent Execution Tools:** Sandboxed Python REPL (`PythonREPLTool` in `core/tools.py`) with AST safety guardrails, structured web search matching `14_web_search.xml` (`WebSearchTool`), and JSON Schema tool registry (`ToolRegistry`)
-* **Frontier Reasoning & Search:** Tree-of-Thoughts / MCTS (`orchestrator/mcts.py`) guided by Process Reward Models (PRMs) for multi-step reasoning trajectories
-* **Multi-Judge Consensus:** Dynamic judge allocation and consensus engine (`orchestrator/decisions.py`) with telemetry tracking
-* **Calibrated Quality Evaluation:** Multi-dimensional 0–5 LLM-as-a-Judge semantic rubrics (`evals/rubric.py`) scoring Accuracy, Factual Consistency, and Reasoning Soundness
+* **Database & Persistence:** Async PostgreSQL via SQLAlchemy 2.0 (`asyncpg`) with an Alembic-managed schema (001→007) — startup verifies the database is at the required revision and refuses to boot on drift
+* **Hallucination Firewall:** deterministic evidence checker on the default path — unsupported claims in the judge's answer are qualified or stripped before it reaches you
+* **Measured Token Accounting:** provider-reported usage blocks are captured per call (contextvars-scoped) and recorded on the execution passport; retries are classified, so deterministic 4xx failures fail fast instead of multiplying
 * **Security & Auth:** Secure JWT authentication via `httpOnly`, `SameSite=Strict` cookies, password strength verification, and IP-scoped rate limiting
 * **Data Validation:** Pydantic V2 & Pydantic-Settings for config validation and data contracts
 * **Output Processing:** `json-repair` for parsing and correcting malformed JSON LLM outputs
-* **Prompt Layout:** Strictly validated XML formats layered dynamically at runtime
+* **Prompt Layout:** Strictly validated XML formats layered dynamically at runtime, with DOCTYPE/entity declarations rejected up front
 * **Frontend Web Dashboard:** Modern React 19 + Vite + GSAP 3 animation engine with triadic dark-mode glassmorphism and restrained fluid motion architecture (`frontend/`)
 * **Authentication UI:** Dedicated responsive HTML5/CSS3 cosmic dark-mode login interface (`calienne_login.html`) with externalized streaming media
 * **LLM Providers:** Native integration with OpenRouter, OpenAI, Google AI Studio, Groq, and custom/local gateways (Ollama / vLLM / LiteLLM). Model routes verified live 2026-08; dead routes (GitHub Models, Llama 3.x, Claude 3.5) are gone from the strategy maps
@@ -132,6 +131,34 @@ calienne now incorporates the Adaptive Multi-Model Reasoning Orchestrator (CALIE
 
 ---
 
+## What is NOT implemented (honesty section)
+
+Several previously advertised subsystems were **quarantined to `attic/`** on
+2026-10-01 because nothing in the live execution path could reach them — they
+were imported only by their own tests. They are recoverable from git history;
+`attic/README.md` documents the revival checklist (wire it in, fix the known
+defects, prove it earns its cost on the golden eval):
+
+| Claimed feature | Reality |
+|---|---|
+| Tree-of-Thoughts / MCTS with Process Reward Models | Dead code; the "PRM" was keyword matching (+0.20 for containing "therefore"). Not a real search. |
+| Dense semantic embeddings + pgvector RAG | The schema exists, but the embedding service silently fell back to an MD5/SHA-1 hash projection (`fastembed` was never in requirements), and the default retrieval provider returns `[]` by design. |
+| Sandboxed Python REPL + web search tools | No agent could call a tool (no tool-call handling in the client), the AST guard was bypassable, and the subprocess inherited provider API keys. |
+| "Calibrated LLM-as-a-Judge" rubrics | The rubric was regex string-matching, and was never invoked by the harness. |
+| Multi-judge consensus | Still in the tree but **flag-gated off by default** (`CALIENNE_ENABLE_CONSENSUS`): as implemented, every judge dispatches to the same model chain with an identical prompt — N× cost without model diversity. |
+
+Other known limitations:
+
+* The Breaker Gate is a full LLM call with a 5s timeout and **fails open** —
+  on live providers it often burns a call and then gates nothing.
+* Per-role temperatures are now configurable defaults (creative 0.8,
+  logician 0.2, judge 0.1, breaker 0.0) — actual model diversity across
+  roles still depends on the provider chain configuration.
+* `validation_score` is a self-reported judge number. Treat it as a signal,
+  not a measurement; the report tool flags runs where it is inert.
+
+---
+
 ## Adaptive Runtime (v1 — in progress)
 
 calienne is moving from the linear four-stage pipeline to a **planner-driven, DAG-based, async-first orchestration runtime** that is observable, replayable, versioned, and feature-flagged end-to-end. The large adaptive subsystems ship **behind `CALIENNE_ENABLE_*` feature flags that default to off**, so the stable `DecisionEngine` path keeps running until a flag is flipped in a separate, recorded decision. But this migration was not purely additive — several changes to the **default request path** already changed how the system behaves on every request, with no flag flip required.
@@ -196,19 +223,20 @@ Every quality claim is backed by a gate that runs without API keys, so it blocks
 | G2 — consensus invariants | Weighted multi-judge math: weights sum to 1, monotonicity, tie handling |
 | G3 — frozen firewall corpus | 66 labeled rows; the matcher must reproduce every ground-truth verdict (`evals/validate`) |
 | G4 — hashed lockfile | `requirements.lock` fully pinned with hashes (`tools/check_pins.py`, 59/59) |
-| G5 — golden integrity | `evals/golden/v1.jsonl` verified against its SHA-256 manifest (n=50, 10 clusters) |
+| G5 — golden integrity | `evals/golden/` verified against the multi-set SHA-256 manifest: `v1` (50 inputs, liveness), `v2` (same queries + deterministic reference checks), `gsm8k_v1` (50 external GSM8K items with exact numeric answers) |
 
 **Stochastic — nightly workflow (`evals.yml`) + `run-evals` label, never a required check:**
 
 | Gate | What it measures |
 |------|------------------|
-| G6 — exact McNemar | Paired regression test on per-item outcomes; needs a captured baseline first |
+| G6 — exact McNemar | Paired regression test on per-item outcomes; `--aggregate` compares reruns files by majority verdict |
 | G7 — noise floor | Run-to-run variance of the golden set |
 
-The dual-agent topology only earns its latency/cost when *exactly one* agent succeeds; `evals.beta` measures the co-failure ceiling β = P(both fail) with Wilson confidence intervals. First live capture (needs provider keys):
+**The experiment (`evals/EXPERIMENT.md`, `evals/run_experiment.py`):** the repo's own decision rule is that the dual-agent topology only earns its 4× cost when it significantly beats a single strong model. The runner executes both arms on golden v2 and the external GSM8K arm, plus a noise floor, stamps every row with `git_commit`/model IDs/temperatures, and `evals.report` flags inert judge metrics (SUSPECT invariant). The 2026-08-22 baseline (n=50, β=0.54) argued against the topology by that rule and has never been replicated — run it twice before believing anything.
 
 ```bash
-python -m evals.capture --label baseline
+python -m evals.run_experiment --label-prefix exp1          # the comparison
+python -m evals.report evals/runs/exp1-triad-v2.jsonl       # read the results
 ```
 
 That baseline is also the evidence the parked DAG verdict (behind all-off flags) is waiting for. Audit history: `research/AUDIT_2026-08-22.md` (post-remediation audit, all findings fixed same day).
@@ -219,8 +247,8 @@ That baseline is also the evidence the parked DAG verdict (behind all-off flags)
 
 | Feature | Why it matters |
 |---------|---------------|
-| **Validation Arbitrage** | Two agents (Logician + Creative) reason independently; the Judge resolves contradictions and scores consistency. You get a confidence score, not just a guess. |
-| **Provider Resilience** | OpenRouter, OpenAI, Google AI Studio, Groq, and custom/local gateways. If one provider is down, the pipeline automatically tries the next. |
+| **Validation Arbitrage** | Two agents (Logician + Creative) reason in parallel at different temperatures; the Judge resolves contradictions and scores consistency. Whether that beats one strong model is now a measured question — `evals/run_experiment.py` runs both arms. |
+| **Provider Resilience** | OpenRouter, OpenAI, Google AI Studio, Groq, and custom/local gateways. If one provider is down, the pipeline automatically tries the next. Retries are classified: deterministic 4xx failures fail fast. |
 | **Circuit Breaker + Cooldown** | Dead providers are automatically excluded. No manual intervention needed when a service is rate-limited or flaky. |
 | **Secure Auth & Identity** | Dedicated login & registration UI with `httpOnly` Strict SameSite cookie authentication, IP rate limiting, and CSRF origin enforcement. |
 | **Persistent Session Memory** | Async PostgreSQL storage tracks multi-turn dialogue, user profiles, and session state across restarts — plus owner-scoped lexical turn memory that hydrates context when a client sends none, with GDPR purge on request. |
@@ -229,9 +257,6 @@ That baseline is also the evidence the parked DAG verdict (behind all-off flags)
 | **Dark-mode Web UI** | A premium React 19 + GSAP glassmorphism interface with animated pipeline progress, expandable agent reasoning, telemetry dashboard, and responsive design. |
 | **Async-Native** | Built on `asyncio`, `httpx.AsyncClient`, and `FastAPI`. Handles concurrent agent calls without blocking. |
 | **Three Operating Modes** | `FREE` (open-weight models only), `HYBRID` (premium + free fallback), `PAID` (top-tier models only). Switch without code changes. |
-| **pgvector & Semantic RAG** | 1024-dim dense vector embeddings with HNSW indexing, syntax-preserving chunking, and Reciprocal Rank Fusion (RRF) for high-accuracy retrieval. |
-| **Agent Execution Tools** | Subprocess-isolated Python REPL with AST safety guards and structured web search tools for empirical verification. |
-| **Tree-of-Thoughts / MCTS** | Search guided by Process Reward Models (PRMs) exploring complex reasoning trajectories with backtracking. |
 
 ---
 
@@ -347,8 +372,7 @@ calienne/
 │   ├── models.py              # ORM models (User, ConversationSessionRecord, DocumentChunkRecord, etc.)
 │   ├── security.py            # JWT auth, password hashing & role enforcement
 │   ├── schemas.py             # Pydantic V2 data contracts
-│   ├── chunking.py            # Recursive boundary-preserving document chunking engine (P1-04)
-│   └── tools.py               # Sandboxed Python REPL & WebSearchTool (P2-01)
+│   └── (chunking.py, tools.py were quarantined to attic/ 2026-10-01)
 │
 ├── api_gateway/
 │   ├── client.py              # HTTPX AsyncClient + non-blocking async file I/O
@@ -369,8 +393,7 @@ calienne/
 │   ├── conversation.py        # Conversation state, DB persistence & dialogue tracking (P2-10)
 │   ├── streaming.py           # Real-time SSE token-level event streaming (P0-07)
 │   ├── memory.py              # Epistemic failure-tracking bus with token Jaccard retrieval
-│   ├── embeddings.py          # 1024-dim dense vector embedding service & cosine similarity (P1-03)
-│   ├── mcts.py                # Tree-of-Thoughts / MCTS guided by Process Reward Models (P2-04)
+│   │                          # (embeddings.py, mcts.py quarantined to attic/ 2026-10-01)
 │   │                          # --- Adaptive v1 runtime (flag-gated, default off) ---
 │   ├── feature_flags.py       # Typed CALIENNE_ENABLE_* accessor (env > file > off)
 │   ├── strategic_planner.py   # LLM-assisted decomposition → StrategicPlan
@@ -421,9 +444,12 @@ calienne/
 ├── frontend/                  # Modern React 19 + Vite + GSAP web dashboard
 │                              #   (served by server.py, restrained fluid motion,
 │                              #    cookie-auth, built + linted in CI)
-├── evals/                     # Measurement layer: golden set (n=50) + frozen
-│   ├── rubric.py              #   Calibrated 0-5 LLM-as-a-Judge semantic rubric (P2-03)
-│   ├── capture.py             #   Live capture runner (`python -m evals.capture`)
+├── evals/                     # Measurement layer: golden v1 (liveness) + v2
+│   │                          #   (reference checks) + gsm8k_v1 (external arm)
+│   ├── checks.py              #   Deterministic reference-check evaluator
+│   ├── capture.py             #   Live capture runner, --arm {triad,single}
+│   ├── report.py              #   Run summary + SUSPECT judge-metric invariant
+│   ├── run_experiment.py      #   One-command triad-vs-single comparison
 │   └── validate.py            #   Integrity validator (`python -m evals.validate`)
 │
 └── docs/

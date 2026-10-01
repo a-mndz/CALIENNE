@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from evals.checks import evaluate_checks
 from evals.capture import grade_item
+from evals.checks import evaluate_checks
 
 pytestmark = pytest.mark.unit
 
