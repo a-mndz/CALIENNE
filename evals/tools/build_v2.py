@@ -69,11 +69,17 @@ CHECKS: dict[str, list[dict]] = {
     ],
     "g014": [
         {"type": "contains_any", "values": ["statistical significance"]},
-        {"type": "contains_any", "values": ["practical significance", "effect size", "material", "meaningful", "magnitude"]},
+        {
+            "type": "contains_any",
+            "values": ["practical significance", "effect size", "material", "meaningful", "magnitude"],
+        },
     ],
     "g015": [
         {"type": "contains_all", "values": ["legislative", "executive", "judicial"]},
-        {"type": "contains_any", "values": ["veto", "impeach", "confirm", "declare", "interpret", "override"]},
+        {
+            "type": "contains_any",
+            "values": ["veto", "impeach", "confirm", "declare", "interpret", "override"],
+        },
     ],
     # ── creative (constraint checks only) ─────────────────────────────
     "g016": [{"type": "min_chars", "value": 60}],
@@ -93,7 +99,10 @@ CHECKS: dict[str, list[dict]] = {
     ],
     "g023": [
         {"type": "min_chars", "value": 120},
-        {"type": "contains_any", "values": ["evidence", "audience", "pattern", "private", "publicly", "facts", "intent"]},
+        {
+            "type": "contains_any",
+            "values": ["evidence", "audience", "pattern", "private", "publicly", "facts", "intent"],
+        },
     ],
     "g024": [
         {"type": "min_chars", "value": 120},
@@ -175,7 +184,10 @@ CHECKS: dict[str, list[dict]] = {
     ],
     "g042": [
         {"type": "min_chars", "value": 250},
-        {"type": "contains_any", "values": ["dual-write", "dual write", "backfill", "replica", "cutover", "rollback", "shadow"]},
+        {
+            "type": "contains_any",
+            "values": ["dual-write", "dual write", "backfill", "replica", "cutover", "rollback", "shadow"],
+        },
     ],
     "g043": [
         {"type": "min_chars", "value": 200},
@@ -204,12 +216,18 @@ CHECKS: dict[str, list[dict]] = {
     "g048": [
         {"type": "min_chars", "value": 120},
         {"type": "contains_any", "values": ["fail", "fault", "detect"]},
-        {"type": "contains_any", "values": ["reset", "recover", "half-open", "retry", "timeout", "attempt"]},
+        {
+            "type": "contains_any",
+            "values": ["reset", "recover", "half-open", "retry", "timeout", "attempt"],
+        },
     ],
     "g049": [
         {"type": "max_sentences", "value": 3},
         {"type": "contains_any", "values": ["rook", "king"]},
-        {"type": "contains_any", "values": ["cannot", "may not", "no pieces", "moved", "in check", "neither"]},
+        {
+            "type": "contains_any",
+            "values": ["cannot", "may not", "no pieces", "moved", "in check", "neither"],
+        },
     ],
     "g050": [
         {"type": "max_sentences", "value": 2},
