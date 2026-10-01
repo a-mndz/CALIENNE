@@ -1,13 +1,14 @@
 """Targeted regression tests for full code review remediations.
 
 Verifies:
-- PythonREPLTool security restrictions (AST blocking of banned modules, builtins, dunder attributes).
-- WebSearchTool fallback metadata (source_authority, confidence level).
 - Breaker gate timeout default (5000ms).
 - Judge target model selection in decisions.py.
 - System prompt handling in api_gateway/client.py.
 - Conversation edit preservation logic in api/routes_conversations.py.
 - Auth initial admin email and registration role assignment.
+
+PythonREPLTool / WebSearchTool coverage lives in attic/tests/ since the tool
+modules were quarantined as unreachable from the live pipeline.
 """
 
 from __future__ import annotations
@@ -25,45 +26,9 @@ from api.routes_conversations import ConversationSaveRequest, save_conversation
 from api_gateway.client import AsyncHTTPClient
 from core.database import Base
 from core.models import ConversationSessionRecord, User
-from core.tools import PythonREPLTool, WebSearchTool
 from orchestrator.breaker_gate import BreakerGate
 from orchestrator.consensus import JudgeOutput
 from orchestrator.decisions import DecisionEngine
-
-
-@pytest.mark.asyncio
-async def test_repl_hardened_ast_validation() -> None:
-    repl = PythonREPLTool()
-
-    def expect_prohibited(res: object) -> None:
-        assert res.success is False  # type: ignore[attr-defined]
-        assert "prohibited" in (res.error or "")  # type: ignore[attr-defined]
-
-    # Banned modules and builtins — each probe is an inline literal.
-    expect_prohibited(await repl.execute("import os"))
-    expect_prohibited(await repl.execute("import sys"))
-    expect_prohibited(await repl.execute("import subprocess"))
-    expect_prohibited(await repl.execute("import socket"))
-    expect_prohibited(await repl.execute("import ctypes"))
-    expect_prohibited(await repl.execute("import shutil"))
-    expect_prohibited(await repl.execute("eval('1')"))
-    expect_prohibited(await repl.execute("exec('x=1')"))
-    expect_prohibited(await repl.execute("open('x')"))
-    expect_prohibited(await repl.execute("__import__('os')"))
-
-    # Banned dunders
-    res = await repl.execute("x = ().__class__.__base__")
-    assert res.success is False
-    assert "prohibited" in (res.error or "")
-
-
-@pytest.mark.asyncio
-async def test_web_search_simulated_fallback() -> None:
-    search = WebSearchTool()
-    res = await search.search("quantum consensus")
-    assert res["status"] == "completed"
-    assert res["results"][0]["source_authority"] == "SIMULATED"
-    assert res["confidence"]["level"] == "LOW"
 
 
 def test_breaker_gate_timeout_defaults() -> None:
