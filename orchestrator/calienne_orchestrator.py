@@ -208,7 +208,3 @@ def create_request_state_machine(request_id: str) -> StateMachine:
         A new state machine initialised to the IDLE state.
     """
     return StateMachine(request_id=request_id)
-
-
-# Backwards compatibility alias
-initialize_calienne_components = initialize_calienne_components

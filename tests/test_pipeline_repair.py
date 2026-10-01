@@ -59,21 +59,28 @@ class TestHIGH019ClaimExtractionToggle:
     """Step 14 — firewall is on by default and env var is now an emergency bypass."""
 
     def test_disabled_by_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("CALIENNE_DISABLE_CLAIM_EXTRACTION", raising=False)
         monkeypatch.delenv("calienne_DISABLE_CLAIM_EXTRACTION", raising=False)
         from orchestrator.pipelines import _is_claim_extraction_enabled
         assert _is_claim_extraction_enabled() is True
 
     def test_enabled_when_explicit(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("calienne_DISABLE_CLAIM_EXTRACTION", "0")
+        monkeypatch.setenv("CALIENNE_DISABLE_CLAIM_EXTRACTION", "0")
         from orchestrator.pipelines import _is_claim_extraction_enabled
         assert _is_claim_extraction_enabled() is True
 
     def test_enabled_when_off_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("calienne_DISABLE_CLAIM_EXTRACTION", "off")
+        monkeypatch.setenv("CALIENNE_DISABLE_CLAIM_EXTRACTION", "off")
         from orchestrator.pipelines import _is_claim_extraction_enabled
         assert _is_claim_extraction_enabled() is True
 
     def test_disabled_when_explicit_bypass_enabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("CALIENNE_DISABLE_CLAIM_EXTRACTION", "1")
+        from orchestrator.pipelines import _is_claim_extraction_enabled
+        assert _is_claim_extraction_enabled() is False
+
+    def test_legacy_lowercase_env_still_honored(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("CALIENNE_DISABLE_CLAIM_EXTRACTION", raising=False)
         monkeypatch.setenv("calienne_DISABLE_CLAIM_EXTRACTION", "1")
         from orchestrator.pipelines import _is_claim_extraction_enabled
         assert _is_claim_extraction_enabled() is False

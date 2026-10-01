@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import random
+import secrets
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -947,8 +947,11 @@ class AsyncAPIGateway:
         backoff_base = 1.5
 
         for attempt in range(max_retries):
-            # Dynamic Jitter
-            jitter = random.uniform(self._jitter_min, self._jitter_max)
+            # Dynamic Jitter (crypto-grade generator; random.uniform is
+            # predictable within a process)
+            jitter = secrets.randbelow(1000) / 1000.0
+            span = self._jitter_max - self._jitter_min
+            jitter = self._jitter_min + jitter * span
             if attempt > 0:
                 # Exponential backoff + jitter
                 delay = (backoff_base ** attempt) + jitter

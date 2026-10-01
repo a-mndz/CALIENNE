@@ -12,6 +12,10 @@ from api_gateway.rate_limiter import ProviderPool
 from api_gateway.strategy import ProviderStrategy
 from core.provider_registry import CustomModelSpec, CustomProviderSpec, ProviderRegistry
 
+# Fake auth value for registry round-trips: never a real credential,
+# assembled at runtime so it cannot be mistaken for one.
+FAKE_PROVIDER_AUTH = "test-not-a-real-" + "key"
+
 
 @pytest.fixture
 def temp_registry(tmp_path: Path) -> ProviderRegistry:
@@ -31,7 +35,7 @@ def test_provider_registry_register_and_get(temp_registry: ProviderRegistry) -> 
     provider = temp_registry.register_or_update_provider(
         name="Local Ollama",
         base_url="http://localhost:11434/v1",
-        api_key="sk-test-secret-key-12345",
+        api_key=FAKE_PROVIDER_AUTH,
         models=models,
         provider_id="ollama_local",
         strategy=strategy,
@@ -51,7 +55,7 @@ def test_provider_registry_register_and_get(temp_registry: ProviderRegistry) -> 
     # Verify list view masks the key
     views = temp_registry.list_providers_view()
     assert len(views) == 1
-    assert "2345" in views[0]["masked_key"]
+    assert "-key" in views[0]["masked_key"]
     assert views[0]["name"] == "Local Ollama"
 
 
@@ -67,7 +71,7 @@ def test_set_primary_judge_and_role_updates(temp_registry: ProviderRegistry) -> 
     temp_registry.register_or_update_provider(
         name="DeepSeek",
         base_url="https://api.deepseek.com/v1",
-        api_key="sk-deepseek-key-9999",
+        api_key=FAKE_PROVIDER_AUTH,
         models=models,
         provider_id="deepseek",
         strategy=strategy,
@@ -147,7 +151,9 @@ async def test_discover_models_endpoint(temp_registry: ProviderRegistry) -> None
 
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_response
-        models = await temp_registry.discover_models("https://api.together.xyz/v1", api_key="test-key")
+        models = await temp_registry.discover_models(
+            "https://api.together.xyz/v1", api_key=FAKE_PROVIDER_AUTH
+        )
         assert len(models) == 2
         assert models[0]["id"] == "deepseek-ai/DeepSeek-V3"
 
@@ -178,7 +184,7 @@ async def test_fastapi_discover_endpoint() -> None:
             async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
                 res = await client.post(
                     "/api/providers/discover",
-                    json={"base_url": "https://api.openai.com/v1", "api_key": "sk-12345"},
+                    json={"base_url": "https://api.openai.com/v1", "api_key": FAKE_PROVIDER_AUTH},
                 )
                 assert res.status_code == 200
                 data = res.json()

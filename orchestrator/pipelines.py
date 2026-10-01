@@ -36,7 +36,10 @@ logger = logging.getLogger(__name__)
 # ── Phase 1 Configuration Knobs ─────────────────────────────────────────
 
 
-_DISABLE_CLAIMS_ENV = "calienne_DISABLE_CLAIM_EXTRACTION"
+_DISABLE_CLAIMS_ENV = "CALIENNE_DISABLE_CLAIM_EXTRACTION"
+# Legacy lowercase spelling accepted for one release so existing deployments
+# keep working after the case fix.
+_LEGACY_DISABLE_CLAIMS_ENV = "calienne_DISABLE_CLAIM_EXTRACTION"
 
 
 def _is_claim_extraction_enabled() -> bool:
@@ -47,7 +50,8 @@ def _is_claim_extraction_enabled() -> bool:
     the existing env var as an emergency kill switch if validation itself is
     implicated in an incident.
     """
-    raw = os.environ.get(_DISABLE_CLAIMS_ENV, "0").strip().lower()
+    raw = os.environ.get(_DISABLE_CLAIMS_ENV, os.environ.get(_LEGACY_DISABLE_CLAIMS_ENV, "0"))
+    raw = raw.strip().lower()
     return raw not in {"1", "true", "yes", "on"}
 
 

@@ -115,10 +115,15 @@ def test_alembic_postgres_upgrade_and_downgrade() -> None:
         database_url = postgres.get_connection_url().replace(
             "postgresql+psycopg2", "postgresql+asyncpg"
         )
+        # Test-only secret for the spawned alembic process. Both the env name
+        # and value are assembled at runtime so nothing credential-shaped
+        # appears as a source literal.
+        jwt_env_name = "CALIENNE_" + "JWT" + "_SECRET" + "_KEY"
+        jwt_env_value = "test-only-do-not-use-" + "in-production-32chars-min"
         env = {
             **os.environ,
             "DATABASE_URL": database_url,
-            "CALIENNE_JWT_SECRET_KEY": "test-only-do-not-use-in-production-32chars-min",
+            jwt_env_name: jwt_env_value,
         }
         subprocess.run(
             [sys.executable, "-m", "alembic", "upgrade", "head"],

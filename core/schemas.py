@@ -213,7 +213,10 @@ class calienneOutput(CalienneBaseModel):
                 if "confidence" in data and isinstance(data["confidence"], (int, float)):
                     data["validation_score"] = float(data["confidence"]) * 10.0
                 else:
-                    data["validation_score"] = 9.0  # default score
+                    # Missing score is a judge contract violation, not a pass.
+                    # Defaulting high silently cleared the < 7.0 failure-memory
+                    # gate and inflated quality gauges.
+                    data["validation_score"] = 0.0
         return data
 
     final_answer: str = Field(

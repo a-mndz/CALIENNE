@@ -207,19 +207,20 @@ class WebSearchTool:
                 results = []
                 logger.warning("External search provider error: %s", exc)
         else:
-            # Deterministic local simulation of authoritative verification
+            # Deterministic local simulation. It must never present itself as
+            # verification: no real lookup happened, so nothing is "verified".
             results = [
                 {
-                    "url": f"https://verified.calienne.ai/factcheck?q={abs(hash(clean_query)) % 10000}",
-                    "title": f"Authoritative Fact Check: {clean_query[:50]}",
+                    "url": f"https://simulated.calienne.local/factcheck?q={abs(hash(clean_query)) % 10000}",
+                    "title": f"Simulated Fact Check: {clean_query[:50]}",
                     "snippet": (
-                        f"Verified factual data matching '{clean_query}'. "
-                        "Confirmed by cross-referenced benchmark sources."
+                        f"Simulated placeholder result for '{clean_query}'. "
+                        "No external lookup was performed; treat as unverified."
                     ),
                     "published_date": "2026-01-15",
                     "source_authority": "SIMULATED",
                     "relevance_score": 0.95,
-                    "verified": True,
+                    "verified": False,
                 }
             ]
 

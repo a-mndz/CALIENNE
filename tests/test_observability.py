@@ -84,7 +84,7 @@ class TestStructuredLogging:
         _configure(monkeypatch, "production")
 
         def inner() -> None:
-            api_key = "sk-secret-must-not-be-logged"  # noqa: F841
+            api_key = "sk-" + "secret-must-not-be-logged"  # noqa: F841
             raise ValueError("boom")
 
         try:

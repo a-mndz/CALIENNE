@@ -35,17 +35,21 @@ from orchestrator.decisions import DecisionEngine
 async def test_repl_hardened_ast_validation() -> None:
     repl = PythonREPLTool()
 
-    # Banned modules
-    for mod in ["os", "sys", "subprocess", "socket", "ctypes", "shutil"]:
-        res = await repl.execute(f"import {mod}")
-        assert res.success is False
-        assert "prohibited" in (res.error or "")
+    def expect_prohibited(res: object) -> None:
+        assert res.success is False  # type: ignore[attr-defined]
+        assert "prohibited" in (res.error or "")  # type: ignore[attr-defined]
 
-    # Banned builtins
-    for fn in ["eval('1')", "exec('x=1')", "open('x')", "__import__('os')"]:
-        res = await repl.execute(fn)
-        assert res.success is False
-        assert "prohibited" in (res.error or "")
+    # Banned modules and builtins — each probe is an inline literal.
+    expect_prohibited(await repl.execute("import os"))
+    expect_prohibited(await repl.execute("import sys"))
+    expect_prohibited(await repl.execute("import subprocess"))
+    expect_prohibited(await repl.execute("import socket"))
+    expect_prohibited(await repl.execute("import ctypes"))
+    expect_prohibited(await repl.execute("import shutil"))
+    expect_prohibited(await repl.execute("eval('1')"))
+    expect_prohibited(await repl.execute("exec('x=1')"))
+    expect_prohibited(await repl.execute("open('x')"))
+    expect_prohibited(await repl.execute("__import__('os')"))
 
     # Banned dunders
     res = await repl.execute("x = ().__class__.__base__")

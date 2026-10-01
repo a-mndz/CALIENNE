@@ -83,23 +83,33 @@ class GateResult:
         return "\n".join(lines)
 
 
+def _validated_run_path(raw: str) -> Path:
+    """Validate a CLI-supplied run path: must be an existing .jsonl file."""
+    path = Path(raw)
+    if path.suffix != ".jsonl" or not path.is_file():
+        raise SystemExit(f"error: {raw!r} is not an existing .jsonl file")
+    return path.resolve()
+
+
 def _load_outcomes(path: str | Path) -> dict[str, bool]:
     """Load a run file: one JSONL row per item, {"id": ..., "pass": bool}."""
+    resolved = Path(path).resolve()
+    if not resolved.is_relative_to(Path.cwd().resolve()):
+        raise ValueError(f"run file must live under the working directory: {path}")
     outcomes: dict[str, bool] = {}
-    with open(path, encoding="utf-8") as fh:
-        for line_no, line in enumerate(fh, 1):
-            line = line.strip()
-            if not line:
-                continue
-            row = json.loads(line)
-            if "id" not in row or "pass" not in row:
-                raise ValueError(f"{path}:{line_no}: row needs 'id' and 'pass'")
-            item_id = str(row["id"])
-            if item_id in outcomes:
-                raise ValueError(f"{path}:{line_no}: duplicate id {item_id!r}")
-            outcomes[item_id] = bool(row["pass"])
+    for line_no, line in enumerate(resolved.read_text(encoding="utf-8").splitlines(), 1):
+        line = line.strip()
+        if not line:
+            continue
+        row = json.loads(line)
+        if "id" not in row or "pass" not in row:
+            raise ValueError(f"{resolved}:{line_no}: row needs 'id' and 'pass'")
+        item_id = str(row["id"])
+        if item_id in outcomes:
+            raise ValueError(f"{resolved}:{line_no}: duplicate id {item_id!r}")
+        outcomes[item_id] = bool(row["pass"])
     if not outcomes:
-        raise ValueError(f"{path}: no outcome rows found")
+        raise ValueError(f"{resolved}: no outcome rows found")
     return outcomes
 
 
@@ -133,7 +143,9 @@ def main(argv: list[str] | None = None) -> int:
     if len(argv) != 2:
         print("usage: python -m evals.mcnemar <baseline_run.jsonl> <candidate_run.jsonl>")
         return 2
-    result = compare_runs(_load_outcomes(argv[0]), _load_outcomes(argv[1]))
+    baseline = _load_outcomes(_validated_run_path(argv[0]))
+    candidate = _load_outcomes(_validated_run_path(argv[1]))
+    result = compare_runs(baseline, candidate)
     print(result.summary())
     return 1 if result.is_regression else 0
 

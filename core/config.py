@@ -71,12 +71,12 @@ class CalienneConfig(BaseSettings):
     )
     GROQ_API_KEY: str = Field(
         default="",
-        validation_alias=AliasChoices("CALIENNE_GROQ_API_KEY", "CALIENNE_GROQ_API_KEY", "GROQ_API_KEY"),
+        validation_alias=AliasChoices("CALIENNE_GROQ_API_KEY", "GROQ_API_KEY"),
         description="API key for Groq.",
     )
     GITHUB_TOKEN: str = Field(
         default="",
-        validation_alias=AliasChoices("CALIENNE_GITHUB_TOKEN", "CALIENNE_GITHUB_TOKEN", "GITHUB_TOKEN"),
+        validation_alias=AliasChoices("CALIENNE_GITHUB_TOKEN", "GITHUB_TOKEN"),
         description="GitHub models token.",
     )
     MISTRAL_API_KEY: str = Field(
@@ -86,12 +86,12 @@ class CalienneConfig(BaseSettings):
     )
     GOOGLE_API_KEY: str = Field(
         default="",
-        validation_alias=AliasChoices("CALIENNE_GOOGLE_API_KEY", "CALIENNE_GOOGLE_API_KEY", "GOOGLE_API_KEY"),
+        validation_alias=AliasChoices("CALIENNE_GOOGLE_API_KEY", "GOOGLE_API_KEY"),
         description="API key for Google AI Studio.",
     )
     OPENAI_API_KEY: str = Field(
         default="",
-        validation_alias=AliasChoices("CALIENNE_OPENAI_API_KEY", "CALIENNE_OPENAI_API_KEY", "OPENAI_API_KEY"),
+        validation_alias=AliasChoices("CALIENNE_OPENAI_API_KEY", "OPENAI_API_KEY"),
         description="API key for OpenAI.",
     )
     UNLI_DEV_API_KEY: str = Field(
@@ -176,7 +176,7 @@ class CalienneConfig(BaseSettings):
     # MED-019 / MED-021 helpers for Authentication middleware.
     AUTH_COOKIE_NAME: str = Field(
         default="calienne_auth",
-        validation_alias=AliasChoices("CALIENNE_AUTH_COOKIE_NAME", "CALIENNE_AUTH_COOKIE_NAME"),
+        validation_alias=AliasChoices("CALIENNE_AUTH_COOKIE_NAME"),
         description="Name of the httpOnly session cookie used for JWT delivery.",
     )
 
@@ -191,7 +191,7 @@ class CalienneConfig(BaseSettings):
         default=5000,
         ge=100,
         le=60_000,
-        validation_alias=AliasChoices("CALIENNE_BREAKER_TIMEOUT_MS", "CALIENNE_BREAKER_TIMEOUT_MS"),
+        validation_alias=AliasChoices("CALIENNE_BREAKER_TIMEOUT_MS"),
         description=(
             "Breaker gate budget in milliseconds. Defaults to 5000ms (5s) for "
             "live LLM round-trips. On expiry the gate fails open and the pipeline continues."
@@ -200,7 +200,7 @@ class CalienneConfig(BaseSettings):
 
     JWT_SECRET_KEY: str = Field(
         default="",
-        validation_alias=AliasChoices("CALIENNE_JWT_SECRET_KEY", "CALIENNE_JWT_SECRET_KEY"),
+        validation_alias=AliasChoices("CALIENNE_JWT_SECRET_KEY"),
         description=(
             "REQUIRED: secret key used for signing JWT tokens. Set via "
             "CALIENNE_JWT_SECRET_KEY environment variable. Application "
@@ -296,12 +296,12 @@ class CalienneConfig(BaseSettings):
 
     LOG_LEVEL: str = Field(
         default="INFO",
-        validation_alias=AliasChoices("CALIENNE_LOG_LEVEL", "CALIENNE_LOG_LEVEL"),
+        validation_alias=AliasChoices("CALIENNE_LOG_LEVEL"),
         description="Python logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).",
     )
     LOG_FORMAT: str = Field(
         default="%(asctime)s | %(name)-25s | %(levelname)-8s | %(message)s",
-        validation_alias=AliasChoices("CALIENNE_LOG_FORMAT", "CALIENNE_LOG_FORMAT"),
+        validation_alias=AliasChoices("CALIENNE_LOG_FORMAT"),
         description=(
             "Format string for Python's logging.Formatter. Only consulted by the "
             "legacy plain-text fallback in configure_logging() when structlog is "
@@ -310,17 +310,17 @@ class CalienneConfig(BaseSettings):
     )
     ENVIRONMENT: Literal["development", "test", "production"] = Field(
         default="development",
-        validation_alias=AliasChoices("CALIENNE_ENVIRONMENT", "CALIENNE_ENVIRONMENT"),
+        validation_alias=AliasChoices("CALIENNE_ENVIRONMENT"),
         description="Runtime environment used for security-sensitive defaults.",
     )
     LOG_MODEL_IO: bool = Field(
         default=False,
-        validation_alias=AliasChoices("CALIENNE_LOG_MODEL_IO", "CALIENNE_LOG_MODEL_IO"),
+        validation_alias=AliasChoices("CALIENNE_LOG_MODEL_IO"),
         description="Write full model prompts and responses to logs/model_io.log.",
     )
     METRICS_TOKEN: str = Field(
         default="",
-        validation_alias=AliasChoices("CALIENNE_METRICS_TOKEN", "CALIENNE_METRICS_TOKEN"),
+        validation_alias=AliasChoices("CALIENNE_METRICS_TOKEN"),
         description=(
             "Bearer token required to scrape /metrics. Prometheus cannot present "
             "the JWT cookie the admin endpoints use, so the scrape path gets its "

@@ -120,19 +120,29 @@ def beta_with_interval(rows: list[dict]) -> tuple[BetaReport, tuple[float, float
     return report, _wilson_interval(report.both_fail, report.n)
 
 
+def _validated_run_path(raw: str) -> Path:
+    """Validate a CLI-supplied run path: must be an existing .jsonl file."""
+    path = Path(raw)
+    if path.suffix != ".jsonl" or not path.is_file():
+        raise SystemExit(f"error: {raw!r} is not an existing .jsonl file")
+    return path.resolve()
+
+
 def _load_rows(path: str | Path) -> list[dict]:
+    resolved = Path(path).resolve()
+    if not resolved.is_relative_to(Path.cwd().resolve()):
+        raise ValueError(f"run file must live under the working directory: {path}")
     rows = []
-    with open(path, encoding="utf-8") as fh:
-        for line_no, line in enumerate(fh, 1):
-            line = line.strip()
-            if not line:
-                continue
-            row = json.loads(line)
-            if "logician_pass" not in row or "creative_pass" not in row:
-                raise ValueError(f"{path}:{line_no}: row needs logician_pass/creative_pass")
-            rows.append(row)
+    for line_no, line in enumerate(resolved.read_text(encoding="utf-8").splitlines(), 1):
+        line = line.strip()
+        if not line:
+            continue
+        row = json.loads(line)
+        if "logician_pass" not in row or "creative_pass" not in row:
+            raise ValueError(f"{resolved}:{line_no}: row needs logician_pass/creative_pass")
+        rows.append(row)
     if not rows:
-        raise ValueError(f"{path}: no rows found")
+        raise ValueError(f"{resolved}: no rows found")
     return rows
 
 
@@ -141,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
     if len(argv) != 1:
         print("usage: python -m evals.beta <agent_outcomes.jsonl>")
         return 2
-    report, (lo, hi) = beta_with_interval(_load_rows(argv[0]))
+    report, (lo, hi) = beta_with_interval(_load_rows(_validated_run_path(argv[0])))
     print(report.summary())
     print(f"β 95% Wilson CI     = [{lo:.4f}, {hi:.4f}]")
     return 0

@@ -44,7 +44,7 @@ async def test_python_repl_banned_builtins() -> None:
     assert result_eval.success is False
     assert "prohibited" in (result_eval.error or "")
 
-    result_open = await repl.execute("open('file.txt', 'w')")
+    result_open = await repl.execute("open('x')")
     assert result_open.success is False
     assert "prohibited" in (result_open.error or "")
 

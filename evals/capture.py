@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -181,10 +182,12 @@ async def capture(
         await gateway.close()
 
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = RUNS_DIR / f"{label}.jsonl"
-    with open(out_path, "w", encoding="utf-8") as fh:
-        for row in rows:
-            fh.write(json.dumps(row, sort_keys=True) + "\n")
+    out_path = (RUNS_DIR / f"{label}.jsonl").resolve()
+    runs_root = RUNS_DIR.resolve()
+    if not out_path.is_relative_to(runs_root):
+        raise ValueError(f"run output path escaped runs directory: {out_path}")
+    payload = "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows)
+    out_path.write_text(payload, encoding="utf-8")
     return out_path
 
 
@@ -219,6 +222,15 @@ def main(argv: list[str] | None = None) -> int:
         help="permit a keyless (simulation-mode) run; rows are tagged label*=sim",
     )
     args = parser.parse_args(argv)
+
+    # The label becomes a filename under evals/runs/ — restrict it to a safe
+    # stem so it cannot escape the directory or smuggle separators.
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", args.label) or ".." in args.label:
+        print(
+            f"error: invalid --label {args.label!r}: use letters, digits, dot, dash, underscore",
+            file=sys.stderr,
+        )
+        return 2
 
     import os
 

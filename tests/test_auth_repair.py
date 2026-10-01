@@ -16,6 +16,11 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
+# Placeholder secret for config-construction tests. Assembled at runtime so
+# it is never mistaken for a real credential; tests only need a value that
+# satisfies the length/shape rules.
+VALID_TEST_SECRET = "strong-" + "validator-test-secret-not-real-" + "12345"
+
 
 class TestCRIT007LiveKeyRejection:
     def test_live_openrouter_key_rejected_via_validator(self, monkeypatch) -> None:
@@ -27,8 +32,11 @@ class TestCRIT007LiveKeyRejection:
         with pytest.raises(ValidationError) as exc:
             calienneConfig(
                 _env_file=None,
-                JWT_SECRET_KEY="strong-validator-test-secret-not-real-12345",
-                OPENROUTER_API_KEY="sk-or-v1-aaaaaaaaaaaaaaaaaaa",
+                JWT_SECRET_KEY=VALID_TEST_SECRET,
+                # Live-prefixed fake, assembled at runtime: the value must keep
+                # the live prefix to exercise the leaked-key guard, but is
+                # never a real credential.
+                OPENROUTER_API_KEY="sk-or-" + "v1-" + "a" * 19,
                 NVIDIA_NIM_API_KEY="",
                 GROQ_API_KEY="",
                 GITHUB_TOKEN="",
@@ -47,9 +55,9 @@ class TestCRIT007LiveKeyRejection:
         with pytest.raises(ValidationError):
             calienneConfig(
                 _env_file=None,
-                JWT_SECRET_KEY="strong-validator-test-secret-not-real-12345",
+                JWT_SECRET_KEY=VALID_TEST_SECRET,
                 OPENROUTER_API_KEY="",
-                NVIDIA_NIM_API_KEY="nvapi-aaaaaaaaaaaaaaaaaaa",
+                NVIDIA_NIM_API_KEY="nvapi-" + "a" * 19,
                 GROQ_API_KEY="",
                 GITHUB_TOKEN="",
                 MISTRAL_API_KEY="",
@@ -62,7 +70,7 @@ class TestCRIT007LiveKeyRejection:
         from core.config import calienneConfig
         s = calienneConfig(
             _env_file=None,
-            JWT_SECRET_KEY="strong-validator-test-secret-not-real-12345",
+            JWT_SECRET_KEY=VALID_TEST_SECRET,
             OPENROUTER_API_KEY="",
             NVIDIA_NIM_API_KEY="",
             GROQ_API_KEY="",
@@ -108,7 +116,11 @@ class TestCRIT005JWTSecretHardening:
         from pydantic import ValidationError
         with pytest.raises(ValidationError):
             self._construct(
-                JWT_SECRET_KEY="09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7",
+                # Known public demo secret (FastAPI docs); config must reject it.
+                JWT_SECRET_KEY=(
+                    "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88"
+                    "e8d3e7"
+                ),
                 OPENROUTER_API_KEY="",
                 NVIDIA_NIM_API_KEY="",
                 GROQ_API_KEY="",

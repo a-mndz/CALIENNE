@@ -840,7 +840,6 @@ def _get_vault_status() -> list[dict[str, Any]]:
     for p in providers_meta:
         val = (
             os.environ.get(f"CALIENNE_{p['account']}", "")
-            or os.environ.get(f"CALIENNE_{p['account']}", "")
             or os.environ.get(p["account"], "")
         )
         has_key = bool(val and len(val.strip()) > 4)

@@ -55,16 +55,14 @@ def _read_keyring(service: str, account: str) -> str | None:
 
 
 def _populate_env(secrets: Mapping[str, str]) -> int:
-    """Export each secret to ``CALIENNE_<NAME>`` and ``CALIENNE_<NAME>`` unless
-    already set."""
+    """Export each secret to ``CALIENNE_<NAME>`` unless already set."""
     set_count = 0
     for account, secret in secrets.items():
         if not secret:
             continue
-        for prefix in ("CALIENNE_", "CALIENNE_"):
-            env_name = f"{prefix}{account}"
-            if env_name not in os.environ or not os.environ[env_name]:
-                os.environ[env_name] = secret
+        env_name = f"CALIENNE_{account}"
+        if env_name not in os.environ or not os.environ[env_name]:
+            os.environ[env_name] = secret
         set_count += 1
     return set_count
 

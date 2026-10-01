@@ -39,6 +39,13 @@ def validate_xml(content: str) -> Tuple[bool, Optional[str]]:
     if not content or not content.strip():
         return False, "Empty XML content"
 
+    # Prompt XML is data, never a DTD carrier: reject entity/DOCTYPE
+    # declarations up front so the parser cannot be pushed into entity
+    # expansion (billion-laughs) or external-entity resolution.
+    header = content[:4096].upper()
+    if "<!DOCTYPE" in header or "<!ENTITY" in header:
+        return False, "DTD/entity declarations are not allowed in prompt XML"
+
     try:
         ET.fromstring(content)
         return True, None
